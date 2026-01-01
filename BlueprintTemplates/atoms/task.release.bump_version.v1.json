@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.release.bump_version.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Release: Bump Version",
+  "description": "Bump version according to ecosystem conventions (no hardcoded tooling).",
+  "tags": ["release", "version"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "release_bump_version",
+    "inputs": ["projectRoot", "ecosystem", "releaseVersion"],
+    "targets": [
+      { "ecosystem": "node", "file": "package.json", "field": "version" },
+      { "ecosystem": "python", "file": "pyproject.toml", "field": "project.version" },
+      { "ecosystem": "dotnet", "fileHint": "*.csproj", "field": "Version" },
+      { "ecosystem": "java", "file": "pom.xml", "field": "version" },
+      { "ecosystem": "rust", "file": "Cargo.toml", "field": "package.version" }
+    ]
+  }
+}

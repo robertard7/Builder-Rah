@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.security.baseline.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Security Baseline (Abstract)",
+  "description": "Apply a lightweight security baseline: secrets hygiene hints, dependency audit hooks, and safe defaults. No tool IDs.",
+  "tags": ["security", "baseline"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "security_baseline",
+    "inputs": ["projectRoot"],
+    "checks": [
+      { "type": "ensure_gitignore", "notes": "Avoid committing secrets/build output." },
+      { "type": "scan_patterns", "patterns": ["BEGIN PRIVATE KEY", "AKIA", "xoxb-", "password="], "notes": "Heuristic only." },
+      { "type": "dependency_audit_hook", "notes": "Delegate to configured environment for ecosystem." }
+    ],
+    "outputs": ["findings"]
+  }
+}

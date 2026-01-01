@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.run.node.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 4 },
+  "title": "Run (node)",
+  "description": "Runs a Node project using its configured entrypoint (package scripts). No commands here.",
+  "tags": ["run", "node"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "run_project", "inputs": ["projectRoot", "profile?"], "outputs": ["runResult"] }
+}

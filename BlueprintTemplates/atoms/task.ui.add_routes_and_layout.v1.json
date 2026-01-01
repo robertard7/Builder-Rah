@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.ui.add_routes_and_layout.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "UI: Add routes + layout shell",
+  "description": "Adds a simple navigation layout and a small set of routes/pages. Abstract.",
+  "tags": ["ui", "routes", "layout"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "ui_add_routes_layout",
+    "inputs": ["projectRoot", "options?"],
+    "outputs": ["routesAdded"]
+  }
+}

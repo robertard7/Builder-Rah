@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.sec.input_validation_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 9 },
+  "title": "Security: Input validation contract",
+  "description": "Defines validation rules for inputs: parsing, bounds, allowlists, encoding, and error behavior.",
+  "tags": ["security", "validation", "contract"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "sec_define_input_validation_contract",
+    "inputs": ["projectRoot", "interfaces", "riskProfile"],
+    "outputs": ["validationContract"],
+    "rules": [
+      "prefer allowlists over blocklists",
+      "validate length, type, format, and ranges",
+      "normalize encoding and reject ambiguous inputs",
+      "errors must not leak secrets or internals"
+    ]
+  }
+}

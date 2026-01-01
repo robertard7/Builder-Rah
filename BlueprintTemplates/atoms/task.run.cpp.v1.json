@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.run.cpp.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Run C++ (CMake)",
+  "description": "Run a built C++ target from a CMake build output.",
+  "tags": ["cpp", "cmake", "run"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "run", "ecosystem": "cpp", "inputs": ["projectRoot", "buildFolderName", "runTarget"] }
+}

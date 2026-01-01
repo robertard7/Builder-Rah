@@ -1,0 +1,25 @@
+﻿{
+  "id": "task.repo.add_gitignore_by_ecosystem.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Repo: Add .gitignore by ecosystem",
+  "description": "Adds/merges safe .gitignore defaults based on ecosystem. Avoids destructive replace.",
+  "tags": ["repo", "gitignore"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_gitignore_by_ecosystem",
+    "inputs": ["projectRoot", "ecosystem"],
+    "mergePolicy": "append_if_missing_lines",
+    "routes": {
+      "generic": ["recipe.security.gitignore.sane_defaults.v1"],
+      "dotnet": ["recipe.repo.gitignore.dotnet.v1"],
+      "node": ["recipe.repo.gitignore.node.v1"],
+      "python": ["recipe.repo.gitignore.python.v1"],
+      "go": ["recipe.repo.gitignore.go.v1"],
+      "rust": ["recipe.repo.gitignore.rust.v1"],
+      "java": ["recipe.repo.gitignore.java.v1"],
+      "cpp": ["recipe.repo.gitignore.cpp.v1"]
+    }
+  }
+}

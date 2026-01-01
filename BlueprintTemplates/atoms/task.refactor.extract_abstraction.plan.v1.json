@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.refactor.extract_abstraction.plan.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Refactor Plan: Extract abstraction plan",
+  "description": "Plans extracting an interface/trait/module with minimal behavior change and tests or golden checks.",
+  "tags": ["refactor", "abstraction", "plan"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "plan_extract_abstraction",
+    "inputs": ["projectRoot", "targetArea", "goal", "changeBudget"],
+    "outputs": ["refactorPlan"],
+    "rules": [
+      "no functional changes unless explicitly needed",
+      "prefer adding tests or characterization checks first",
+      "keep plan incremental"
+    ]
+  }
+}

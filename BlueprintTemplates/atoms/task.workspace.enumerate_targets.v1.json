@@ -1,0 +1,39 @@
+﻿{
+  "id": "task.workspace.enumerate_targets.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Workspace: Enumerate targets",
+  "description": "Enumerates runnable/buildable/testable targets inside a workspace (projects, packages, modules) based on workspaceKind.",
+  "tags": ["workspace", "enumerate", "targets"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "enumerate_workspace_targets",
+    "inputs": ["workspaceReport", "goalVerb?"],
+    "outputs": ["targetsReport"],
+    "targetsShape": {
+      "fields": [
+        "targets[]",
+        "defaultTarget?",
+        "groupingHint?",
+        "notes[]",
+        "ambiguities[]"
+      ]
+    },
+    "targetShape": {
+      "fields": [
+        "id",
+        "displayName",
+        "relativePath",
+        "kind",
+        "supportedVerbs[]",
+        "evidence[]"
+      ]
+    },
+    "rules": [
+      "supportedVerbs must be inferred from evidence (eg, csproj with OutputType Exe supports run)",
+      "if multiple viable targets exist, do not auto-pick unless deterministic and safe",
+      "groupingHint can be used by UI (apps/libs/tests/services)"
+    ]
+  }
+}

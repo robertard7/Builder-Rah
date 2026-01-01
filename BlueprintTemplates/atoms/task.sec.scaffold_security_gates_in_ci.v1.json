@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.sec.scaffold_security_gates_in_ci.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Security: Scaffold CI security gates (neutral)",
+  "description": "Adds neutral CI gates: dependency review step placeholder, secret leak detection placeholder, and baseline checks.",
+  "tags": ["security", "ci", "gates"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "sec_scaffold_ci_security_gates",
+    "inputs": ["projectRoot", "ciSystem?", "dependencyPolicy", "secretsPolicy"],
+    "outputs": ["changedFiles", "gatesAdded"],
+    "rules": [
+      "do not hardcode a CI vendor; keep as docs/config placeholders",
+      "ensure gates fail clearly when violations are detected",
+      "avoid adding toolchain assumptions"
+    ]
+  }
+}

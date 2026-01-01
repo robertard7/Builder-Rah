@@ -1,0 +1,24 @@
+﻿{
+  "id": "task.project.start.prompt_select.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Start Project: Prompt select ecosystem/profile",
+  "description": "Collects user intent (ecosystem/profile/name/folder) with safe defaults. If missing, WAIT_USER.",
+  "tags": ["start_project", "wizard", "prompt"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "prompt_select_project_profile",
+    "inputs": ["userIntent?", "defaults?"],
+    "outputs": ["selection"],
+    "selectionSchema": {
+      "ecosystem": "dotnet|node|python|go|rust|java|cpp",
+      "profile": "cli|web|api|library|gui",
+      "projectName": "string",
+      "folderName": "string",
+      "projectRoot": "string",
+      "options": "object"
+    },
+    "waitUserIfMissing": true
+  }
+}

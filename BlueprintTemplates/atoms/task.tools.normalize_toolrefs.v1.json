@@ -1,0 +1,28 @@
+﻿{
+  "id": "task.tools.normalize_toolrefs.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 9 },
+  "title": "Tools: Normalize toolRefs metadata",
+  "description": "Collects explicit toolRefs[] metadata from plan context (packs/recipes/graphs/atoms) and outputs a stable deduped list with source traces. Prefer explicit toolRefs over inferred hints.",
+  "tags": ["tools", "toolrefs", "normalize", "prompts", "preflight"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "normalize_toolrefs",
+    "inputs": ["planContext"],
+    "outputs": ["toolRefReport"],
+    "rules": [
+      "toolRefs may appear at content.toolRefs, content.toolRefIds, or top-level toolRefs (treat all as aliases)",
+      "dedupe toolIds preserving stable ordering by first occurrence",
+      "include source traces (sourceId, sourceKind) for every toolId",
+      "if no explicit toolRefs exist anywhere, emit empty toolIds list and add a note: 'no explicit toolRefs found'"
+    ],
+    "toolRefReportShape": {
+      "fields": [
+        "toolIds[]",
+        "toolRefs[]",
+        "notes[]"
+      ]
+    }
+  }
+}

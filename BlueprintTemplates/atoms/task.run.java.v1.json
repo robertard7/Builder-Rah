@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.run.java.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Run Java (Maven)",
+  "description": "Run a Java app using configured Maven exec/run settings.",
+  "tags": ["java", "maven", "run"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "run", "ecosystem": "java", "inputs": ["projectRoot", "runTarget"] }
+}

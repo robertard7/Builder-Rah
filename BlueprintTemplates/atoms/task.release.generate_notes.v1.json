@@ -1,0 +1,14 @@
+﻿{
+  "id": "task.release.generate_notes.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Release: Generate Release Notes",
+  "description": "Generate RELEASE_NOTES.md from changelog entries and brief summary.",
+  "tags": ["release", "notes"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "release_generate_notes",
+    "inputs": ["projectRoot", "releaseVersion", "summary", "highlights", "breakingChanges", "upgradeNotes"]
+  }
+}

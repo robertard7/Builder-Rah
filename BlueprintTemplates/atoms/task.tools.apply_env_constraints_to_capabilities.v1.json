@@ -1,0 +1,26 @@
+﻿{
+  "id": "task.tools.apply_env_constraints_to_capabilities.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Tools: apply environment constraints to capability refs",
+  "description": "Filters/rewrites capabilityRefs based on runtime constraints. If required capabilities are not possible, produces WAIT_USER questions.",
+  "tags": ["tools", "capabilities", "env", "gate", "internal"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "apply_capability_constraints",
+    "inputs": ["capabilityRefs", "runtimeProfile", "constraints", "goalIntent?"],
+    "outputs": ["capabilityRefsConstrained", "blockedCapabilities", "waitUser", "questions"],
+    "rules": [
+      "never invent tool ids",
+      "do not hardcode provider/model/toolchain ids",
+      "prefer capability refs; keep explicit tool refs unchanged but validate coverage later",
+      "if blockedCapabilities is non-empty and blocks core verbs, set waitUser=true and emit questions"
+    ],
+    "questionRules": [
+      "ask only what is needed to choose an execution environment or adjust the goal",
+      "prefer yes/no or pick-one questions",
+      "never ask for provider/model/toolchain ids"
+    ]
+  }
+}

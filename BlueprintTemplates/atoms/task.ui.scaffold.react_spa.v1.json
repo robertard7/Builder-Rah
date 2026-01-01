@@ -1,0 +1,16 @@
+﻿{
+  "id": "task.ui.scaffold.react_spa.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "UI: Scaffold React SPA (generic)",
+  "description": "Creates a React SPA baseline with routing, layout shell, and env-config hooks. Abstract; orchestrator chooses actual scaffolding strategy.",
+  "tags": ["ui", "frontend", "react", "spa"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "ui_scaffold_spa",
+    "inputs": ["projectRoot", "appName", "options?"],
+    "outputs": ["uiArtifacts"],
+    "defaults": { "routing": true, "linting": true, "testSmoke": true }
+  }
+}

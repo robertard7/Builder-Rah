@@ -1,0 +1,15 @@
+{
+  "id": "task.test.dotnet.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 12 },
+  "title": "Test .NET",
+  "description": "Run tests for a .NET project/solution.",
+  "tags": ["dotnet", "test"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "test",
+    "ecosystem": "dotnet",
+    "inputs": ["projectRoot", "solutionPath"]
+  }
+}

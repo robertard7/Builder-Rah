@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.release.ensure_license.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Release: Ensure License File",
+  "description": "Ensure LICENSE exists (user chooses SPDX id/name; never assumes).",
+  "tags": ["release", "license"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "ensure_license",
+    "inputs": ["projectRoot", "licenseName", "licenseText"],
+    "notes": "User must supply licenseName and licenseText (no auto-legal)."
+  }
+}

@@ -1,0 +1,18 @@
+﻿{
+  "id": "task.project.start.scaffold_docs_and_hygiene.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Start Project: Scaffold docs + repo hygiene",
+  "description": "Applies baseline docs and hygiene packs (public templates).",
+  "tags": ["start_project", "docs", "hygiene"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "apply_packs",
+    "inputs": ["selection"],
+    "packs": [
+      "pack.docs.baseline.v1",
+      "pack.repo.hygiene.baseline.v1"
+    ]
+  }
+}

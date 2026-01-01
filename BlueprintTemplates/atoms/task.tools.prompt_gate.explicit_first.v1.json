@@ -1,0 +1,28 @@
+﻿{
+  "id": "task.tools.prompt_gate.explicit_first.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 10 },
+  "title": "Tools: Prompt gate (explicit toolRefs first)",
+  "description": "Runs tool prompt gate preferring explicit toolRefs metadata. If none declared, falls back to existing reference collector. Blocks with WAIT_USER if missing prompts.",
+  "tags": ["tools", "prompts", "gate", "preflight", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tool_prompt_gate_explicit_first",
+    "inputs": ["planContext", "promptRegistrySnapshot"],
+    "outputs": ["gateResult", "waitUser?", "questions?"],
+    "pipeline": [
+      { "use": "task.tools.normalize_toolrefs.v1" },
+      { "decision": "if toolRefReport.toolIds length == 0 then collect inferred tool refs else continue" },
+      { "useIf": { "condition": "toolRefReport.toolIds length == 0", "use": "task.tools.collect_references_from_plan.v1" } },
+      { "use": "task.tools.validate_prompt_registry.v1" },
+      { "decision": "if promptValidationReport.missingToolIds length > 0 then WAIT_USER else continue" }
+    ],
+    "onWaitUser": { "use": "task.tools.wait_user.missing_prompts.v1" },
+    "rules": [
+      "never invent tool ids",
+      "no silent fallback if missing prompts",
+      "do not generate prompt contents here"
+    ]
+  }
+}

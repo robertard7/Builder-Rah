@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.tools.inject_capabilityrefs_into_plancontext.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 9 },
+  "title": "Tools: Inject capabilityRefs into planContext",
+  "description": "Adds capabilityRefs to planContext.content.capabilityRefs if missing. Does not overwrite existing entries.",
+  "tags": ["tools", "capabilities", "inject", "plancontext"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "inject_capabilityrefs",
+    "inputs": ["planContext", "selectedCapabilityRefs"],
+    "outputs": ["updatedPlanContext", "notes"],
+    "rules": [
+      "if planContext.content.capabilityRefs missing, create it",
+      "append selectedCapabilityRefs that are not already present (match by capability string)",
+      "do not change explicit toolRefs",
+      "preserve stable ordering: existing first, then injected"
+    ]
+  }
+}

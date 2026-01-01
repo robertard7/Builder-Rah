@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.test.java.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Test Java (Maven)",
+  "description": "Run Java tests using Maven configuration.",
+  "tags": ["java", "maven", "test"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "test", "ecosystem": "java", "inputs": ["projectRoot"] }
+}

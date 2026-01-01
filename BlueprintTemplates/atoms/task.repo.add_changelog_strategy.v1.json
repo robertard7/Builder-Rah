@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.repo.add_changelog_strategy.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Repo: Add changelog strategy",
+  "description": "Adds changelog conventions and a basic CHANGELOG.md stub if missing.",
+  "tags": ["repo", "changelog", "release"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_changelog_strategy",
+    "inputs": ["projectRoot"],
+    "route": "recipe.repo.release.changelog_conventions.v1"
+  }
+}

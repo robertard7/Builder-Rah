@@ -1,0 +1,22 @@
+﻿{
+  "id": "task.productionize.service_bundle.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Productionize: Service Bundle",
+  "description": "Adds observability + health checks + resilience + release hygiene docs. Leaves toolchain and infra decisions to Settings.",
+  "tags": ["productionize", "service", "observability", "health", "resilience"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "productionize_service_bundle",
+    "inputs": ["projectRoot", "strategy"],
+    "defaults": { "strategy": "retry_backoff" },
+    "uses": [
+      "task.feature.add_observability.v1",
+      "task.feature.add_health_checks.v1",
+      "task.feature.add_resilience.v1",
+      "task.release.update_changelog.v1",
+      "task.release.ensure_license.v1"
+    ]
+  }
+}

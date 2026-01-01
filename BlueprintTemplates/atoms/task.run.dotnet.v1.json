@@ -1,0 +1,15 @@
+{
+  "id": "task.run.dotnet.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 12 },
+  "title": "Run .NET",
+  "description": "Run a .NET project using configured run settings.",
+  "tags": ["dotnet", "run"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "run",
+    "ecosystem": "dotnet",
+    "inputs": ["projectRoot", "runTarget"]
+  }
+}

@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.refactor.safe_rename_move.plan.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Refactor Plan: Safe rename/move plan",
+  "description": "Plans a safe rename/move refactor with references update and a verification checklist (build/test).",
+  "tags": ["refactor", "rename", "move", "plan"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "plan_safe_rename_move",
+    "inputs": ["projectRoot", "renameMap", "detectionReport?"],
+    "outputs": ["refactorPlan"],
+    "rules": [
+      "plan must include reference updates across code/config/docs",
+      "require verification steps after rename/move",
+      "avoid large moves unless user explicitly requests"
+    ]
+  }
+}

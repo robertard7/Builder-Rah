@@ -1,0 +1,19 @@
+﻿{
+  "id": "task.project.start.optional_containerize.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 4 },
+  "title": "Start Project: Optional container/devcontainer",
+  "description": "If user requests containerization, applies environment packs. Otherwise no-op.",
+  "tags": ["start_project", "env", "container"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "conditional_apply_packs",
+    "inputs": ["selection"],
+    "when": { "anyOf": ["selection.options.containerize == true", "selection.options.devcontainer == true"] },
+    "packs": [
+      "pack.env.containerize.project.v1",
+      "pack.env.devcontainer.only.v1"
+    ]
+  }
+}

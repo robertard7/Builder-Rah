@@ -1,0 +1,32 @@
+﻿{
+  "id": "task.tools.wait_user.select_execution_environment.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Tools: WAIT_USER select execution environment",
+  "description": "When capability constraints block progress, asks the user to choose/confirm a runtime environment (host/container/wsl/remote) and scope.",
+  "tags": ["tools", "env", "wait_user", "internal"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "emit_wait_user_questions",
+    "inputs": ["blockedCapabilities", "runtimeProfile", "projectRootHint?"],
+    "outputs": ["questions", "waitUser"],
+    "waitUser": true,
+    "questions": [
+      {
+        "id": "env.choice",
+        "type": "pick_one",
+        "title": "Where should this run?",
+        "options": ["host", "container", "wsl", "remote"],
+        "notes": "Pick the environment that has the needed tools/capabilities."
+      },
+      {
+        "id": "env.scope",
+        "type": "pick_one",
+        "title": "Scope of execution",
+        "options": ["repo_only", "repo_and_submodules", "workspace_multi_project"],
+        "notes": "Choose the scope so tooling discovery and build targets are accurate."
+      }
+    ]
+  }
+}

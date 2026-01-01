@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.tests.define_golden_files.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Tests: Define golden file strategy",
+  "description": "Defines golden file testing for stable outputs: snapshots, approval workflow, normalization rules, and update policy.",
+  "tags": ["tests", "golden", "snapshot"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tests_define_golden_file_strategy",
+    "inputs": ["projectRoot", "outputsToStabilize?"],
+    "outputs": ["goldenStrategy"],
+    "rules": [
+      "normalize line endings, timestamps, and nondeterministic values",
+      "golden updates must be intentional and reviewable",
+      "store goldens under a clear folder with stable naming"
+    ]
+  }
+}

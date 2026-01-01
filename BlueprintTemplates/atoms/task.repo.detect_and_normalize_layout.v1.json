@@ -1,0 +1,19 @@
+﻿{
+  "id": "task.repo.detect_and_normalize_layout.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Repo: Detect & Normalize Layout",
+  "description": "Detects basic project layout and adds missing conventional folders/docs as needed.",
+  "tags": ["repo", "layout", "normalize"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "detect_and_normalize_layout",
+    "inputs": ["projectRoot"],
+    "effects": [
+      "ensure docs folder exists",
+      "ensure .github templates folder exists when appropriate",
+      "ensure basic README exists if missing"
+    ]
+  }
+}

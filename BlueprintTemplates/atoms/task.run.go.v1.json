@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.run.go.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Run Go",
+  "description": "Run a Go CLI/app with configured run target.",
+  "tags": ["go", "run"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "run", "ecosystem": "go", "inputs": ["projectRoot", "runTarget"] }
+}

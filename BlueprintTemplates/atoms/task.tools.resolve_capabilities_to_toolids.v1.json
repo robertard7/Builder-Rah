@@ -1,0 +1,30 @@
+﻿{
+  "id": "task.tools.resolve_capabilities_to_toolids.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 12 },
+  "title": "Tools: Resolve capabilities to toolIds",
+  "description": "Maps capabilityRefs[] to concrete toolIds using the active tool manifest at runtime. Produces toolRefs[] suitable for prompt gating. Does not execute tools.",
+  "tags": ["tools", "capabilities", "resolve", "preflight", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "resolve_capabilities_to_toolids",
+    "inputs": ["capabilityRefs", "toolManifestSnapshot", "runtimeEnv"],
+    "outputs": ["resolvedToolRefs", "missingCapabilities", "notes", "waitUser?"],
+    "matchInputs": {
+      "runtimeEnvFields": ["os", "hostKind", "envScope", "workspaceRoot?"],
+      "capabilityRefShape": { "fields": ["capability", "required", "reason?", "constraints?"] }
+    },
+    "selectionRules": [
+      "only select toolIds that exist in toolManifestSnapshot",
+      "prefer tools whose metadata matches runtimeEnv.os and runtimeEnv.hostKind when available",
+      "if required capability has zero matches, add to missingCapabilities and set waitUser true",
+      "dedupe resolved toolIds preserving stable order by first resolution"
+    ],
+    "outputShape": {
+      "resolvedToolRefs": [
+        { "toolId": "string", "capability": "string", "required": true, "reason": "string" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,41 @@
+﻿{
+  "id": "task.workspace.detect_root_and_type.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Workspace: Detect root and type",
+  "description": "Detects whether repo is a single-project repo or a workspace/monorepo (solutions, pnpm/yarn workspaces, cargo, go work, maven multi-module, etc.).",
+  "tags": ["workspace", "detect", "monorepo", "solution"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "detect_workspace_root_and_type",
+    "inputs": ["projectRoot"],
+    "outputs": ["workspaceReport"],
+    "reportShape": {
+      "fields": [
+        "workspaceKind",
+        "workspaceRoot",
+        "primaryMarkers[]",
+        "candidateTargets[]",
+        "notes[]",
+        "ambiguities[]"
+      ]
+    },
+    "rules": [
+      "evidence-based detection via marker files only",
+      "workspaceRoot must be a deterministic folder path",
+      "do not guess the primary target if multiple exist"
+    ],
+    "workspaceKinds": [
+      "single",
+      "dotnet_solution",
+      "node_workspace",
+      "python_multi",
+      "go_work",
+      "cargo_workspace",
+      "maven_multi_module",
+      "cmake_superbuild",
+      "unknown_multi"
+    ]
+  }
+}

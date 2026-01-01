@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.sec.output_encoding_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Security: Output encoding + error model contract",
+  "description": "Defines safe output encoding rules and a consistent error model that avoids leaking sensitive details.",
+  "tags": ["security", "encoding", "errors"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "sec_define_output_encoding_contract",
+    "inputs": ["projectRoot", "interfaces", "riskProfile"],
+    "outputs": ["outputContract", "errorModel"],
+    "rules": [
+      "encode outputs appropriate to context (html/json/cli)",
+      "ensure errors are stable, safe, and non-sensitive",
+      "provide correlation id for support without leaking internals"
+    ]
+  }
+}

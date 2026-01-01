@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.test.python.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Test Python",
+  "description": "Run Python tests using configured runner/settings.",
+  "tags": ["python", "test"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "test", "ecosystem": "python", "inputs": ["projectRoot"] }
+}

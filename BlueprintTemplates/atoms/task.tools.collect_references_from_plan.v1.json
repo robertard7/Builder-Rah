@@ -1,0 +1,36 @@
+﻿{
+  "id": "task.tools.collect_references_from_plan.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 9 },
+  "title": "Tools: Collect referenced tool IDs from a plan",
+  "description": "Extracts tool IDs referenced by a plan (packs/recipes/atoms/graphs) from declared toolRefs or inferred usage metadata. Produces a deduplicated list with source traces.",
+  "tags": ["tools", "prompts", "validate", "collect"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "collect_tool_references",
+    "inputs": ["planContext"],
+    "outputs": ["toolRefReport"],
+    "toolRefReportShape": {
+      "fields": [
+        "toolIds[]",
+        "toolRefs[]",
+        "notes[]"
+      ]
+    },
+    "toolRefShape": {
+      "fields": [
+        "toolId",
+        "sourceId",
+        "sourceKind",
+        "pathHint?",
+        "reason?"
+      ]
+    },
+    "rules": [
+      "dedupe toolIds preserving stable ordering by first occurrence",
+      "include source traces for every toolId",
+      "do not invent toolIds not present in planContext"
+    ]
+  }
+}

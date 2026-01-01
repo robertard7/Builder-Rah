@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.tools.select_capability_preset.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 10 },
+  "title": "Tools: Select capability preset (by ecosystem)",
+  "description": "Chooses a capability preset based on detected ecosystem. Outputs selectedPresetName + capabilityRefs to merge into planContext.",
+  "tags": ["tools", "capabilities", "preset", "select"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "select_capability_preset",
+    "inputs": ["detectedEcosystem", "goalIntent?", "presetCatalog"],
+    "outputs": ["selectedPresetName", "selectedCapabilityRefs", "notes"],
+    "rules": [
+      "if detectedEcosystem matches a preset.when.ecosystem, choose that preset",
+      "else choose generic.base",
+      "do not remove any existing explicit planContext toolRefs",
+      "stable output order as declared in preset"
+    ]
+  }
+}

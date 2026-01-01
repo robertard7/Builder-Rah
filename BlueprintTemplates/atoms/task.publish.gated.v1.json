@@ -1,0 +1,23 @@
+﻿{
+  "id": "task.publish.gated.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Package/Publish (Gated)",
+  "description": "Gate publish behind: clean lint/build/test + optional security baseline + WAIT_USER approval.",
+  "tags": ["publish", "gate", "release"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "publish_gated",
+    "inputs": ["projectRoot", "releaseVersion"],
+    "prechecks": [
+      "task.detect.project_shape.v1",
+      "task.format_lint.${ecosystem}.v1",
+      "task.build.${ecosystem}.v1",
+      "task.test.${ecosystem}.v1",
+      "task.security.baseline.v1"
+    ],
+    "waitUser": true,
+    "publish": "task.package_publish.${ecosystem}.v1"
+  }
+}

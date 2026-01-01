@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.project.start.baseline_validate.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Start Project: Baseline validate (build/test/run/format)",
+  "description": "Runs the core validate flow abstractly using existing task atoms (build/test/run/format).",
+  "tags": ["start_project", "validate"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "baseline_validate",
+    "inputs": ["selection"],
+    "uses": [
+      "task.build.${selection.ecosystem}.v1",
+      "task.test.${selection.ecosystem}.v1",
+      "task.run.${selection.ecosystem}.v1",
+      "task.format_lint.${selection.ecosystem}.v1"
+    ],
+    "note": "Tasks may be missing for some ecosystems; orchestrator should skip missing tasks safely."
+  }
+}
