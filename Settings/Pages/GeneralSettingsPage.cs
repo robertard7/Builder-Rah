@@ -115,6 +115,8 @@ public sealed class GeneralSettingsPage : UserControl
         {
             var scope = RepoScope.Resolve(_config);
             var message = scope.Message;
+            if (!string.IsNullOrWhiteSpace(scope.GitTopLevel))
+                message += $" (GitTopLevel={scope.GitTopLevel})";
             if (_trace != null)
                 _trace.Emit(message);
             else

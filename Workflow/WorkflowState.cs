@@ -16,6 +16,7 @@ public sealed class WorkflowState
     public string PendingUserRequest { get; set; } = "";
     public List<string> ClarificationAnswers { get; set; } = new();
     public List<string> PendingQuestions { get; set; } = new();
+    public bool AutoApproveAll { get; set; }
 
     public void ClearPlan()
     {
@@ -25,6 +26,7 @@ public sealed class WorkflowState
         ToolOutputs = new List<JsonElement>();
         LastJobSpecJson = null;
         OriginalUserText = null;
+        AutoApproveAll = false;
     }
 
     public void ClearClarifications()
