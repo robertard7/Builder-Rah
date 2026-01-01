@@ -1,4 +1,6 @@
 #nullable enable
+using System;
+
 namespace RahBuilder.Settings;
 
 public sealed class AppConfig
@@ -30,9 +32,25 @@ public sealed class GeneralSettings
     public bool GraphDriven { get; set; } = true;
     public bool ContainerOnly { get; set; } = true;
     public bool EnableGlobalClipboardShortcuts { get; set; } = true;
+    public string ExecutionTarget { get; set; } = OperatingSystem.IsWindows() ? "WindowsHost" : "LinuxContainer";
 
     // SAVE POINT: global digest prompt lives here (JSON-only, no tools)
-    public string JobSpecDigestPrompt { get; set; } = "";
+    public string JobSpecDigestPrompt { get; set; } =
+        @"You are the JobSpec Digest. Reply with exactly one JSON object that matches this shape:
+{
+  ""request"": ""<briefly restate the user's ask>"",
+  ""state"": {
+    ""ready"": true,
+    ""missing"": []
+  }
+}
+Rules:
+- Output must be valid JSON (no prose, markdown, code fences, or commentary).
+- The top-level object MUST contain state.ready (boolean) and state.missing (array of strings).
+- Do not invent fields. Only include keys explicitly provided by the user plus the required state object.
+- If any required information is missing or ambiguous, set state.ready=false and list the missing field names in state.missing.
+- If everything is present, set state.ready=true and state.missing=[].
+- Any non-JSON output is a prompt failure.";
 }
 
 public sealed class ProvidersSettings
