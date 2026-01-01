@@ -1,0 +1,27 @@
+﻿{
+  "id": "task.diagnose.apply_fix_and_validate.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Diagnose: Apply fix and validate",
+  "description": "Applies fixPlan using generic patch primitives, then validates by rerunning stage-appropriate tasks (abstract).",
+  "tags": ["diagnose", "apply", "validate"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "apply_fix_and_validate",
+    "inputs": ["projectRoot", "fixPlan", "stage", "ecosystem?"],
+    "uses": [
+      "task.apply_patch.generic.v1",
+      "task.add_file.generic.v1",
+      "task.replace_file.generic.v1"
+    ],
+    "validationRoutes": {
+      "restore": ["task.build.${ecosystem}.v1"],
+      "compile": ["task.build.${ecosystem}.v1"],
+      "test": ["task.test.${ecosystem}.v1"],
+      "run": ["task.run.${ecosystem}.v1"],
+      "publish": ["task.package_publish.${ecosystem}.v1"],
+      "format": ["task.format_lint.${ecosystem}.v1"]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.diagnose.test_fail.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Diagnose Test Failure",
+  "description": "Classify and propose fixes for failing tests.",
+  "tags": ["diagnose", "test"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "diagnose", "subtype": "test_fail", "inputs": ["logText"] }
+}

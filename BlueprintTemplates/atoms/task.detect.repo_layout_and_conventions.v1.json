@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.detect.repo_layout_and_conventions.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Detect: Repo layout + conventions",
+  "description": "Infers layout patterns: monorepo, src/tests, apps/packages, solutions, modules; suggests normalization steps.",
+  "tags": ["detect", "layout", "conventions"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "detect_repo_layout_and_conventions",
+    "inputs": ["projectRoot", "detectionReport?"],
+    "outputs": ["layoutReport"],
+    "rules": [
+      "detect src/ and tests/ layout when present",
+      "detect workspace roots (monorepo) and app subfolders",
+      "avoid destructive moves; propose safe normalization plans only"
+    ]
+  }
+}

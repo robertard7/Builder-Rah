@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.diagnose.run_fail.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Diagnose Run Failure",
+  "description": "Classify and propose fixes for runtime failures (startup/crash/config).",
+  "tags": ["diagnose", "run", "runtime"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "diagnose", "subtype": "run_fail", "inputs": ["logText"] }
+}

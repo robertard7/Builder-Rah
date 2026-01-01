@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.docs.scaffold.contributing.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Docs: Scaffold CONTRIBUTING",
+  "description": "Adds contributing guidelines that reference Settings for build/test/lint, with no hardcoded commands.",
+  "tags": ["docs", "contributing"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "docs_scaffold_contributing", "inputs": ["projectRoot"], "route": "recipe.docs.contributing.base.v1" }
+}

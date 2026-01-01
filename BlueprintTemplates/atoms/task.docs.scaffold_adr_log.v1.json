@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.docs.scaffold_adr_log.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Docs: Scaffold ADR log",
+  "description": "Creates docs/adr/ and an ADR index plus a template.",
+  "tags": ["docs", "adr"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "docs_scaffold_adr", "inputs": ["projectRoot"], "route": "recipe.docs.adr.base.v1" }
+}

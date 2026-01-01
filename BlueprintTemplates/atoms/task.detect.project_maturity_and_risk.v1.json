@@ -1,0 +1,26 @@
+﻿{
+  "id": "task.detect.project_maturity_and_risk.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Detect: Maturity + risk profile",
+  "description": "Scores project maturity (prototype/standard/production) and recommends which packs/routes to apply.",
+  "tags": ["detect", "maturity", "risk"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "detect_project_maturity_and_risk",
+    "inputs": ["projectRoot", "detectionReport", "layoutReport?"],
+    "outputs": ["maturityReport"],
+    "signals": [
+      "tests presence and coverage hints",
+      "ci files presence",
+      "docs presence (README/SECURITY/CONTRIBUTING)",
+      "release artifacts or publish config presence",
+      "observability hints (logging/metrics placeholders)"
+    ],
+    "rules": [
+      "never assume cloud vendor",
+      "use conservative defaults; if uncertain, request minimal clarification"
+    ]
+  }
+}

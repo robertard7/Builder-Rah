@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.diagnose.compile_fail.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Diagnose Compile Failure",
+  "description": "Classify and propose fixes for compilation failures.",
+  "tags": ["diagnose", "compile"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "diagnose", "subtype": "compile_fail", "inputs": ["logText"] }
+}

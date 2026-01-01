@@ -1,0 +1,30 @@
+﻿{
+  "id": "task.detect.ecosystem_and_entrypoints.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Detect: Ecosystem(s) + entrypoints",
+  "description": "Scans repo for ecosystem signals (dotnet/node/python/go/rust/java/cpp), project layout, and build/test/run entrypoints without assuming tools.",
+  "tags": ["detect", "ecosystem", "entrypoints", "layout"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "detect_ecosystem_and_entrypoints",
+    "inputs": ["projectRoot", "hintEcosystem?", "hintProfile?"],
+    "outputs": ["detectionReport"],
+    "signals": {
+      "dotnet": ["*.sln", "*.csproj", "global.json", "Directory.Build.props"],
+      "node": ["package.json", "pnpm-lock.yaml", "yarn.lock", "package-lock.json"],
+      "python": ["pyproject.toml", "requirements.txt", "setup.py", "Pipfile"],
+      "go": ["go.mod", "go.work"],
+      "rust": ["Cargo.toml"],
+      "java": ["pom.xml"],
+      "cpp": ["CMakeLists.txt"]
+    },
+    "rules": [
+      "support multi-ecosystem repos (monorepo) and return a set",
+      "identify likely root(s) for builds and tests",
+      "record candidate run targets (cli main, web start, service entry) abstractly",
+      "do not hardcode paths beyond relative discovery under projectRoot"
+    ]
+  }
+}

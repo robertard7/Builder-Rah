@@ -1,0 +1,27 @@
+﻿{
+  "id": "task.detect.project_maturity.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 4 },
+  "title": "Detect Project Maturity",
+  "description": "Detect maturity by looking for indicators: tests, CI files, packaging metadata, docs.",
+  "tags": ["detect", "maturity"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "detect_project_maturity",
+    "inputs": ["projectRoot"],
+    "signals": [
+      { "ifAnyGlob": "tests/**,test/**", "score": 2 },
+      { "ifAnyGlob": ".github/workflows/**,.gitlab-ci.yml,azure-pipelines.yml", "score": 2 },
+      { "ifAnyGlob": "CHANGELOG.md,docs/**", "score": 1 },
+      { "ifAnyGlob": "LICENSE,NOTICE", "score": 1 },
+      { "ifAnyGlob": "pyproject.toml,package.json,pom.xml,Cargo.toml,*.csproj,CMakeLists.txt", "score": 1 }
+    ],
+    "outputs": ["maturityLevel"],
+    "levels": [
+      { "name": "new", "maxScore": 1 },
+      { "name": "active", "maxScore": 4 },
+      { "name": "release", "maxScore": 999 }
+    ]
+  }
+}
