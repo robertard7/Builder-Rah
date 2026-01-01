@@ -26,6 +26,13 @@ public sealed class JobSpec
         return new JobSpec(doc, false, new List<string> { reason });
     }
 
+    public static JobSpec FromJson(JsonDocument raw, bool ready, List<string> missing)
+    {
+        if (raw == null) throw new ArgumentNullException(nameof(raw));
+        missing ??= new List<string>();
+        return new JobSpec(raw, ready, missing);
+    }
+
     public List<string> GetMissingFields() => new List<string>(Missing);
 
     private static string Escape(string s) => (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");

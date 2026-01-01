@@ -122,23 +122,18 @@ public sealed class WorkflowFacade
             return;
         }
 
+        if (!OperatingSystem.IsWindows() || string.Equals(_cfg.General.ExecutionTarget, "LinuxContainer", StringComparison.OrdinalIgnoreCase))
+        {
+            if (IsWindowsDesktopProject())
+            {
+                _trace.Emit("[env:error] WinForms build requires WindowsDesktop SDK. Switch ExecutionTarget to WindowsHost.");
+                EmitWaitUser("WinForms build requires WindowsDesktop SDK. Switch ExecutionTarget to WindowsHost.");
+                return;
+            }
+        }
+
         // Run digest.
         var spec = await RunJobSpecDigestAsync(text, ct).ConfigureAwait(true);
-
-        // If digest failed JSON, we do TWO things:
-        // 1) force edit next (prevents infinite loop)
-        // 2) create a local fallback JobSpec so WAIT_USER can be useful
-        if (spec == null)
-        {
-            _trace.Emit("[digest:error] Digest returned null JobSpec (unexpected).");
-            _forceEditBecauseInvalidJson = true;
-
-            var fallback = JobSpecFallbackFromUserText(text);
-            _trace.Emit("[digest:fallback] local minimal JobSpec created (null spec).");
-            EmitWaitUser("Model output was not valid JSON. Reply with: edit <rewrite your request>");
-
-            return;
-        }
 
         if (!spec.IsComplete)
         {
@@ -148,9 +143,6 @@ public sealed class WorkflowFacade
             if (missing.Count == 1 && string.Equals(missing[0], "invalid_json", StringComparison.OrdinalIgnoreCase))
             {
                 _forceEditBecauseInvalidJson = true;
-
-                var fallback = JobSpecFallbackFromUserText(text);
-                _trace.Emit("[digest:fallback] local minimal JobSpec created (invalid_json).");
 
                 EmitWaitUser("Model output was not valid JSON. Reply with: edit <rewrite your request>");
                 return;
@@ -172,7 +164,7 @@ public sealed class WorkflowFacade
         _trace.Emit("[route:graph_ok] Mermaid workflow graph validated. (Planner dispatch not wired yet.)");
     }
 
-    private async Task<JobSpec?> RunJobSpecDigestAsync(string userText, CancellationToken ct)
+    private async Task<JobSpec> RunJobSpecDigestAsync(string userText, CancellationToken ct)
     {
         var prompt = (_cfg.General.JobSpecDigestPrompt ?? "").Trim();
         if (prompt.Length == 0)
@@ -252,29 +244,5 @@ public sealed class WorkflowFacade
         return s.Length <= max ? s : s.Substring(0, max) + "...";
     }
 
-    // Local minimal fallback so WAIT_USER isn't useless.
-    // This does NOT hardcode app logic. It just preserves user intent and flags missing fields.
-    private static JobSpec JobSpecFallbackFromUserText(string userText)
-    {
-        // This assumes your JobSpec has these members as described earlier:
-        // intent, jobType, targets, project, features, constraints, acceptance, state.
-        // If your actual JobSpec shape differs, this will fail to compile and you'll adjust it once.
-        var spec = new JobSpec
-        {
-            intent = userText ?? "",
-            jobType = "unknown",
-            targets = Array.Empty<string>(),
-            project = new(),
-            features = Array.Empty<string>(),
-            constraints = Array.Empty<string>(),
-            acceptance = Array.Empty<string>(),
-            state = new()
-            {
-                ready = false,
-                missing = new[] { "jobType", "targets", "project" }
-            }
-        };
-
-        return spec;
-    }
+    private static bool IsWindowsDesktopProject() => true; // RahBuilder.csproj uses Microsoft.NET.Sdk.WindowsDesktop
 }
