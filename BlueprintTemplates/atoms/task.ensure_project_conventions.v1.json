@@ -1,0 +1,19 @@
+﻿{
+  "id": "task.ensure_project_conventions.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Ensure Project Conventions",
+  "description": "Ensure conventional folders and documentation exist (src/, tests/, README) without overwriting existing files.",
+  "tags": ["conventions", "structure", "safe"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "ensure_conventions",
+    "inputs": ["projectRoot", "projectName"],
+    "creates": [
+      { "dir": "${projectRoot}/src" },
+      { "dir": "${projectRoot}/tests" },
+      { "file": "${projectRoot}/README.md", "onConflict": "skip" }
+    ]
+  }
+}

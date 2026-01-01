@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.obs.add_correlation_id_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Observability: Correlation ID contract",
+  "description": "Defines how correlation IDs are generated, propagated across boundaries, and included in logs/traces/metrics.",
+  "tags": ["observability", "correlation", "trace", "logging"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "obs_define_correlation_id_contract",
+    "inputs": ["projectRoot", "boundaries", "protocols?"],
+    "outputs": ["correlationContract"],
+    "rules": [
+      "must propagate inbound to outbound calls",
+      "must be included in error responses where safe",
+      "must be stable per request unit of work"
+    ]
+  }
+}

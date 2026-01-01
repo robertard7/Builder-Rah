@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.format_lint.java.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Format/Lint Java",
+  "description": "Format and lint Java using configured tooling.",
+  "tags": ["java", "format", "lint"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "format_lint", "ecosystem": "java", "inputs": ["projectRoot"] }
+}

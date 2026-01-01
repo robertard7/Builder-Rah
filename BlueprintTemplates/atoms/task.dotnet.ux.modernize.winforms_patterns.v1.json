@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.dotnet.ux.modernize.winforms_patterns.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "UX: Modernize WinForms patterns",
+  "description": "Applies UX modernization patterns to WinForms apps: layout consistency, async UI rules, centralized theme/styles, navigation patterns. Abstract.",
+  "tags": ["dotnet", "winforms", "ux", "modernize"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "dotnet_winforms_modernize_patterns",
+    "inputs": ["projectRoot", "options?"],
+    "outputs": ["changesSummary"],
+    "rules": [
+      "no toolkit hardcoding",
+      "prefer consistent layout grid/panels",
+      "avoid blocking UI thread",
+      "add centralized theme settings file"
+    ]
+  }
+}

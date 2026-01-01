@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.feature.add_http_client_pattern.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Feature: Add HTTP client pattern (generic)",
+  "description": "Adds an outbound HTTP client abstraction with timeouts, retries (optional), and test seams. Abstract.",
+  "tags": ["feature", "http", "client", "resilience"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "feature_add_http_client_pattern",
+    "inputs": ["projectRoot", "ecosystem", "options?"],
+    "outputs": ["httpClientArtifacts"],
+    "guidance": {
+      "timeouts": "required",
+      "retries": "optional",
+      "circuitBreaker": "optional"
+    }
+  }
+}

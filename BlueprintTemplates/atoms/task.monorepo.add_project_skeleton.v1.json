@@ -1,0 +1,26 @@
+﻿{
+  "id": "task.monorepo.add_project_skeleton.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Monorepo: Add project skeleton",
+  "description": "Adds a new app/lib skeleton under apps/ or libs/ with minimal wiring. Uses existing create_project atoms by ecosystem.",
+  "tags": ["monorepo", "workspace", "project"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "monorepo_add_project_skeleton",
+    "inputs": ["projectRoot", "ecosystem", "profile", "name", "kind"],
+    "delegates": {
+      "dotnet.cli": "task.create_project.dotnet.cli.v1",
+      "dotnet.library": "task.create_project.dotnet.library.v1",
+      "node.cli": "task.create_project.node.cli.v1",
+      "node.web": "task.create_project.node.web.v1",
+      "python.cli": "task.create_project.python.cli.v1",
+      "python.api": "task.create_project.python.api.v1",
+      "go.cli": "task.create_project.go.cli.v1",
+      "rust.cli": "task.create_project.rust.cli.v1",
+      "java.cli": "task.create_project.java.cli.v1",
+      "cpp.cmake": "task.create_project.cpp.cmake.v1"
+    }
+  }
+}

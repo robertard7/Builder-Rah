@@ -1,0 +1,23 @@
+﻿{
+  "id": "task.patch.apply_with_receipts.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Patch Apply: Apply patch with receipts",
+  "description": "Applies the surgical patch plan using existing file/patch atoms and produces receipts (what changed, why, evidence).",
+  "tags": ["patch", "apply", "receipts"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "apply_patch_with_receipts",
+    "inputs": ["projectRoot", "patchPlan", "changeBudget"],
+    "outputs": ["patchReceipts"],
+    "receipts": {
+      "include": ["filesChanged", "lineCounts", "rationale", "linksToEvidence", "riskFlags"]
+    },
+    "rules": [
+      "do not exceed approved budget",
+      "if any apply fails, stop and route to diagnose",
+      "ensure receipts are deterministic and human-readable"
+    ]
+  }
+}

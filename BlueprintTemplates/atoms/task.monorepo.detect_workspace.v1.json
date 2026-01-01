@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.monorepo.detect_workspace.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Monorepo: Detect workspace",
+  "description": "Detects multi-project repo patterns and suggests a workspace strategy. No commands; analysis-only.",
+  "tags": ["monorepo", "workspace", "detect"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "detect_workspace",
+    "inputs": ["projectRoot"],
+    "signals": [
+      "multiple solution files",
+      "multiple package manifests",
+      "multiple module descriptors",
+      "src/apps/libs folders"
+    ],
+    "outputs": ["workspaceType", "projectList", "recommendedLayout"]
+  }
+}

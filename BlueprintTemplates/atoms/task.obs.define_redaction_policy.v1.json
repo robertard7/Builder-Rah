@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.obs.define_redaction_policy.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Observability: Define redaction + PII policy",
+  "description": "Defines what is sensitive (secrets/PII), what must be redacted, and safe logging/tracing guidelines.",
+  "tags": ["observability", "security", "privacy", "redaction"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "obs_define_redaction_policy",
+    "inputs": ["projectRoot", "dataCategories?", "regulatoryContext?"],
+    "outputs": ["redactionPolicy"],
+    "rules": [
+      "never log secrets, tokens, keys, passwords, auth headers",
+      "define safe allowlist fields",
+      "mask/omit PII by default unless explicitly needed and justified",
+      "document retention expectations conceptually"
+    ]
+  }
+}

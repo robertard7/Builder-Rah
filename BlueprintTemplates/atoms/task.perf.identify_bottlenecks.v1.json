@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.perf.identify_bottlenecks.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Perf: Identify bottlenecks from evidence",
+  "description": "Analyzes baseline evidence to identify bottlenecks: CPU hot paths, allocations, IO waits, lock contention, N+1 patterns.",
+  "tags": ["perf", "triage", "bottlenecks"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "perf_identify_bottlenecks",
+    "inputs": ["baselineReport", "logs?", "traces?"],
+    "outputs": ["bottleneckList", "hypotheses"],
+    "rules": [
+      "rank by impact vs effort",
+      "avoid premature optimization",
+      "always propose measurement-first next step"
+    ]
+  }
+}

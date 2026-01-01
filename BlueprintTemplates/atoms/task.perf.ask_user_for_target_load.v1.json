@@ -1,0 +1,23 @@
+﻿{
+  "id": "task.perf.ask_user_for_target_load.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Perf: Ask user for target load (WAIT_USER)",
+  "description": "When perf targets are unclear, asks minimal questions needed to define SLOs and load profile.",
+  "tags": ["perf", "wait_user", "slo", "load"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "emit_wait_user_questions",
+    "inputs": ["serviceType?", "knownConstraints?"],
+    "outputs": ["questions", "waitUser"],
+    "waitUser": true,
+    "questionRules": [
+      "ask expected concurrent users or rps range",
+      "ask latency targets (p95/p99) per key journey",
+      "ask payload sizes and data store involvement",
+      "ask whether single-machine or distributed deployment",
+      "never ask for provider/toolchain/model ids"
+    ]
+  }
+}

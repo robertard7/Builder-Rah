@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.package_publish.dotnet.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 12 },
+  "title": "Package/Publish .NET",
+  "description": "Package and publish .NET artifacts using configured feeds/credentials.",
+  "tags": ["dotnet", "package", "publish"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "package_publish",
+    "ecosystem": "dotnet",
+    "inputs": ["projectRoot", "solutionPath", "releaseVersion"]
+  }
+}

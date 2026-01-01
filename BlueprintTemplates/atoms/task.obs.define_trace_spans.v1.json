@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.obs.define_trace_spans.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Observability: Define trace spans and attributes",
+  "description": "Defines trace spans, boundaries, and attributes to capture latency and failures without over-collecting.",
+  "tags": ["observability", "tracing", "spans"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "obs_define_trace_spans",
+    "inputs": ["projectRoot", "criticalFlows", "riskProfile?"],
+    "outputs": ["tracePlan"],
+    "defaults": { "riskProfile": "standard" },
+    "rules": [
+      "trace only key boundaries and critical flows",
+      "attributes must avoid PII/secrets",
+      "include correlationId link to logs"
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.format_lint.dotnet.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 12 },
+  "title": "Format/Lint .NET",
+  "description": "Format and lint .NET projects using configured tooling/settings.",
+  "tags": ["dotnet", "format", "lint"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "format_lint",
+    "ecosystem": "dotnet",
+    "inputs": ["projectRoot", "solutionPath"]
+  }
+}

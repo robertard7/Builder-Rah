@@ -1,0 +1,35 @@
+﻿{
+  "id": "task.feature.add_cache.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Add Feature: Cache",
+  "description": "Add caching (in-memory + external hook placeholder).",
+  "tags": ["feature", "cache"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_feature_cache",
+    "inputs": ["projectRoot", "cacheMode"],
+    "cacheModes": ["memory", "external_hook"],
+    "routes": {
+      "memory": {
+        "dotnet": ["recipe.dotnet.cache.memory.v1"],
+        "node": ["recipe.node.cache.memory.v1"],
+        "python": ["recipe.python.cache.memory.v1"],
+        "go": ["recipe.go.cache.memory.v1"],
+        "rust": ["recipe.rust.cache.memory.v1"],
+        "java": ["recipe.java.cache.memory.v1"],
+        "cpp": ["recipe.cpp.cache.memory.v1"]
+      },
+      "external_hook": {
+        "dotnet": ["recipe.dotnet.cache.external_hook.v1"],
+        "node": ["recipe.node.cache.external_hook.v1"],
+        "python": ["recipe.python.cache.external_hook.v1"],
+        "go": ["recipe.go.cache.external_hook.v1"],
+        "rust": ["recipe.rust.cache.external_hook.v1"],
+        "java": ["recipe.java.cache.external_hook.v1"],
+        "cpp": ["recipe.cpp.cache.external_hook.v1"]
+      }
+    }
+  }
+}

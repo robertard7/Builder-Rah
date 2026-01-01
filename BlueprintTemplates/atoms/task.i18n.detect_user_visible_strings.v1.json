@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.i18n.detect_user_visible_strings.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "i18n: Detect user-visible strings",
+  "description": "Identifies user-visible strings and surfaces a plan to extract them into a message catalog, without choosing a library.",
+  "tags": ["i18n", "strings", "localization"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "i18n_detect_strings",
+    "inputs": ["projectRoot", "ecosystem", "uiType?"],
+    "outputs": ["stringInventory", "hotspots"],
+    "rules": [
+      "include UI labels, errors, logs shown to users, validation messages",
+      "exclude internal-only debug logs unless they are user-facing",
+      "must be reproducible and reviewable"
+    ]
+  }
+}

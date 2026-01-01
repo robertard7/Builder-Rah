@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.obs.scaffold_incident_playbook.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Observability: Scaffold incident playbook",
+  "description": "Creates an incident playbook: triage checklist, dashboards/queries placeholders, escalation rules, and postmortem template.",
+  "tags": ["observability", "incident", "runbook", "postmortem"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "obs_scaffold_incident_playbook",
+    "inputs": ["projectRoot", "appType?", "ownership?"],
+    "outputs": ["docsAdded"],
+    "rules": [
+      "include steps: detect, assess impact, mitigate, recover, verify, communicate",
+      "include where logs/traces/metrics should be checked (as placeholders, not vendor-specific)",
+      "include postmortem learning checklist"
+    ]
+  }
+}

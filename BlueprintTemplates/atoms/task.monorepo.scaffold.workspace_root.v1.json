@@ -1,0 +1,24 @@
+﻿{
+  "id": "task.monorepo.scaffold.workspace_root.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Monorepo: Scaffold workspace root",
+  "description": "Creates a conventional monorepo layout and root docs. No commands, no toolchain assumptions.",
+  "tags": ["monorepo", "workspace", "layout"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "scaffold_workspace_root",
+    "inputs": ["projectRoot", "workspaceType"],
+    "routes": {
+      "generic": ["recipe.monorepo.workspace.generic.v1"],
+      "dotnet": ["recipe.monorepo.workspace.dotnet.v1"],
+      "node": ["recipe.monorepo.workspace.node.v1"],
+      "python": ["recipe.monorepo.workspace.python.v1"],
+      "go": ["recipe.monorepo.workspace.go.v1"],
+      "rust": ["recipe.monorepo.workspace.rust.v1"],
+      "java": ["recipe.monorepo.workspace.java.v1"],
+      "cpp": ["recipe.monorepo.workspace.cpp.v1"]
+    }
+  }
+}

@@ -1,0 +1,26 @@
+﻿{
+  "id": "task.feature.add_observability.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Add Feature: Observability",
+  "description": "Adds structured logging + correlation id scaffolding and observability docs. No toolchain assumptions.",
+  "tags": ["feature", "observability", "logging", "tracing"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_feature_observability",
+    "inputs": ["projectRoot", "mode"],
+    "modes": ["basic"],
+    "routes": {
+      "basic": {
+        "dotnet": ["recipe.dotnet.observability.basic.v1"],
+        "node": ["recipe.node.observability.basic.v1"],
+        "python": ["recipe.python.observability.basic.v1"],
+        "go": ["recipe.go.observability.basic.v1"],
+        "rust": ["recipe.rust.observability.basic.v1"],
+        "java": ["recipe.java.observability.basic.v1"],
+        "cpp": ["recipe.cpp.observability.basic.v1"]
+      }
+    }
+  }
+}

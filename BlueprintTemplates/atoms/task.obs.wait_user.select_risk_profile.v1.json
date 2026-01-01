@@ -1,0 +1,22 @@
+﻿{
+  "id": "task.obs.wait_user.select_risk_profile.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Observability: Ask user for risk profile (WAIT_USER)",
+  "description": "When requirements are unclear, asks for minimal risk profile and critical flows list to avoid over-instrumenting.",
+  "tags": ["observability", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "emit_wait_user_questions",
+    "inputs": ["projectRoot", "appType?"],
+    "outputs": ["questions", "waitUser"],
+    "waitUser": true,
+    "questionRules": [
+      "ask for risk profile: low/standard/high",
+      "ask for 1-3 critical user flows",
+      "ask about sensitive data categories (PII/secrets)",
+      "do not ask for provider/toolchain/model ids"
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.patch.preflight.scan_targets.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Patch Preflight: Scan targets and classify change risk",
+  "description": "Validates patch targets exist, classifies file types (code/config/docs), detects generated files and lockfiles, and flags high-risk targets.",
+  "tags": ["patch", "preflight", "safety", "risk"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "patch_preflight_scan_targets",
+    "inputs": ["projectRoot", "patchPlan", "allowGenerated?"],
+    "outputs": ["preflightReport"],
+    "rules": [
+      "never patch binaries or vendor folders unless explicitly allowed",
+      "treat lockfiles as sensitive; only change if patchPlan explicitly includes them",
+      "prefer minimal surface area: smallest file set that achieves goal"
+    ]
+  }
+}

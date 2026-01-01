@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.format_lint.rust.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Format/Lint Rust",
+  "description": "Format and lint Rust using configured tooling.",
+  "tags": ["rust", "format", "lint"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "format_lint", "ecosystem": "rust", "inputs": ["projectRoot"] }
+}

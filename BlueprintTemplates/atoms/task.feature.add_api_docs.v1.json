@@ -1,0 +1,23 @@
+﻿{
+  "id": "task.feature.add_api_docs.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Add Feature: API Docs",
+  "description": "Add API documentation scaffolding (OpenAPI stub + README routes).",
+  "tags": ["feature", "docs", "openapi"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_feature_api_docs",
+    "inputs": ["projectRoot"],
+    "routes": {
+      "dotnet": ["recipe.dotnet.docs.api.v1"],
+      "node": ["recipe.node.docs.api.v1"],
+      "python": ["recipe.python.docs.api.v1"],
+      "go": ["recipe.go.docs.api.v1"],
+      "rust": ["recipe.rust.docs.api.v1"],
+      "java": ["recipe.java.docs.api.v1"],
+      "cpp": ["recipe.cpp.docs.api.v1"]
+    }
+  }
+}

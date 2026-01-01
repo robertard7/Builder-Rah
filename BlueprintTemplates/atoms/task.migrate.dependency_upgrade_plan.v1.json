@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.migrate.dependency_upgrade_plan.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Migrate: Dependency upgrade plan (safe)",
+  "description": "Plans a dependency upgrade with risk classification, incremental steps, and rollback notes. Abstract.",
+  "tags": ["migrate", "dependencies", "upgrade"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "migrate_dependency_upgrade_plan",
+    "inputs": ["projectRoot", "ecosystem", "targetPackages?", "constraints?"],
+    "outputs": ["upgradePlan", "riskNotes"],
+    "rules": [
+      "prefer smallest diffs",
+      "upgrade one dependency group at a time",
+      "keep builds reproducible"
+    ]
+  }
+}

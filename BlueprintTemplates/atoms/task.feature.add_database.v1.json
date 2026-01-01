@@ -1,0 +1,44 @@
+﻿{
+  "id": "task.feature.add_database.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Add Feature: Database",
+  "description": "Add a database integration by selecting recipes based on ecosystem and db kind.",
+  "tags": ["feature", "database", "db"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_feature_database",
+    "inputs": ["projectRoot", "dbKind"],
+    "dbKinds": ["sqlite", "postgres", "generic"],
+    "routes": {
+      "sqlite": {
+        "dotnet": ["recipe.dotnet.db.sqlite.v1"],
+        "node": ["recipe.node.db.sqlite.v1"],
+        "python": ["recipe.python.db.sqlite.v1"],
+        "go": ["recipe.go.db.sqlite.v1"],
+        "rust": ["recipe.rust.db.sqlite.v1"],
+        "java": ["recipe.java.db.sqlite.v1"],
+        "cpp": ["recipe.cpp.db.sqlite.v1"]
+      },
+      "postgres": {
+        "dotnet": ["recipe.dotnet.db.postgres.v1"],
+        "node": ["recipe.node.db.postgres.v1"],
+        "python": ["recipe.python.db.postgres.v1"],
+        "go": ["recipe.go.db.postgres.v1"],
+        "rust": ["recipe.rust.db.postgres.v1"],
+        "java": ["recipe.java.db.postgres.v1"],
+        "cpp": ["recipe.cpp.db.postgres.v1"]
+      },
+      "generic": {
+        "dotnet": ["recipe.dotnet.db.generic.v1"],
+        "node": ["recipe.node.db.generic.v1"],
+        "python": ["recipe.python.db.generic.v1"],
+        "go": ["recipe.go.db.generic.v1"],
+        "rust": ["recipe.rust.db.generic.v1"],
+        "java": ["recipe.java.db.generic.v1"],
+        "cpp": ["recipe.cpp.db.generic.v1"]
+      }
+    }
+  }
+}

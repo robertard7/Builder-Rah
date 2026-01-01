@@ -1,0 +1,27 @@
+﻿{
+  "id": "task.patch.define_change_budget.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Patch Safety: Define change budget",
+  "description": "Defines a hard budget on number of files/lines changed and prohibits broad rewrites unless user explicitly requests.",
+  "tags": ["patch", "budget", "safety"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "define_change_budget",
+    "inputs": ["goalVerb", "maturityReport?", "patchPlan?"],
+    "outputs": ["changeBudget"],
+    "defaults": {
+      "maxFilesChanged": 6,
+      "maxTotalLinesChanged": 250,
+      "maxSingleFileLinesChanged": 180,
+      "allowRenameMove": false,
+      "allowLockfileChange": false
+    },
+    "rules": [
+      "if goal is simple (build fix), keep budget tight",
+      "if goal is refactor, still incremental: prefer staged refactors",
+      "if budget would be exceeded, trigger WAIT_USER with options"
+    ]
+  }
+}

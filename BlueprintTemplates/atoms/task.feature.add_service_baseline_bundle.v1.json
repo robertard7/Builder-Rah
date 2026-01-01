@@ -1,0 +1,22 @@
+﻿{
+  "id": "task.feature.add_service_baseline_bundle.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Feature: Add service baseline bundle",
+  "description": "Composes config + logging + DI + HTTP client + health into a baseline production-minded skeleton.",
+  "tags": ["feature", "service", "baseline"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "feature_add_service_baseline",
+    "inputs": ["projectRoot", "ecosystem", "profile?", "options?"],
+    "uses": [
+      "task.feature.add_config_system.v1",
+      "task.feature.add_structured_logging.v1",
+      "task.feature.add_di_container.v1",
+      "task.feature.add_http_client_pattern.v1",
+      "task.feature.add_health_endpoint_or_check.v1"
+    ],
+    "outputs": ["serviceBaselineArtifacts"]
+  }
+}

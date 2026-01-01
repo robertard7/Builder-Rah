@@ -1,0 +1,22 @@
+﻿{
+  "id": "task.i18n.define_message_catalog_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "i18n: Define message catalog contract",
+  "description": "Defines a neutral message catalog contract: keys, placeholders, plural rules, namespaces, fallback behavior.",
+  "tags": ["i18n", "catalog", "contract"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "i18n_define_catalog_contract",
+    "inputs": ["projectRoot", "languages?"],
+    "outputs": ["catalogContract"],
+    "defaults": { "languages": ["en"] },
+    "rules": [
+      "keys must be stable and deterministic",
+      "placeholders must be named, not positional",
+      "fallback language must be defined",
+      "pluralization and gender rules must be explicit where needed"
+    ]
+  }
+}

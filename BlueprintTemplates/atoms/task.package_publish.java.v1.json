@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.package_publish.java.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Package/Publish Java (Maven)",
+  "description": "Package and publish Java artifacts using configured repository credentials.",
+  "tags": ["java", "maven", "package", "publish"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "package_publish", "ecosystem": "java", "inputs": ["projectRoot", "releaseVersion"] }
+}

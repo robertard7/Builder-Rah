@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.obs.scaffold_tracing_integration.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Observability: Scaffold tracing integration",
+  "description": "Adds tracing hooks for defined spans and attributes, without selecting an instrumentation vendor by name.",
+  "tags": ["observability", "tracing", "scaffold"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "obs_scaffold_tracing_integration",
+    "inputs": ["projectRoot", "tracePlan", "correlationContract", "redactionPolicy"],
+    "outputs": ["changedFiles", "instrumentedFlows"],
+    "rules": [
+      "instrument boundaries, not every function",
+      "avoid PII in attributes",
+      "ensure correlation linkages exist"
+    ]
+  }
+}

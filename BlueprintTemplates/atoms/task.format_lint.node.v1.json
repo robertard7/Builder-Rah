@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.format_lint.node.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Format/Lint Node",
+  "description": "Format and lint a Node project using configured tooling.",
+  "tags": ["node", "format", "lint"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "format_lint", "ecosystem": "node", "inputs": ["projectRoot"] }
+}
