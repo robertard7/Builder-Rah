@@ -1,0 +1,131 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\run.cmd.txt
+TOOL ID:
+run.cmd
+
+CATEGORY:
+misc
+
+PURPOSE:
+Run an arbitrary bash command string inside the rah-linux container with strict error handling.
+This tool echoes the command and then executes it using `bash -euo pipefail -c`.
+
+WHEN TO USE:
+- You need a one-off command that is not covered by a specific toolId.
+- You need to chain multiple shell operations in one step (cd + command, pipes, etc.).
+- You need to inspect or manipulate files under /work in a controlled way.
+- You need to run build commands not represented by existing build tools.
+- You need to run diagnostics commands with exact flags.
+
+WHEN NOT TO USE:
+- A dedicated tool exists for the task (prefer the specific tool to avoid ambiguity).
+- You are not certain of the exact command; do not guess.
+- The command could delete data or modify critical paths without explicit user instruction.
+- The command requires interactive input; this tool is non-interactive.
+- The command includes secrets (tokens/passwords) that would be echoed and logged.
+- You want to run commands on the Windows host; this runs in container only.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is used as a single raw command string.
+  - The tool checks `[ -z "{args}" ]` and errors if empty.
+  - Then prints: `[run.cmd] {args}`
+  - Then runs: `bash -euo pipefail -c "{args}"`
+  - No positional parsing by the tool itself; bash does all parsing.
+- Positional arguments:
+  - None at tool level; everything is inside the bash command string.
+- Optional arguments:
+  - None at tool level.
+- Defaults:
+  - Strict bash flags:
+    - -e: exit on any command failure.
+    - -u: treat unset variables as errors.
+    - -o pipefail: pipeline fails if any segment fails.
+- Error conditions:
+  - If {args} empty: prints "missing command" and exits 2.
+  - If bash returns non-zero: tool returns non-zero.
+  - If command references missing files/commands: failure.
+  - If command uses unset variables: failure due to -u.
+  - If command has syntax errors: failure.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not automatically cd; command runs in whatever current directory the runner uses.
+  - If you need a specific directory, include `cd /work && ...` inside the command.
+- File system assumptions:
+  - /work is workspace.
+  - /rah/tools contains tool scripts (read-only for this tool unless command modifies).
+  - Normal Linux utilities availability depends on installed packages.
+
+OUTPUT:
+- stdout behavior:
+  - First prints `[run.cmd] <command>`.
+  - Then prints stdout from the command.
+  - On missing args: prints "missing command".
+- stderr behavior:
+  - Command stderr prints normally.
+  - Bash strict-mode errors appear on stderr.
+- exit codes and meanings:
+  - 0: command succeeded fully.
+  - 2: missing command argument (explicit tool check).
+  - Other non-zero: bash/command failure code (propagated).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Depends entirely on the command; can be none or destructive.
+- Network access:
+  - Depends on the command (curl, git, apt, etc.).
+- Installed packages:
+  - Possible if command runs apt-get, etc.
+- State changes:
+  - Arbitrary; depends on command.
+  - This is the highest-risk tool in the manifest.
+
+SAFETY RULES:
+- MUST verify before calling:
+  - Exact command string is correct.
+  - The command’s effects are understood (especially rm, mv, chmod, sed, redirects).
+  - Paths used are correct and under /work unless explicitly approved otherwise.
+  - No secrets are included, because the tool echoes the command.
+- MUST NEVER guess:
+  - Never invent a command sequence.
+  - Never assume shell quoting will work; be explicit.
+  - Never run destructive commands without explicit user instruction.
+- Requires user confirmation:
+  - Any command that deletes files, rewrites many files, changes permissions broadly, modifies /rah/tools, or installs packages.
+  - Any command touching paths outside /work.
+  - Any command that could leak credentials or access remote systems.
+
+COMMON FAILURE MODES:
+- Empty args triggers "missing command".
+- Command fails due to strict -e (any failing command stops the whole script).
+- Unset variables cause immediate failure due to -u.
+- Pipes fail due to pipefail.
+- Incorrect quoting causes bash parse errors.
+- Missing executables (command not found).
+- Permission denied on target files.
+- Running in wrong directory because command did not cd.
+
+EXAMPLES:
+1) run.cmd cd /work && ls -la
+2) run.cmd cd /work/RahOllamaOnly && dotnet build -v minimal
+3) run.cmd cd /work && find . -maxdepth 2 -type f -name "*.csproj"
+4) run.cmd cd /work && grep -RIn --exclude-dir=.git "RunIntent" .
+5) run.cmd cd /work && cat RahOllamaOnly/tools/tools.json | head -n 40
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT use run.cmd when a specific tool exists unless you need something the tool cannot do.
+- Do NOT claim a command ran if you did not see its output and exit code success.
+- Do NOT run commands with placeholders; every path and flag must be real.
+- Do NOT include secrets in the command; it will be echoed.
+- Do NOT assume current directory; include `cd` explicitly.
+- Do NOT chain risky commands without explicit user approval.
+- Do NOT pretend run.cmd is “safe”; it can do anything bash can do.
+- Do NOT invent environment variables; -u will fail if you reference unset vars.
+- Do NOT use wildcards for deletion or mass edits unless user explicitly approved.
+- Do NOT modify /rah/tools scripts via run.cmd unless user explicitly requested.
+- Treat all results as authoritative; do not fill gaps with assumptions.
+- If a command fails, do not guess why; read the exact failing line and stderr.
+- Avoid multi-line scripts unless necessary; keep commands minimal and explicit.
+- Do NOT reference tools not yet written here.
+- Never claim network activity occurred unless command clearly did it.

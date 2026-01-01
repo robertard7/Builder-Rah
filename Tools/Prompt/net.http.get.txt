@@ -1,0 +1,117 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\net.http.get.txt
+TOOL ID:
+net.http.get
+
+CATEGORY:
+network
+
+PURPOSE:
+Perform an HTTP GET request to a URL using curl and print only the first N lines of the response body.
+This is for quick inspection of content without downloading everything into logs.
+
+WHEN TO USE:
+- You need to verify what a URL returns (HTML, JSON, text) from inside the container.
+- You want to confirm a registry/index endpoint returns expected text/JSON.
+- You want to debug HTTP connectivity beyond headers (actual body).
+- You want to sample the beginning of a large file safely (limited lines).
+- You want to validate a health check endpoint output.
+
+WHEN NOT TO USE:
+- You need full content download to a file; this tool only prints a head of body.
+- You do not have an explicit URL; never guess.
+- The URL returns binary data; printing binary into logs is bad.
+- The content includes secrets; avoid unless user explicitly provided and approved.
+- You need custom curl options (auth headers, POST, cookies); tool does not support.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool command does: `set -- {args}; u="$1"; n="$2"; ... curl -fsS "$u" | head -n "$n"`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved; avoid spaces in URL.
+- Positional arguments:
+  - 1st token: <url> (required).
+  - 2nd token: [n] optional number of lines to print.
+- Optional arguments:
+  - [n] must be an integer line count (e.g., 20, 120, 500).
+  - No other tokens are supported; extra tokens are ignored by this tool because it only reads $1 and $2.
+- Defaults:
+  - If n is missing/empty: n defaults to 120 lines.
+- Error conditions:
+  - If url missing: prints `missing url` and exits 2.
+  - curl -f: HTTP 400+ typically returns non-zero.
+  - If n is non-numeric, head may error; treat as failure.
+  - DNS/TLS/connect errors: non-zero.
+  - curl missing: command not found.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - curl is available.
+  - head is available.
+
+OUTPUT:
+- stdout behavior:
+  - Prints the first N lines of the response body.
+  - Body is whatever server returns (JSON/HTML/text).
+- stderr behavior:
+  - curl errors and diagnostics (because -S).
+  - head errors if invalid n.
+- exit codes and meanings:
+  - 0: request succeeded and head printed.
+  - 2: missing url argument.
+  - Non-zero: curl/head failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - Yes, outbound HTTP(S) GET to the URL.
+- Installed packages:
+  - None.
+- State changes:
+  - None beyond network activity.
+
+SAFETY RULES:
+- MUST verify before calling:
+  - URL is explicitly known and approved.
+  - URL content is safe to print into logs (not binary, not secrets).
+  - If [n] is provided, it is a reasonable integer.
+- MUST NEVER be guessed:
+  - Never guess URLs.
+  - Never guess that response is text; treat unknown endpoints cautiously.
+  - Never guess a sensible [n] beyond the default unless user asked for more/less.
+- Requires user confirmation:
+  - If URL likely returns credentials, tokens, private data, or huge output.
+
+COMMON FAILURE MODES:
+- `missing url` due to empty args.
+- URL contains spaces and breaks tokenization.
+- DNS failure in container.
+- TLS handshake failure.
+- HTTP 404/500 cause failure due to curl -f.
+- Endpoint returns binary and logs become unreadable.
+- Invalid n causes head to error.
+
+EXAMPLES:
+1) net.http.get https://example.com 40
+2) net.http.get https://httpbin.org/json 80
+3) net.http.get https://httpbin.org/uuid
+4) net.http.get https://raw.githubusercontent.com/git/git/master/README.md 60
+5) net.http.get https://httpbin.org/status/200 10
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim the full response; only first N lines are shown.
+- Do NOT infer JSON validity if truncated; verify from content shown.
+- Do NOT claim status code unless curl printed it elsewhere (it doesn’t by default).
+- Do NOT claim redirects were followed; curl follows redirects only if -L (not used here).
+- Do NOT invent missing parts of the body.
+- Do NOT interpret binary noise as “probably compressed”; treat as unsafe.
+- Do NOT guess why curl failed; read stderr.
+- Do NOT convert URLs or rewrite them.
+- Do NOT add headers/auth; tool does not support.
+- Do NOT reference tools not yet written here.
+- If output is truncated, state only what is visible.
+- Treat non-zero exit as failure, even if partial output appears.
+- Never fabricate timing or performance info.

@@ -1,0 +1,104 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\sys.os.txt
+TOOL ID:
+sys.os
+
+CATEGORY:
+system
+
+PURPOSE:
+Identify kernel type/version and the Linux distribution metadata inside the rah-linux container.
+Prints `uname -srm` and the contents of /etc/os-release if present.
+
+WHEN TO USE:
+- You need to confirm distro family (Debian/Ubuntu/Alpine/etc.) to choose correct package commands.
+- You need kernel version string (as seen by the container) for compatibility checks.
+- You need to confirm whether /etc/os-release exists and what it reports.
+- You are debugging tool behavior that varies by distro (package names, default shells, coreutils).
+
+WHEN NOT TO USE:
+- You need detailed CPU/RAM/disk/mount info: use sys.info.
+- You need uptime/load: use sys.uptime.
+- You need environment variables: use sys.env.
+- You need kernel log messages: use sys.dmesg.
+- You need process list: use sys.ps.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool does not accept arguments.
+  - Any provided {args} is ignored.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Always runs:
+    - uname -srm
+    - cat /etc/os-release (best-effort; errors suppressed with `|| true`)
+- Error conditions:
+  - uname missing (rare).
+  - /etc/os-release missing is handled safely; output will just omit it.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - /etc may exist; /etc/os-release may or may not exist.
+
+OUTPUT:
+- stdout behavior:
+  - First line: uname -srm output (kernel name, release, machine).
+  - Then: if /etc/os-release exists, prints its content as KEY=VALUE lines.
+- stderr behavior:
+  - uname errors appear on stderr.
+  - cat errors are suppressed by `2>/dev/null || true`, so missing file does not produce stderr.
+- exit codes and meanings:
+  - 0: uname succeeded (cat is best-effort).
+  - Non-zero: uname failed.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Nothing. Read-only.
+- MUST NEVER guess:
+  - Do not guess distro if /etc/os-release is missing.
+  - Do not claim Debian/Ubuntu unless it is stated.
+- Requires user confirmation:
+  - None.
+
+COMMON FAILURE MODES:
+- /etc/os-release absent in minimal images, giving only uname output.
+- /etc/os-release may be customized; do not assume it matches host OS.
+
+EXAMPLES:
+1) sys.os
+2) sys.os 
+3) sys.os ignored
+4) sys.os anything
+5) sys.os check_distro
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT invent distro names, versions, or codenames.
+- Do NOT claim package manager availability from distro alone (but it is a strong hint).
+- Do NOT infer kernel modules or capabilities from uname alone.
+- Do NOT treat uname machine as CPU model; it is architecture only.
+- If /etc/os-release is missing, explicitly state “not present in output”.
+- Do NOT assume systemd or init system from os-release.
+- Do NOT claim “Ubuntu” because you saw apt; verify with os-release or apt presence.
+- Do NOT guess container base image by “feel”; only use printed fields.
+- Keep any mapping to package commands conservative.
+- Never claim this identifies host Windows OS; it does not.
+- Never add extra commands; tool is fixed.
+- If user asks for glibc version, this tool does not provide it.
+- If user asks for dotnet runtime, use dotnet.info later, not sys.os.
+- Treat output as authoritative text only.
+- Do not normalize quotes or whitespace in os-release; preserve meaning.

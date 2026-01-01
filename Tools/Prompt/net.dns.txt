@@ -1,0 +1,113 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\net.dns.txt
+TOOL ID:
+net.dns
+
+CATEGORY:
+network
+
+PURPOSE:
+Resolve a hostname to addresses using system name service.
+Uses `getent hosts <name>` first, then falls back to `nslookup <name>` if getent fails.
+This checks DNS and/or local resolution depending on system configuration.
+
+WHEN TO USE:
+- A network call fails and you suspect DNS resolution is the problem.
+- ping to a hostname fails and you want to separate DNS from routing.
+- You need to see what IP a name resolves to in this container environment.
+- You need to confirm /etc/hosts entries are being honored (via getent).
+
+WHEN NOT TO USE:
+- You need to test actual connectivity to the resolved IP: use net.ping or net.http.* tools.
+- You need to resolve SRV/TXT/MX records; this tool only does basic host lookup.
+- You need to debug HTTP status or TLS: use net.http.head/get later.
+- You are dealing with an IP address and not a name; getent hosts may still work but is not the point.
+- You need advanced DNS tracing (dig +trace); this tool does not do that.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is read as a single string into n="{args}".
+  - It is NOT split into multiple tokens by the tool template.
+- Positional arguments:
+  - 1st: <name> required.
+    - Typically a DNS hostname (e.g., github.com).
+    - Can also be something resolved by NSS (e.g., a hosts file alias).
+- Optional arguments:
+  - None.
+- Defaults:
+  - None. Name is required.
+- Error conditions:
+  - If name is missing or empty, prints "missing name" and exits 2.
+  - If getent is missing or fails, it tries nslookup (nslookup errors suppressed).
+  - If both methods fail, output may be empty and exit code may still be 0 because of `|| true` in fallback.
+  - If getent exists but returns non-zero for unresolved name, fallback runs.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - Uses system resolver configuration (/etc/resolv.conf, /etc/nsswitch.conf, /etc/hosts) if present.
+
+OUTPUT:
+- stdout behavior:
+  - If name missing: prints exactly "missing name".
+  - Otherwise:
+    - If getent succeeds: prints one or more lines of "IP hostname".
+    - If getent fails: prints nslookup output if nslookup is installed; otherwise may print nothing.
+- stderr behavior:
+  - getent errors may go to stderr.
+  - nslookup stderr is redirected to /dev/null.
+- exit codes and meanings:
+  - 0: getent succeeded OR getent failed but the overall command chain did not produce a fatal error.
+  - 2: missing name (explicit tool check).
+  - Non-zero: getent command missing or other shell error before fallback could run.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - May perform DNS queries via system resolver (depends on configuration).
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - The name is explicitly provided; do not invent a target name.
+- MUST NEVER guess:
+  - Never fabricate resolved IPs.
+  - Do not claim “DNS is working” if output is empty.
+- Requires user confirmation:
+  - None for public names. For internal names, ensure user intent.
+
+COMMON FAILURE MODES:
+- getent not installed in minimal images.
+- nslookup not installed; fallback then produces no output.
+- DNS blocked or misconfigured, resulting in no resolution.
+- Name resolves to IPv6 only; some tooling may behave differently.
+
+EXAMPLES:
+1) net.dns github.com
+2) net.dns google.com
+3) net.dns localhost
+4) net.dns registry.npmjs.org
+5) net.dns api.github.com
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT assume nslookup ran; check output.
+- Do NOT assume empty output means “no internet”; could be missing tools.
+- Do NOT claim a specific DNS server is used unless shown elsewhere.
+- Do NOT infer TTL or record types; tool does not show them reliably.
+- Do NOT change the lookup method; it is fixed: getent then nslookup best-effort.
+- If name is missing, stop; do not invent a reasonable default.
+- Do not interpret multiple IPs as load balancing unless explicitly asked, and even then be cautious.
+- Keep conclusions tied to the actual printed lines.
+- If you need to confirm connectivity to the resolved IP, explicitly call net.ping afterward (with the IP shown).
+- Do not claim that /etc/hosts was used unless you can verify via output and context.
+- Do not claim split-horizon DNS without evidence.
+- Never fabricate “NXDOMAIN”; nslookup stderr is suppressed.
+- If troubleshooting, pair with sys.env (proxy) and sys.os (distro) only when relevant.
+- Treat this tool as resolution-only, not reachability.
+- Avoid reformatting the returned lines; preserve meaning.
+- Never propose additional tools inside this definition.

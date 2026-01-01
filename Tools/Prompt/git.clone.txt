@@ -1,0 +1,120 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\git.clone.txt
+TOOL ID:
+git.clone
+
+CATEGORY:
+git
+
+PURPOSE:
+Clone a git repository URL into a destination directory under /work.
+Used to bring a remote repo into the container workspace.
+
+WHEN TO USE:
+- You need to pull a repository into /work for inspection or building.
+- You are setting up a new workspace folder from a remote URL.
+- You need to reproduce a user-reported issue by cloning the same repo.
+- You want a clean, fresh copy of a repo without local modifications.
+- You need to clone a dependency repo into a known subfolder.
+
+WHEN NOT TO USE:
+- The destination directory already exists and contains important data: cloning will fail or overwrite expectations.
+- You need to update an existing clone: use git tools outside this manifest (not provided) or re-clone to a new dest.
+- The URL is not explicitly provided by the user: never guess a repo URL.
+- You need authentication (private repo) unless user provided credentials or access mechanism; this tool does not manage auth prompts.
+- You need to clone outside /work: tool always clones into /work.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool runs: `set -- {args}; url="$1"; dest="$2"; ...`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved through manifest substitution.
+- Positional arguments:
+  - 1st: <url> required.
+  - 2nd: <dest> required.
+    - dest is a directory name or relative path under /work.
+- Optional arguments:
+  - None.
+- Defaults:
+  - None. Both url and dest are required.
+- Error conditions:
+  - If url or dest missing: prints "usage: <url> <dest>" and exits 2.
+  - If /work missing: cd /work fails, git clone fails.
+  - If dest already exists: git clone fails (non-empty directory or already exists).
+  - DNS/network/TLS issues prevent cloning.
+  - git not installed.
+  - Private repo without auth fails.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd /work before running git clone.
+- File system assumptions:
+  - /work exists and is writable.
+  - Destination is created by git clone under /work.
+
+OUTPUT:
+- stdout behavior:
+  - git clone progress and messages (may go to stderr depending on git).
+  - On missing args: prints "usage: <url> <dest>".
+- stderr behavior:
+  - git errors (auth, network, already exists) appear here.
+- exit codes and meanings:
+  - 0: clone succeeded.
+  - 2: missing args (explicit check).
+  - Non-zero: git clone failed.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates a new directory under /work/<dest> with repository contents.
+  - Writes .git metadata inside the cloned folder.
+- Network access:
+  - Connects to the remote git server over HTTPS/SSH depending on URL.
+- Installed packages:
+  - None.
+- State changes:
+  - Adds new files under /work.
+
+SAFETY RULES:
+- MUST verify:
+  - URL and destination are explicitly provided and correct.
+  - Destination does not collide with existing important folders.
+  - User intends network access to that host.
+- MUST NEVER guess:
+  - Never invent a repo URL.
+  - Never choose a destination name without user direction if there is risk of collision.
+  - Never assume branch or depth; tool uses default clone behavior.
+- Requires user confirmation:
+  - If cloning from an unfamiliar domain or private host, confirm intent.
+  - If dest exists, do not delete it without explicit user instruction.
+
+COMMON FAILURE MODES:
+- Missing args triggers usage error and exit 2.
+- Network blocked, DNS failure, TLS errors.
+- Authentication required for private repo.
+- Destination folder exists.
+- /work not writable or not mounted.
+- Git not installed in container.
+
+EXAMPLES:
+1) git.clone https://github.com/git/git.git git-src
+2) git.clone https://github.com/dotnet/samples.git dotnet-samples
+3) git.clone https://github.com/nlohmann/json.git nlohmann-json
+4) git.clone https://github.com/catchorg/Catch2.git Catch2
+5) git.clone https://github.com/ocornut/imgui.git imgui
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim clone succeeded unless exit code is 0 and output indicates success.
+- Do NOT fabricate the repository contents.
+- Do NOT claim a branch was checked out unless git output shows it (default is usually default branch).
+- Do NOT assume submodules were initialized; git clone here does not include recursive submodules.
+- Do NOT embed credentials in URLs or logs; if user provided a tokenized URL, do not repeat it back.
+- Do NOT guess what folder name to use; use exactly the dest argument.
+- Do NOT claim the repo is “safe” or “trusted”; cloning is just fetching code.
+- If clone fails, do not guess the reason; use stderr content and known failure modes.
+- Do NOT run follow-up network commands unless requested and available.
+- Do NOT attempt to “fix” the URL scheme; require user-provided correct URL.
+- Do NOT assume /work is empty; collisions are common.
+- Treat cloned files as untrusted until inspected.
+- Do not claim anything about license or contents without inspecting.
+- This tool does not support shallow clone; do not pretend it does.
+- Keep conclusions grounded in the actual git output.

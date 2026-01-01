@@ -1,0 +1,117 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\file.searchpath.txt
+TOOL ID:
+file.searchpath
+
+CATEGORY:
+file
+
+PURPOSE:
+Search for a literal (fixed-string) pattern inside a single file and print matching lines with line numbers.
+Uses ripgrep (rg) if available, otherwise falls back to grep -nF.
+Used to quickly locate exact strings in one known file.
+
+WHEN TO USE:
+- You know the exact file path and want to find where a specific string occurs.
+- You need line numbers for a symbol, method name, config key, or error text.
+- You want to confirm whether a file contains an exact literal substring.
+- You want a safe, constrained search that won’t traverse the whole repo.
+
+WHEN NOT TO USE:
+- You don’t know the file path: use file.find first.
+- You want regex search: this tool is fixed-string, not regex.
+- You want to search across many files: use grep.text or grep.files.
+- You want to search directories: this tool is file-only.
+- You need case-insensitive search: this tool does not provide flags for that.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool runs: `set -- {args}; p="$1"; pat="$2"; ...`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved through manifest substitution.
+- Positional arguments:
+  - 1st: <path> required (p).
+  - 2nd: <pattern> required (pat).
+- Optional arguments:
+  - None.
+- Defaults:
+  - Uses `rg -n --fixed-strings "<pattern>" "<path>"` if rg exists.
+  - Otherwise uses `grep -nF "<pattern>" "<path>" || true`.
+- Error conditions:
+  - If path missing or pattern missing: prints "usage: <path> <pattern>" and exits 2.
+  - If path is not a file: prints "not a file" and exits 2.
+  - If rg exists but fails due to binary file or encoding, it returns non-zero; tool will still exit non-zero unless grep fallback path is chosen (it is not).
+  - grep errors are suppressed by `|| true` so “no matches” results in exit 0 in fallback mode.
+  - In rg mode, “no matches” returns exit 1 (normal rg behavior), which will be treated as failure by callers unless handled.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+  - Relative paths resolve against current working directory.
+- File system assumptions:
+  - File is accessible.
+  - rg may or may not be installed.
+
+OUTPUT:
+- stdout behavior:
+  - rg mode: prints lines in format "path:line:content" (rg default with -n).
+  - grep mode: prints "line:content" with -n.
+  - On missing args: prints "usage: <path> <pattern>".
+  - On not a file: prints "not a file".
+- stderr behavior:
+  - rg/grep errors (permission denied, binary warnings) appear on stderr.
+- exit codes and meanings:
+  - 0: matches found (rg), or command succeeded (grep).
+  - 2: missing args or not a file (explicit checks).
+  - 1: rg found no matches (normal), or grep found no matches (but grep path uses || true so it will still be 0).
+  - Non-zero: tool error reading file.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Provide an exact file path (do not guess).
+  - Pattern should be a literal string without spaces unless you understand token splitting will break it.
+- MUST NEVER guess:
+  - Never invent line numbers or matches.
+  - Never “assume” a string exists; search results must show it.
+- Requires user confirmation:
+  - If the file may contain secrets, confirm before searching/printing matching lines.
+
+COMMON FAILURE MODES:
+- Pattern contains spaces, but only the second token is captured; remainder is lost.
+- Path contains spaces; token splitting breaks p.
+- rg returns exit 1 for no matches, causing callers to treat it as error.
+- File is huge or binary; rg may warn or fail.
+- Permission denied.
+
+EXAMPLES:
+1) file.searchpath /work/RahOllamaOnly/Program.cs Main
+2) file.searchpath /work/RahOllamaOnly/tools/tools.json sys.info
+3) file.searchpath /work/RahOllamaOnly/Workflow/WorkflowModels.cs SearchHit
+4) file.searchpath /work/MiniPad/Program.cs ApplicationConfiguration
+5) file.searchpath /work/RahOllamaOnly/MainForm.cs PlanAsync
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim there are “no matches” unless you saw either empty output with known exit behavior or explicit tool output.
+- Do NOT fabricate line numbers.
+- Do NOT convert grep output into rg format or vice versa; keep what is printed.
+- Be careful: rg exit 1 can mean “no matches”, not “tool failure”.
+- Do NOT assume pattern tokenization preserves quotes; it usually does not here.
+- If user needs multi-word patterns, require a different approach (e.g., grep.text with a simpler token) rather than guessing.
+- Do NOT infer surrounding code context beyond the printed line.
+- Do NOT claim refactors are needed based solely on one match; verify broader context.
+- Do NOT add flags like -i or regex; tool is fixed.
+- Do NOT search outside the provided file; this tool is single-file only.
+- If output is truncated by terminal, do not invent missing lines.
+- Treat printed matches as authoritative and complete for that pattern under that tool behavior.
+- Keep conclusions conservative and tied to printed results only.
+- Never leak secrets if found; mask them in summaries unless user explicitly requests full visibility.

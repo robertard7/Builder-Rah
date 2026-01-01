@@ -1,0 +1,106 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\file.tail.txt
+TOOL ID:
+file.tail
+
+CATEGORY:
+file
+
+PURPOSE:
+Show the last N lines of a file using `tail -n`.
+Default N is 180 if not provided.
+
+WHEN TO USE:
+- You need the most recent entries from a log file.
+- You want to inspect file endings (stack traces, build outputs).
+- You are checking what happened last in a process output.
+- You want a bounded view of a potentially large file.
+- You are diagnosing failures that appear at end of logs.
+
+WHEN NOT TO USE:
+- You need the start of a file; use file.head or file.cat.
+- You need to search for a string; use file.searchpath or grep tools.
+- You do not have an explicit path; never guess.
+- The file is binary; avoid printing binary.
+- You need a live follow (-f); this tool does not support follow.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool command does: `set -- {args}; p="$1"; n="$2"; ... tail -n "$n" "$p"`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved; avoid spaces in file path.
+- Positional arguments:
+  - 1st token: <path> required.
+  - 2nd token: [n] optional integer lines.
+- Optional arguments:
+  - [n] must be numeric.
+- Defaults:
+  - If n missing: n=180.
+- Error conditions:
+  - If path missing: prints `missing path` and exits 2.
+  - If file missing/unreadable: tail errors, non-zero.
+  - If n invalid: tail errors, non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not cd; relative paths resolve from current directory.
+- File system assumptions:
+  - tail is available.
+
+OUTPUT:
+- stdout behavior:
+  - Prints the last N lines of the file.
+- stderr behavior:
+  - tail errors and permission issues.
+- exit codes and meanings:
+  - 0: printed successfully.
+  - 2: missing path argument (tool check).
+  - Non-zero: tail failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None; read-only.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify before calling:
+  - Path is exact and intended.
+  - N is numeric if provided.
+  - File content is safe to print (may contain secrets).
+- MUST NEVER be guessed:
+  - Never guess file path.
+  - Never guess that the last lines include the error; verify.
+- Requires user confirmation:
+  - If tailing a secrets file or credential log, confirm.
+
+COMMON FAILURE MODES:
+- Wrong path.
+- Path with spaces breaks tokenization.
+- Permission denied.
+- Invalid n.
+- File is shorter than N lines (not an error; just prints whole file).
+
+EXAMPLES:
+1) file.tail /work/logs/build.log
+2) file.tail /work/logs/build.log 80
+3) file.tail /work/RahOllamaOnly/trace.log 200
+4) file.tail /work/src/output.txt 60
+5) file.tail /work/app.log 120
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT invent earlier context; you only saw the last lines.
+- Do NOT claim “this is the only error” based on tail output.
+- Do NOT infer timestamps or ordering beyond the printed lines.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written here.
+- Treat stderr as authoritative.
+- Keep conclusions tied to visible lines.
+- If last lines look truncated, request more lines (higher n) rather than guessing.
+- Never fabricate log entries.
+- Do not claim a process is still running; this is not follow mode.
+- Do not assume file exists if tail produced no output; check errors.

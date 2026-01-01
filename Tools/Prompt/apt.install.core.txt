@@ -1,0 +1,112 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\apt.install.core.txt
+TOOL ID:
+apt.install.core
+
+CATEGORY:
+build
+
+PURPOSE:
+Install a fixed set of core build tools inside the rah-linux container.
+This tool always runs apt-get update and installs: build-essential, clang, lld, cmake, ninja-build, pkg-config, git, curl, wget, unzip, zip, ca-certificates.
+
+WHEN TO USE:
+- You are preparing a fresh container for compiling C/C++ projects.
+- You need cmake/ninja for CMake-based builds.
+- You need git/curl/wget for repo retrieval and HTTP operations.
+- Basic build tools are missing and you want the standard baseline.
+- You want a known minimal set of tools for reproducible builds.
+
+WHEN NOT TO USE:
+- You only need one small package: use apt.install with specific pkgs.
+- You are on the Windows host: this affects only the container.
+- Network access is not allowed; this requires apt access.
+- You already have these packages installed and are trying to keep image minimal.
+- You need language toolchains beyond core (go/rust/java/node/etc): use apt.install.languages (separate tool).
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool does not accept arguments.
+  - Any provided {args} is ignored by the command.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Always runs:
+    - apt-get update
+    - apt-get install -y build-essential clang lld cmake ninja-build pkg-config git curl wget unzip zip ca-certificates
+- Error conditions:
+  - apt-get update failure (network/DNS/TLS/repo).
+  - apt-get install failure (package not found, dpkg lock, disk full).
+  - Permission denied if not root inside container.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - apt-get available.
+  - /etc/apt configured.
+  - Sufficient disk space.
+
+OUTPUT:
+- stdout behavior:
+  - apt-get update output then apt-get install progress.
+- stderr behavior:
+  - apt/dpkg errors, repository signature issues, network errors.
+- exit codes and meanings:
+  - 0: all packages installed successfully.
+  - Non-zero: apt update or install failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Installs packages into container.
+  - Updates apt lists and dpkg database.
+- Network access:
+  - Yes.
+- Installed packages:
+  - Yes, fixed set listed above.
+- State changes:
+  - Adds/updates executables (gcc/g++, clang, cmake, ninja, git, curl, etc.).
+
+SAFETY RULES:
+- MUST verify:
+  - User wants container environment modified (package install).
+  - Network access is allowed.
+- MUST NEVER guess:
+  - Do not claim it installs anything beyond the fixed list.
+  - Do not add extra packages via args; args are ignored.
+- Requires user confirmation:
+  - If user did not request installing these tools, get explicit approval before calling.
+  - If disk constraints are tight, confirm intent.
+
+COMMON FAILURE MODES:
+- apt-get update fails due to DNS/proxy/TLS issues.
+- dpkg lock held by another process.
+- Disk full during install.
+- Repository signature errors.
+- Package names unavailable due to distro mismatch (rare, but possible).
+
+EXAMPLES:
+1) apt.install.core
+2) apt.install.core now
+3) apt.install.core ignored-args
+4) apt.install.core baseline
+5) apt.install.core bootstrap
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim packages are installed unless exit code is 0 and apt output confirms.
+- Do NOT claim exact versions; apt chooses versions from repos.
+- Do NOT claim host machine is changed; container-only.
+- Do NOT claim this installs dotnet, node, or other languages; it does not.
+- Do NOT infer tool availability without checking sys.which afterward.
+- Do NOT say “everything is ready” unless you validate required commands exist.
+- Do NOT modify apt sources; not part of this tool.
+- Do NOT suggest removing packages as part of this tool.
+- Do NOT hide apt error lines; they are needed for diagnosis.
+- Do NOT add flags like --no-install-recommends; tool is fixed.
+- Treat the package set as authoritative and complete for “core”.
+- If failure occurs, use the printed apt error text to decide next steps.
+- Do NOT re-run repeatedly without understanding the failure cause.
+- Keep conclusions conservative: install success means packages installed, not that builds succeed.
+- Do NOT reference tools not yet written here; focus only on this tool.

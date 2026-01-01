@@ -1,0 +1,116 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\php.composer.install.txt
+TOOL ID:
+php.composer.install
+
+CATEGORY:
+build
+
+PURPOSE:
+Install PHP project dependencies using Composer in a specified project directory.
+Runs: `cd <projectDir> && composer install`
+
+WHEN TO USE:
+- You have a PHP project with composer.json and need dependencies installed.
+- You want to reproduce Composer dependency resolution in the container.
+- You need vendor/ populated before running PHP unit tests or running the app.
+- You want a standard `composer install` without extra flags.
+- You need composer error output for debugging dependency issues.
+
+WHEN NOT TO USE:
+- The directory is not a Composer project (no composer.json): composer will fail.
+- Composer is not installed in the container: tool will fail.
+- You need `composer update` semantics; this tool only runs install.
+- You require private repository credentials not provided; do not run without explicit config.
+- You do not know the correct project directory; do not guess.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `p="{args}"; if [ -z "$p" ]; then echo 'usage: <projectDir>'; exit 2; fi; cd "$p" && composer install`
+- {args} is treated as a single string path.
+- No token splitting is performed by the tool itself.
+Positional arguments:
+- 1st: <projectDir> required.
+Optional arguments:
+- None.
+Defaults:
+- Always runs `composer install`.
+Error conditions:
+- If projectDir missing/empty:
+  - Prints `usage: <projectDir>`
+  - Exits 2.
+- If cd fails:
+  - Non-zero exit.
+- If composer missing:
+  - Command not found, non-zero.
+- If composer.json missing:
+  - Composer error, non-zero.
+- If install fails (network/auth/conflicts):
+  - Non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into <projectDir>.
+- File system assumptions:
+  - projectDir exists.
+  - projectDir is writable for vendor/ and composer.lock updates as applicable.
+  - Composer cache directory exists/writable.
+
+OUTPUT:
+- stdout behavior:
+  - Composer progress, package install lines.
+- stderr behavior:
+  - Composer error messages and stack traces when applicable.
+- exit codes and meanings:
+  - 0: install succeeded.
+  - 2: missing projectDir argument.
+  - Non-zero: composer failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates/updates vendor/ directory.
+  - May write composer.lock if absent or if install generates lock (depends on project state).
+  - Writes Composer cache.
+- Network access:
+  - Typically yes to download packages unless cached.
+- Installed packages:
+  - Installs PHP libraries into vendor/.
+- State changes:
+  - Dependency tree realized on disk.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - projectDir is correct and contains composer.json.
+  - User accepts network downloads.
+  - Any private repo credentials are already configured (do not invent).
+- What must NEVER be guessed:
+  - Do not guess projectDir.
+  - Do not guess Composer flags or repositories.
+  - Do not guess auth tokens.
+- What requires user confirmation:
+  - If install may modify lockfile and user wants lockfile unchanged, confirm.
+  - If private repositories are involved and config is unknown, confirm.
+
+COMMON FAILURE MODES:
+- composer not installed.
+- Missing composer.json.
+- Network/DNS/proxy issues.
+- PHP version/platform constraint mismatch.
+- Permission denied writing vendor/ or cache.
+- Out of disk.
+- Auth failures for private packages.
+
+EXAMPLES:
+1) php.composer.install /work/php/app
+2) php.composer.install /work/services/php_backend
+3) php.composer.install /work/repro/php_proj
+4) php.composer.install /work/tools/php_util
+5) php.composer.install /work/components/php_api
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim vendor/ exists unless install succeeded.
+- Do NOT claim which packages installed unless output shows it.
+- Do NOT claim offline install; composer usually needs network.
+- Do NOT invent composer.lock changes; verify if needed.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written.

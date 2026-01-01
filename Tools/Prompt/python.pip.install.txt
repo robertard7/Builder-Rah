@@ -1,0 +1,113 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\python.pip.install.txt
+TOOL ID:
+python.pip.install
+
+CATEGORY:
+language
+
+PURPOSE:
+Install Python dependencies from a requirements file using pip.
+Runs: `cd <projectDir> && python3 -m pip install -r <requirementsFile>`
+Defaults requirementsFile to `requirements.txt` if not provided.
+
+WHEN TO USE:
+- You have a Python project with a requirements file and need dependencies installed.
+- You are setting up environment for a Python script/service in the container.
+- You want the standard pip install behavior for requirements.txt.
+- You need pip output to diagnose dependency resolution issues.
+- You are reproducing CI dependency installs.
+
+WHEN NOT TO USE:
+- You need to install into a virtual environment but did not activate it; this uses system python3 pip.
+- You want to install a single package by name; not supported directly here.
+- You do not know the project directory or requirements filename; do not guess.
+- You need offline installation; pip may fetch from the internet.
+- You need private index credentials; do not run without explicit user-provided config.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `set -- {args}; p="$1"; r="$2"; ... if [ -z "$r" ]; then r=requirements.txt; fi; cd "$p" && python3 -m pip install -r "$r"`
+- {args} is split by whitespace into tokens.
+- Quoting is not reliably preserved; avoid spaces in projectDir and requirementsFile.
+Positional arguments:
+- 1st token: <projectDir> required.
+- 2nd token: [requirementsFile] optional.
+Optional arguments:
+- requirementsFile optional; defaults to requirements.txt.
+Defaults:
+- If requirementsFile missing: r=requirements.txt.
+Error conditions:
+- If projectDir missing:
+  - Prints `usage: <projectDir> [requirementsFile]`
+  - Exits 2.
+- If cd fails: non-zero.
+- If python3/pip missing: non-zero.
+- If requirements file missing: pip fails non-zero.
+- If dependency resolution fails: non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into <projectDir> before running pip.
+- File system assumptions:
+  - projectDir exists.
+  - requirements file exists in that directory unless specified otherwise.
+  - pip installs into the Python environment associated with python3.
+
+OUTPUT:
+- stdout behavior:
+  - pip install progress and package install lines.
+- stderr behavior:
+  - pip errors, network errors, build failures for wheels.
+- exit codes and meanings:
+  - 0: install succeeded.
+  - 2: missing projectDir argument.
+  - Non-zero: pip failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Installs Python packages into site-packages of the python3 environment.
+  - Writes pip cache.
+  - May build wheels locally (temporary build dirs).
+- Network access:
+  - Typically yes, unless packages already cached and indexes reachable.
+- Installed packages:
+  - Yes, Python packages.
+- State changes:
+  - Python environment changes, may affect other projects if not using venv.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - projectDir and requirements file name are correct.
+  - User accepts modifying the python3 environment (global vs venv).
+  - User accepts network access if required.
+- What must NEVER be guessed:
+  - Do not guess requirements filename or location.
+  - Do not guess index URLs or credentials.
+- What requires user confirmation:
+  - If installing globally could impact other builds, confirm.
+  - If private packages are involved, confirm config and credentials are provided.
+
+COMMON FAILURE MODES:
+- pip not installed.
+- requirements file missing.
+- Network/proxy/DNS failures.
+- Build failures for packages requiring compilers/headers.
+- Version conflicts.
+- Permission denied writing site-packages.
+- Disk full.
+
+EXAMPLES:
+1) python.pip.install /work/py/app
+2) python.pip.install /work/py/app requirements.txt
+3) python.pip.install /work/services/py_backend requirements-prod.txt
+4) python.pip.install /work/tools/py_util requirements-dev.txt
+5) python.pip.install /work/repro/pyproj reqs.txt
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim packages installed unless pip exited 0.
+- Do NOT claim versions installed; read pip output if needed.
+- Do NOT claim install occurred in a venv unless you verified python3 points to venv interpreter.
+- Do NOT invent missing dependencies; use pip error messages.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written.

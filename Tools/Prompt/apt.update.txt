@@ -1,0 +1,106 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\apt.update.txt
+TOOL ID:
+apt.update
+
+CATEGORY:
+build
+
+PURPOSE:
+Update Debian package index lists inside the rah-linux container using `apt-get update`.
+Used as a prerequisite before installing packages with apt.
+
+WHEN TO USE:
+- You are about to install packages and need fresh package lists.
+- Package installs fail due to outdated indexes.
+- You want to ensure the container sees the latest available versions from configured repos.
+- You are diagnosing apt-related failures and need to confirm repository connectivity.
+
+WHEN NOT TO USE:
+- You are operating outside the rah-linux container: this tool is container-only.
+- The container is intended to be offline; apt update requires network access.
+- You are trying to update the host OS: this does not affect Windows host.
+- You need to install packages: use apt.install or other apt.* tools.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool does not accept arguments.
+  - Any provided {args} is ignored.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Runs `apt-get update` with default configured repositories.
+- Error conditions:
+  - Network failure or DNS issues prevent reaching apt mirrors.
+  - Repository misconfiguration (bad sources.list) causes errors.
+  - TLS/cert issues can break HTTPS repos.
+  - Permission issues if not running as root inside container.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - Container has apt-get and repo configuration in /etc/apt.
+
+OUTPUT:
+- stdout behavior:
+  - apt-get update progress and repository fetch messages.
+- stderr behavior:
+  - Errors about unreachable repos, signature verification, DNS, etc.
+- exit codes and meanings:
+  - 0: update succeeded.
+  - Non-zero: update failed (repo unreachable, signature failure, etc.).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Updates apt cache lists under /var/lib/apt/lists.
+- Network access:
+  - Yes, connects to configured apt repositories.
+- Installed packages:
+  - None (index update only).
+- State changes:
+  - Updates package list state inside container.
+
+SAFETY RULES:
+- MUST verify:
+  - User intends network access for apt operations.
+  - You are in the correct container context (rah-linux).
+- MUST NEVER guess:
+  - Never invent missing apt repo URLs or keys.
+  - Never claim update succeeded without exit code/output.
+- Requires user confirmation:
+  - If apt sources need to be changed or keys added, require explicit user approval before modifications (not handled by this tool anyway).
+
+COMMON FAILURE MODES:
+- DNS resolution failure.
+- Proxy required but not configured.
+- TLS certificate issues.
+- 404 from mirrors (stale mirror).
+- GPG signature errors.
+- Permission denied (non-root).
+
+EXAMPLES:
+1) apt.update
+2) apt.update 
+3) apt.update ignored
+4) apt.update now
+5) apt.update refresh
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim packages were installed; this only updates indexes.
+- Do NOT claim specific repository versions were fetched unless printed.
+- Do NOT assume partial success means success; apt may exit non-zero.
+- Do NOT guess the fix; read the exact apt error lines.
+- Do NOT claim host machine was updated; container-only.
+- Do NOT invent missing packages; verify with sys.which or apt.install attempts.
+- Do NOT assume apt repos are Ubuntu vs Debian; read /etc/os-release via sys.os if needed.
+- Do NOT claim security implications; this is routine package index refresh.
+- Do NOT add extra flags; tool is fixed to apt-get update.
+- If network is restricted, state apt.update cannot succeed without connectivity.
+- Treat output as authoritative for diagnosing apt failures.
+- Keep conclusions conservative and tied to printed apt messages.
+- Never fabricate GPG key IDs or mirror names.
+- If user asks for package versions, this tool does not provide them.
+- Do not reference tools not yet written; keep scope to this tool only.

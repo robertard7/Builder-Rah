@@ -1,0 +1,115 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\grep.text.txt
+TOOL ID:
+grep.text
+
+CATEGORY:
+file
+
+PURPOSE:
+Search for a pattern across text files under /work and print up to 500 matching lines with file paths and line numbers.
+Uses ripgrep (rg) if available; otherwise falls back to recursive grep.
+Used to locate where a string appears across the workspace.
+
+WHEN TO USE:
+- You need to find all occurrences of a symbol, error message, or config key across /work.
+- You are debugging compile errors and need to locate references quickly.
+- You need to discover where a toolId or string literal is used.
+- You need fast cross-repo searching under /work.
+- You need file+line output to navigate to specific locations.
+
+WHEN NOT TO USE:
+- You want fixed-string search in one file: use file.searchpath.
+- You only need the list of files, not lines: use grep.files.
+- You need regex with special handling or multiline: this tool uses default rg/grep behavior.
+- You need to search outside /work: not supported.
+- You need more than 500 results: tool is capped; refine the pattern.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into pat="{args}".
+  - No token splitting; pat is the full argument string.
+- Positional arguments:
+  - 1st: <pattern> required.
+    - Passed to `rg -n "<pattern>" /work` if rg exists.
+    - Otherwise passed to `grep -RIn --exclude-dir=.git "<pattern>" /work`.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Limits output to 500 lines via head.
+- Error conditions:
+  - If pattern missing/empty: prints "missing pattern" and exits 2.
+  - If rg is missing and grep is missing (unlikely), tool fails.
+  - If pattern is a regex with invalid syntax in rg, rg exits non-zero.
+  - Binary files may be skipped or produce warnings.
+  - Permission denied may produce partial results.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - Searches only /work.
+  - Excludes .git in fallback grep mode only (rg default ignores .git typically, but not guaranteed).
+
+OUTPUT:
+- stdout behavior:
+  - rg mode: lines like "/work/path/file:line:matchline", capped at 500.
+  - grep fallback: similar "file:line:matchline", capped at 500.
+  - On missing pattern: prints exactly "missing pattern".
+- stderr behavior:
+  - rg/grep warnings and errors appear here.
+- exit codes and meanings:
+  - 0: matches found (rg) or grep succeeded.
+  - 1: rg found no matches (normal rg behavior).
+  - 2: missing pattern (explicit tool check).
+  - Non-zero: syntax error or command failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Pattern is user-provided or from known logs; do not invent search terms.
+  - Pattern is narrow enough to avoid flooding; tool caps at 500 but still can be noisy.
+- MUST NEVER guess:
+  - Never claim a match exists if none printed.
+  - Never fabricate file paths or line numbers.
+- Requires user confirmation:
+  - If searching for secrets (tokens/keys) across /work, confirm before running and before printing matches.
+
+COMMON FAILURE MODES:
+- Pattern is too broad (e.g., "a") and produces meaningless output; capped at 500 hides many.
+- Pattern includes regex metacharacters unexpectedly; rg treats as regex and may error.
+- rg exit 1 is “no matches”, not a crash.
+- Permission denied on some folders.
+- Huge repos cause search to take longer; output still capped.
+
+EXAMPLES:
+1) grep.text PlanAsync
+2) grep.text RunIntent
+3) grep.text sys.mount.check
+4) grep.text TaskBoardEngine.ParseAiTaskBoardText
+5) grep.text HttpClient.Timeout
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT interpret rg exit 1 as a tool failure; it can mean “no matches”.
+- Do NOT assume the first 500 results represent the full set; output is capped.
+- Do NOT infer refactor steps from partial results; gather targeted matches instead.
+- Do NOT guess file encoding; if output looks corrupted, note possible binary/encoding.
+- Do NOT claim the match is unique unless you verify with more targeted searches.
+- Do NOT replace regex characters; use the pattern as provided.
+- Do NOT search outside /work; this tool cannot.
+- If user needs literal matching, use file.searchpath with fixed-string or instruct a literal-safe pattern; do not pretend it is fixed-string here.
+- Do NOT summarize unseen matches; only discuss what is printed.
+- Treat file:line output as authoritative and do not invent additional context.
+- Keep conclusions conservative and tied to evidence from printed lines.
+- If results include secrets, mask them in summaries unless user explicitly requires full exposure.
+- Do not add flags to rg/grep; tool is fixed.
+- If output is empty, do not guess; report no matches and stop.

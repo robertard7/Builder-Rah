@@ -1,0 +1,113 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\ruby.bundle.install.txt
+TOOL ID:
+ruby.bundle.install
+
+CATEGORY:
+build
+
+PURPOSE:
+Install Ruby project dependencies using Bundler in a specified project directory.
+Runs: `cd <projectDir> && bundle install`
+
+WHEN TO USE:
+- You have a Ruby project with a Gemfile and need gems installed.
+- You want to reproduce Bundler dependency resolution in the container.
+- You need gems installed before running Ruby scripts or tests.
+- You want a standard `bundle install` without extra options.
+- You need bundler error output to diagnose gem conflicts.
+
+WHEN NOT TO USE:
+- The directory is not a Ruby Bundler project (no Gemfile): bundler will fail.
+- Bundler is not installed in the container: tool will fail.
+- You need to run Ruby tests; this tool only installs dependencies.
+- You require private gem source credentials not provided; do not run without explicit config.
+- You do not know the correct project directory; do not guess.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `p="{args}"; if [ -z "$p" ]; then echo 'usage: <projectDir>'; exit 2; fi; cd "$p" && bundle install`
+- {args} is treated as a single string path.
+- No token splitting is performed by the tool itself.
+Positional arguments:
+- 1st: <projectDir> required.
+Optional arguments:
+- None.
+Defaults:
+- Always runs `bundle install`.
+Error conditions:
+- If projectDir missing/empty:
+  - Prints `usage: <projectDir>`
+  - Exits 2.
+- If cd fails:
+  - Non-zero exit.
+- If bundle missing:
+  - Non-zero.
+- If Gemfile missing:
+  - Non-zero.
+- If install fails (network, native extensions):
+  - Non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into <projectDir>.
+- File system assumptions:
+  - projectDir exists and is writable.
+  - Bundler may write to vendor/bundle or system gem paths depending on config.
+
+OUTPUT:
+- stdout behavior:
+  - Bundler progress, gem install logs.
+- stderr behavior:
+  - Bundler errors, native extension compile errors.
+- exit codes and meanings:
+  - 0: install succeeded.
+  - 2: missing projectDir argument.
+  - Non-zero: bundler failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Installs gems into configured gem path.
+  - May create Gemfile.lock if missing.
+  - Writes caches and compiled native extensions.
+- Network access:
+  - Typically yes to fetch gems.
+- Installed packages:
+  - Ruby gems.
+- State changes:
+  - Ruby environment changes.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - projectDir contains Gemfile.
+  - User accepts network downloads.
+  - Any private gem source credentials are configured (do not invent).
+- What must NEVER be guessed:
+  - Do not guess projectDir.
+  - Do not guess bundler config, mirror URLs, or credentials.
+- What requires user confirmation:
+  - If running bundle install modifies Gemfile.lock and that is undesirable, confirm.
+  - If native extension builds require system packages, confirm before installing extras.
+
+COMMON FAILURE MODES:
+- bundler not installed.
+- Missing Gemfile.
+- Network/proxy issues.
+- Ruby version mismatch.
+- Native extension compile failures due to missing build tools.
+- Permission issues writing gem paths.
+- Out of disk.
+
+EXAMPLES:
+1) ruby.bundle.install /work/ruby/app
+2) ruby.bundle.install /work/services/ruby_backend
+3) ruby.bundle.install /work/repro/ruby_proj
+4) ruby.bundle.install /work/tools/ruby_util
+5) ruby.bundle.install /work/components/ruby_cli
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim gems installed unless exit 0.
+- Do NOT claim Gemfile.lock created/updated unless verified.
+- Do NOT invent missing packages; use actual native extension errors.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written.

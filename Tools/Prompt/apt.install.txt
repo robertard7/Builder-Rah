@@ -1,0 +1,121 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\apt.install.txt
+TOOL ID:
+apt.install
+
+CATEGORY:
+build
+
+PURPOSE:
+Install one or more Debian packages inside the rah-linux container using apt-get.
+This tool runs `apt-get update` first, then installs packages with `apt-get install -y`.
+
+WHEN TO USE:
+- A required executable is missing (confirmed via sys.which) and you need to install it.
+- A build fails due to missing headers/libraries and you need system dependencies.
+- You need to install dev tooling (e.g., clang-format, cppcheck) for formatting/linting tools.
+- You need to install runtime dependencies for language toolchains inside the container.
+- You are preparing the container for a reproducible build by ensuring packages exist.
+
+WHEN NOT TO USE:
+- You are on the Windows host: this affects only the rah-linux container.
+- You do not know the package names: do not guess; require explicit package list.
+- The container is offline or should not reach the internet.
+- You need a curated set of core tools: use apt.install.core (written elsewhere) if available in manifest.
+- You need dotnet SDK: container-side prereqs only are in apt.install.dotnet, not full SDK.
+- You need language mega-pack: apt.install.languages exists for that (written elsewhere).
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into pkgs="{args}".
+  - The tool then runs: `apt-get install -y $pkgs`
+  - This means pkgs is expanded by the shell as whitespace-separated package tokens.
+  - Quoting is not preserved reliably; avoid package names with spaces (apt packages do not use spaces).
+- Positional arguments:
+  - 1st..N: <pkgs> required, one or more package names separated by spaces.
+- Optional arguments:
+  - None. All tokens are treated as package names.
+- Defaults:
+  - Runs `apt-get update` every time before install.
+- Error conditions:
+  - If pkgs missing/empty: prints "missing packages" and exits 2.
+  - If any package name is invalid or not found: apt exits non-zero.
+  - If network fails during update or install: apt exits non-zero.
+  - If dpkg is interrupted or locked: apt fails.
+  - If not running as root: apt fails with permission denied.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - apt-get and dpkg available.
+  - /etc/apt sources configured.
+  - Sufficient disk space for package installs.
+
+OUTPUT:
+- stdout behavior:
+  - apt-get update output followed by apt-get install progress.
+  - On missing pkgs: prints exactly "missing packages".
+- stderr behavior:
+  - apt errors, dpkg errors, network errors.
+- exit codes and meanings:
+  - 0: packages installed successfully.
+  - 2: missing packages argument (explicit tool check).
+  - Non-zero: apt-get update/install failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Installs packages into the container filesystem.
+  - Updates apt cache lists under /var/lib/apt/lists.
+  - May modify /var/cache/apt and dpkg status database.
+- Network access:
+  - Yes, fetches package indexes and package archives.
+- Installed packages:
+  - Yes, installs the requested packages.
+- State changes:
+  - Container environment changes; subsequent commands may have new executables/libs.
+
+SAFETY RULES:
+- MUST verify:
+  - Package names come from user instruction or from a known missing-command mapping that the user approved.
+  - Confirm the container OS family supports apt (use sys.os if uncertain).
+- MUST NEVER guess:
+  - Never invent package names.
+  - Never add extra packages “just in case”.
+  - Never assume installing a package is harmless; it changes the environment.
+- Requires user confirmation:
+  - If you propose installing packages not explicitly requested, require user confirmation first.
+  - If install will be large (language mega-pack), confirm user intent.
+
+COMMON FAILURE MODES:
+- "missing packages" due to empty args.
+- apt-get update fails due to DNS/proxy/TLS.
+- Package not found (wrong name or repo missing).
+- dpkg lock held by another apt process.
+- Disk full.
+- Repository signature/GPG key issues.
+- Network timeouts.
+
+EXAMPLES:
+1) apt.install tree
+2) apt.install ripgrep
+3) apt.install clang-format
+4) apt.install cppcheck
+5) apt.install libssl-dev zlib1g-dev
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim a package was installed unless apt exit code is 0 and output indicates success.
+- Do NOT guess which package provides a missing command; verify with user or documented mapping.
+- Do NOT claim apt updated the host machine; container-only.
+- Do NOT claim specific versions were installed unless apt output shows them.
+- Do NOT assume install fixes the build; re-run the build to confirm.
+- Do NOT hide errors; apt error messages matter.
+- Do NOT suggest removing packages; not part of this tool.
+- Do NOT modify apt sources; not part of this tool.
+- Do NOT add flags like --no-install-recommends; tool is fixed.
+- If apt fails, do not invent the fix; use the exact error lines.
+- Treat installed packages as environment changes that should be tracked.
+- Do NOT run apt.install with empty args.
+- Keep conclusions conservative and tied to apt output.
+- Avoid bundling many packages unless user requested it explicitly.
+- Never claim a security posture change; installing packages increases surface area.

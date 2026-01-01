@@ -1,0 +1,108 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\repo.ls.txt
+TOOL ID:
+repo.ls
+
+CATEGORY:
+repo
+
+PURPOSE:
+List the current working directory contents and the /work directory contents.
+Prints `pwd`, `ls -la .`, then `ls -la /work`.
+
+WHEN TO USE:
+- You need to see where the tool is currently running (pwd).
+- You want a quick view of files in the current directory.
+- You want to confirm what exists under /work in the container.
+- You are orienting before running file operations.
+- You suspect the working directory is wrong and need evidence.
+
+WHEN NOT TO USE:
+- You need a recursive tree; use repo.tree instead.
+- You need to find a file by name pattern; use file.find instead.
+- You need detailed file metadata beyond ls; use file.stat for specific paths.
+- You want to list a different directory than current and /work; this tool is fixed.
+- You are dealing with extremely large /work and only want a subset; this tool prints full ls output (still manageable).
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool ignores {args}; it has no parameters in the manifest.
+  - Any provided args are not used by the command template.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Always lists `.` and `/work`.
+- Error conditions:
+  - If /work does not exist: ls will error.
+  - If permissions block listing: ls errors.
+  - If pwd fails (rare): shell error.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Uses whatever current directory the runner has set.
+  - Does not cd.
+- File system assumptions:
+  - /work is expected to exist and contain the workspace.
+  - Current directory may or may not be /work depending on tool runner.
+
+OUTPUT:
+- stdout behavior:
+  - Prints the current directory path (pwd).
+  - Prints `ls -la .` output.
+  - Prints separator line `-----`.
+  - Prints `ls -la /work` output.
+- stderr behavior:
+  - Errors from ls if directories missing or permission denied.
+- exit codes and meanings:
+  - 0: command completed successfully.
+  - Non-zero: errors listing directories (missing mounts or permissions).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify before calling:
+  - Nothing sensitive is expected to be printed; repo.ls is safe but may show filenames.
+- MUST NEVER be guessed:
+  - Do not claim files exist unless they appear in output.
+  - Do not assume current dir is /work; read pwd output.
+- Requires user confirmation:
+  - None typically, because listing is read-only.
+  - If user has privacy concerns about filenames, confirm.
+
+COMMON FAILURE MODES:
+- /work not mounted.
+- Permission denied on /work.
+- Runner starts in unexpected directory.
+- Extremely large directory listing can be long (but still bounded).
+
+EXAMPLES:
+1) repo.ls
+2) repo.ls ""
+3) repo.ls (no args)
+4) repo.ls (ignored args are still ignored)
+5) repo.ls (used to confirm /work content)
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT infer repository structure beyond what is listed.
+- Do NOT invent missing files or directories.
+- Do NOT claim git repo exists; this tool does not check .git.
+- Do NOT claim /work is writable; this tool does not test writing.
+- Do NOT convert paths to Windows.
+- Do NOT assume /work contains the intended project; verify names.
+- Do NOT reference tools not yet written here.
+- If stderr shows missing /work, treat that as environment issue, not “probably fine”.
+- Keep conclusions tied to the listing shown.
+- Do not summarize hidden files unless output shows them.
+- Do not interpret file sizes as “big” or “small” without context.
+- Never fabricate timestamps or permissions.
+- Treat output as authoritative.

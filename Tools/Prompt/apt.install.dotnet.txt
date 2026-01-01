@@ -1,0 +1,109 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\apt.install.dotnet.txt
+TOOL ID:
+apt.install.dotnet
+
+CATEGORY:
+build
+
+PURPOSE:
+Install container-side prerequisites for running the dotnet SDK/runtime (not the dotnet SDK itself).
+Installs: libc6, libgcc-s1, libstdc++6, zlib1g, libicu-dev.
+
+WHEN TO USE:
+- dotnet fails to run inside the container due to missing system libraries.
+- You are preparing a Linux container to host dotnet binaries copied in or mounted.
+- You see errors related to ICU, zlib, libc, or libstdc++ when running dotnet.
+- You want a minimal dependency set for dotnet runtime compatibility.
+
+WHEN NOT TO USE:
+- You want to install the dotnet SDK from Microsoft repos: this tool does not do that.
+- You are working on the Windows host where dotnet is installed normally.
+- You need a full development environment with workloads: not provided here.
+- You do not have dotnet binaries present; installing prereqs alone will not add dotnet.
+- Network access is not allowed; apt is required.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool does not accept arguments.
+  - Any provided {args} is ignored.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Always runs:
+    - apt-get update
+    - apt-get install -y libc6 libgcc-s1 libstdc++6 zlib1g libicu-dev
+- Error conditions:
+  - apt update/install failures.
+  - dpkg lock.
+  - disk full.
+  - repo signature issues.
+  - permission denied if not root.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - apt-get available and configured.
+
+OUTPUT:
+- stdout behavior:
+  - apt-get update output and install progress.
+- stderr behavior:
+  - apt/dpkg errors and warnings.
+- exit codes and meanings:
+  - 0: prereqs installed successfully.
+  - Non-zero: failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Installs packages into container.
+  - Updates apt lists and dpkg database.
+- Network access:
+  - Yes.
+- Installed packages:
+  - Yes, fixed list above.
+- State changes:
+  - Adds system libraries needed by dotnet.
+
+SAFETY RULES:
+- MUST verify:
+  - User wants container modified.
+  - There is a real dotnet runtime requirement (error evidence).
+- MUST NEVER guess:
+  - Do not claim dotnet is installed by this tool.
+  - Do not claim this fixes all dotnet issues; it only covers listed prereqs.
+- Requires user confirmation:
+  - If user did not request installing these prereqs, obtain approval first.
+
+COMMON FAILURE MODES:
+- apt update cannot reach repos.
+- Packages already installed (not a failure).
+- Repo mismatch causing package name differences (rare).
+- Disk or dpkg lock issues.
+
+EXAMPLES:
+1) apt.install.dotnet
+2) apt.install.dotnet prereqs
+3) apt.install.dotnet ignored
+4) apt.install.dotnet now
+5) apt.install.dotnet bootstrap
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim dotnet CLI exists after this; confirm with dotnet.info or sys.which dotnet.
+- Do NOT claim Windows dotnet is affected; container-only.
+- Do NOT claim workloads or SDK components were installed.
+- Do NOT invent missing library names; use actual error output.
+- Do NOT suggest adding Microsoft apt repos as an automatic step; requires user instruction.
+- If dotnet still fails after prereqs, do not guess; collect the new error output.
+- Keep conclusions conservative: success means libraries installed, not that dotnet is usable.
+- Do NOT add or remove packages; tool list is fixed.
+- Do NOT hide apt error output.
+- Do NOT re-run repeatedly without addressing the underlying error cause.
+- Treat the installed list as authoritative for this tool.
+- Do NOT reference tools not yet written; stay scoped.
+- Never assume ICU issues are solved without verification.
+- Never claim platform compatibility beyond what is tested.
+- Use sys.os if distro mismatch is suspected (separately, not assumed).

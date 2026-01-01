@@ -1,0 +1,108 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\repo.tree.txt
+TOOL ID:
+repo.tree
+
+CATEGORY:
+repo
+
+PURPOSE:
+Show a directory tree view of a path up to a limited depth.
+If `tree` exists, runs `tree -L 4 <path>`.
+If `tree` does not exist, falls back to `find <path> -maxdepth 3 -type d -print | head -n 400`.
+Default path is /work if not provided.
+
+WHEN TO USE:
+- You need a quick overview of folders in a workspace.
+- You want to confirm project layout and key directories.
+- You are locating where source files likely live.
+- You want a bounded-depth tree to avoid massive output.
+- You are debugging path assumptions and need evidence.
+
+WHEN NOT TO USE:
+- You need to list files, not directories; this tool is directory-focused.
+- You need deeper depth; tool is fixed to L4 or find maxdepth 3.
+- You need an exact file search by pattern; use file.find.
+- You do not know the path; do not guess (but you may rely on default /work if that is intended).
+- You need a full recursive listing; output is intentionally truncated.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool command does: `p="{args}"; if [ -z "$p" ]; then p=/work; fi; ...`
+  - {args} is treated as a single string path.
+  - No token splitting needed; but spaces in path can still cause issues in some shells; avoid spaces.
+- Positional arguments:
+  - 1st: <path> optional.
+- Optional arguments:
+  - None beyond the optional path.
+- Defaults:
+  - If no args: path defaults to `/work`.
+- Error conditions:
+  - If path does not exist: tree/find fails.
+  - If permissions deny access: errors.
+  - If neither tree nor find works: failure (find should exist on most systems).
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not cd.
+- File system assumptions:
+  - /work exists.
+  - `tree` may or may not be installed.
+  - `find` is expected to exist.
+
+OUTPUT:
+- stdout behavior:
+  - If tree exists: prints a tree view up to depth 4.
+  - Else: prints a list of directories up to depth 3, capped at 400 lines.
+- stderr behavior:
+  - Errors from tree/find if path missing or permission denied.
+- exit codes and meanings:
+  - 0: command completed (even if truncated).
+  - Non-zero: path invalid or command failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify before calling:
+  - Path is correct (or default /work is appropriate).
+  - Output will expose directory names; consider privacy.
+- MUST NEVER be guessed:
+  - Do not claim file counts or directory depth beyond what is shown.
+  - Do not claim tree is installed; check output path (tree vs find).
+- Requires user confirmation:
+  - If path points outside /work and could reveal sensitive layout, confirm.
+
+COMMON FAILURE MODES:
+- Path does not exist.
+- /work not mounted.
+- Permission denied entering directories.
+- Output truncated by head; user thinks directories don’t exist when they just didn’t appear.
+
+EXAMPLES:
+1) repo.tree
+2) repo.tree /work
+3) repo.tree /work/RahOllamaOnly
+4) repo.tree /work/src
+5) repo.tree /work/tools
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT assume missing directories do not exist; output may be truncated.
+- Do NOT invent file listings; this tool primarily shows directories.
+- Do NOT interpret fallback find output as equivalent to tree; it only prints directories.
+- Do NOT claim maximum depth is configurable; it is fixed by tool.
+- Do NOT convert paths to Windows.
+- Do NOT claim repository is a git repo; this tool does not check .git.
+- Do NOT reference tools not yet written here.
+- If errors appear, report them exactly.
+- If tree output is used, do not paraphrase structure incorrectly; keep it literal.
+- Never fabricate directory names.
+- Treat stdout/stderr as authoritative evidence.
+- Avoid speculating about missing tools; verify with sys.which if needed.

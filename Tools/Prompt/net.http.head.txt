@@ -1,0 +1,118 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\net.http.head.txt
+TOOL ID:
+net.http.head
+
+CATEGORY:
+network
+
+PURPOSE:
+Send an HTTP HEAD request to a URL using curl and print the response headers (trimmed).
+This is used to verify basic HTTP reachability, redirects, and server response metadata without downloading the full body.
+
+WHEN TO USE:
+- You need to verify a URL is reachable from inside the rah-linux container.
+- You need to see HTTP status (200/301/302/403/404/500) for a URL.
+- You need to confirm redirects and Location headers.
+- You need to check TLS handshake success via curl (without fetching body).
+- You are debugging why downloads fail and want the server response headers first.
+- You need to confirm a registry endpoint is up (e.g., an index.json URL).
+
+WHEN NOT TO USE:
+- You need the response body: use net.http.get.
+- You need DNS-only checks: use net.dns.
+- You need raw TCP-level debugging: this tool is HTTP-only.
+- You need authentication flows that require cookies, tokens, or custom headers: this tool does not accept extra curl flags.
+- You need to test POST/PUT/DELETE: HEAD only.
+- You need to download binaries or large files: this tool intentionally avoids body transfer.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into u="{args}".
+  - No splitting into multiple arguments occurs in the tool template.
+  - Spaces inside {args} will be part of u and will usually break curl unless the runner preserves exact quoting.
+- Positional arguments:
+  - 1st: <url> required.
+    - Must be a full URL string understood by curl (e.g., https://example.com/path).
+- Optional arguments:
+  - None.
+- Defaults:
+  - Prints only the first 120 lines of headers.
+- Error conditions:
+  - If url is missing or empty: prints "missing url" and exits 2.
+  - curl returns non-zero for DNS failure, connect timeout, TLS failure, or non-2xx with -f enabled.
+  - curl may fail on malformed URL (spaces, missing scheme).
+  - If curl is missing, command fails.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - None.
+
+OUTPUT:
+- stdout behavior:
+  - On success: HTTP response headers produced by `curl -fsS -I <url>`, trimmed to 120 lines.
+  - Includes status line and header lines; may include multiple header blocks for redirects.
+  - On missing url: prints exactly "missing url".
+- stderr behavior:
+  - curl error messages (because -S) appear on stderr.
+- exit codes and meanings:
+  - 0: request succeeded and curl returned success.
+  - 2: missing url (explicit tool check).
+  - Non-zero: curl failure (DNS, connect, TLS, HTTP error with -f).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - Makes an outbound HTTP(S) request to the URL.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - The URL is explicitly provided by the user or already present in logs.
+  - The URL scheme is included (http:// or https://) unless curl can infer (do not assume).
+- MUST NEVER guess:
+  - Never invent a URL.
+  - Never add query parameters or paths not provided.
+  - Never assume authentication headers; this tool cannot add them.
+- Requires user confirmation:
+  - If URL targets a private/internal host not clearly intended, confirm before probing.
+  - If URL includes credentials in the string, do not repeat them back.
+
+COMMON FAILURE MODES:
+- "missing url" because args were empty.
+- curl not installed.
+- DNS failure: "Could not resolve host".
+- TLS failure: certificate issues, handshake problems.
+- HTTP error codes trigger failure due to `-f` (e.g., 404 makes curl exit non-zero).
+- Redirect loops may produce repeated header blocks; output is trimmed at 120 lines.
+- Proxy requirements not met; curl may fail if outbound requires proxy.
+
+EXAMPLES:
+1) net.http.head https://github.com
+2) net.http.head https://raw.githubusercontent.com
+3) net.http.head https://registry.npmjs.org
+4) net.http.head http://example.com
+5) net.http.head https://165.245.138.66/index.json
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim the HTTP status unless it appears in the printed headers.
+- Do NOT claim a redirect target unless a Location header is present.
+- Do NOT assume "network down" from one failure; it may be DNS or TLS.
+- Do NOT assume the server supports HEAD; some servers behave oddly.
+- Do NOT fabricate headers like Server, Date, Content-Type; only report what is shown.
+- Do NOT infer body size unless Content-Length is present, and even then note it is header-reported.
+- Do NOT claim the content exists if curl failed due to -f on 404/403; treat as failure.
+- Do NOT claim authentication is required unless headers indicate it (e.g., WWW-Authenticate).
+- Do NOT “fix” the URL by adding https://; only if user explicitly requests that rewrite.
+- Do NOT pass extra curl options; tool does not accept them.
+- If user asks to send a header, this tool cannot; do not pretend.
+- If output is truncated, say it is truncated; do not claim unseen headers.
+- Keep conclusions conservative and tied to the exact printed lines.
+- Never interpret CDN headers beyond stating they exist.
+- This tool is for headers-only; do not describe body content.

@@ -1,0 +1,112 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\sys.mount.check.txt
+TOOL ID:
+sys.mount.check
+
+CATEGORY:
+system
+
+PURPOSE:
+Verify that /rah/tools and /work exist in the container and that /rah/tools is writable.
+It lists directories and performs a small write-test in /rah/tools.
+
+WHEN TO USE:
+- Tools fail with “No such file or directory” for /rah/tools scripts.
+- You suspect the container was started without the expected volume mounts.
+- You need to confirm /work is present and visible.
+- You need to confirm /rah/tools is writable (tool scripts can be installed/updated).
+- You suspect filesystem permission issues are causing tool execution failures.
+
+WHEN NOT TO USE:
+- You need a general mount list: use sys.info.
+- You need OS distro info: use sys.os.
+- You need to verify a specific file in /work: use repo.ls or file.stat.
+- You are trying to check network connectivity: use net.* tools.
+- You want to remove files or clean builds: use repo.clean (carefully), not this.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool does not accept arguments.
+  - Any provided {args} is ignored.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Always checks /rah/tools and /work.
+- Error conditions:
+  - If /rah/tools does not exist, `ls -la /rah/tools` will fail and tool will exit non-zero due to `set -e`.
+  - If write test fails (permission denied, read-only FS), the tool exits non-zero.
+  - If /work does not exist, final `ls -la /work` will fail and tool exits non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - /rah/tools should exist and be mounted from host or image.
+  - /work should exist as workspace mount.
+
+OUTPUT:
+- stdout behavior:
+  - Prints labeled sections:
+    - "[check] /rah/tools"
+    - listing of /rah/tools (first 120 lines)
+    - "[check] write test"
+    - prints contents of a temp file created in /rah/tools
+    - "[check] /work"
+    - listing of /work (first 120 lines)
+- stderr behavior:
+  - Directory missing or permission errors appear here.
+- exit codes and meanings:
+  - 0: both mounts exist and write-test succeeded.
+  - Non-zero: missing path or write failure or listing failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates /rah/tools/__mount_test.txt and removes it.
+  - No other modifications.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - Writes and deletes a small test file.
+
+SAFETY RULES:
+- MUST verify:
+  - None required, but understand it writes a temporary file to /rah/tools.
+- MUST NEVER guess:
+  - Do not claim mounts are fine if the tool exits non-zero.
+  - Do not claim /work is writable; this tool does not write-test /work.
+- Requires user confirmation:
+  - None. The write-test is minimal and self-cleaning.
+
+COMMON FAILURE MODES:
+- /rah/tools not mounted, causing “No such file or directory”.
+- /rah/tools mounted read-only, causing “Permission denied” on write test.
+- /work not mounted, causing listing failure.
+- Wildly large directory listings are truncated to 120 lines.
+
+EXAMPLES:
+1) sys.mount.check
+2) sys.mount.check 
+3) sys.mount.check ignored
+4) sys.mount.check anything
+5) sys.mount.check check_mounts
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT invent mount paths or claim host paths.
+- Do NOT assume /work writable unless you run a separate write-test via run.cmd (only with user intent).
+- Do NOT ignore non-zero exit; treat it as a hard failure signal.
+- Keep the section labels exact; they are part of stdout.
+- Do NOT say “tools are installed” based on listing alone; verify actual files with repo.ls or file.stat if needed.
+- If listing is truncated, say so; do not pretend you saw everything.
+- Do NOT diagnose Docker compose issues without evidence; use the output to point to missing mounts only.
+- Do NOT recommend chmod/chown blindly; only after seeing permission errors.
+- Do NOT claim the temp file persists; it is removed on success.
+- If the tool dies before rm, a temp file may remain; only claim that if output shows it.
+- Do NOT infer container runtime from mount behavior.
+- This tool is deterministic; do not add extra checks.
+- Do not call other tools from inside this definition.
+- Treat /rah/tools as tool script directory, not general storage.
+- Never suggest using this tool to “fix” mounts; it only reports.

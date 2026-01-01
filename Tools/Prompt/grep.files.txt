@@ -1,0 +1,112 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\grep.files.txt
+TOOL ID:
+grep.files
+
+CATEGORY:
+file
+
+PURPOSE:
+List files under /work that match a search pattern, using `rg -l` if available or grep -RIl fallback.
+Used to identify which files contain a pattern without printing matching lines.
+
+WHEN TO USE:
+- You need a list of files containing a string, not the exact lines.
+- You are narrowing scope before opening files.
+- You want to find which source files reference a type or method.
+- You want to identify which configs contain a key.
+- You want to build a targeted review list for edits.
+
+WHEN NOT TO USE:
+- You need line numbers or matching content: use grep.text.
+- You need fixed-string single-file search: use file.searchpath.
+- You need to search outside /work: not supported.
+- You need more than 900 file paths: tool is capped; refine the pattern.
+- You need regex-heavy searching with strict semantics: tool uses default rg/grep behavior.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into pat="{args}".
+  - No token splitting; pat is the entire pattern string.
+- Positional arguments:
+  - 1st: <pattern> required.
+    - Passed to `rg -l "<pattern>" /work` if rg exists.
+    - Otherwise passed to `grep -RIl --exclude-dir=.git "<pattern>" /work`.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Output truncated to 900 paths via head -n 900.
+- Error conditions:
+  - If pattern missing/empty: prints "missing pattern" and exits 2.
+  - rg invalid regex can exit non-zero.
+  - rg exit 1 means no matches (normal).
+  - grep exit 1 means no matches (normal).
+  - Permission errors may cause partial results.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - Operates under /work only.
+
+OUTPUT:
+- stdout behavior:
+  - Prints file paths (one per line) that contain the pattern, capped at 900.
+  - On missing pattern: prints exactly "missing pattern".
+- stderr behavior:
+  - rg/grep warnings/errors printed here.
+- exit codes and meanings:
+  - 0: matches found.
+  - 1: no matches (rg/grep normal behavior).
+  - 2: missing pattern (explicit tool check).
+  - Non-zero: command failure (syntax, permissions, etc.).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Pattern is legitimate and user-intended.
+  - Pattern is narrow enough to keep results useful.
+- MUST NEVER guess:
+  - Never claim a file contains a pattern unless it is listed.
+  - Never invent file paths.
+- Requires user confirmation:
+  - If searching for sensitive tokens/keys across workspace, confirm before printing results.
+
+COMMON FAILURE MODES:
+- Pattern too broad yields huge results; capped at 900 hides many.
+- Pattern includes regex metacharacters; rg treats as regex and may error.
+- Permission denied hides files.
+- No matches yields exit 1; do not treat as crash.
+
+EXAMPLES:
+1) grep.files RunIntent
+2) grep.files TaskBoardEngine
+3) grep.files tools.json
+4) grep.files HttpProbe
+5) grep.files QdrantClient
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT treat “no output” as “tool broke”; check exit code semantics (exit 1 can be no matches).
+- Do NOT infer match counts; tool prints only file paths.
+- Do NOT claim a file contains the pattern if not listed.
+- Output is capped; do not claim completeness if many results expected.
+- Do NOT assume rg exists; fallback may run.
+- Do NOT convert paths to Windows.
+- Do NOT infer file content type or correctness from listing alone; open files to confirm.
+- Do NOT add additional filters; tool is fixed.
+- If user needs exact literal matching, note that rg uses regex by default; do not pretend it was literal.
+- Keep conclusions conservative and tied to printed file list only.
+- If results include secret file names, do not broadcast them beyond what user asked for.
+- Do not claim refactor steps purely from file list; inspect content.
+- Treat printed file paths as authoritative evidence.
+- If pattern is empty, tool prints missing pattern; do not guess a default.
+- Never invent alternative patterns.

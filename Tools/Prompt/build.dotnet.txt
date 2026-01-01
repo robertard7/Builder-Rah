@@ -1,0 +1,124 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\build.dotnet.txt
+TOOL ID:
+build.dotnet
+
+CATEGORY:
+build
+
+PURPOSE:
+Build dotnet projects from the /work workspace using `dotnet build`.
+If no args are provided, runs `dotnet build -v minimal` in /work.
+If args are provided, passes them directly to `dotnet build`.
+
+WHEN TO USE:
+- You need to compile a dotnet solution or project under /work.
+- You changed C# code and need to confirm the build still succeeds.
+- You need error output from compilation to diagnose failures.
+- You want to run a targeted build (specific project path, configuration, framework) by providing args.
+- You want a minimal-verbosity build by default to reduce noise.
+
+WHEN NOT TO USE:
+- You need to run tests: use test.dotnet.
+- You need to create a new project: use dotnet.new.
+- You need to build outside /work: this tool forces `cd /work` first.
+- You need MSBuild-specific operations not supported by dotnet CLI args; do not assume.
+- You do not know which project/solution to build and /work contains multiple repos: locate the right path first.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into a="{args}".
+  - If a is empty:
+    - Runs: `dotnet build -v minimal`
+  - Else:
+    - Runs: `dotnet build $a`
+  - In the non-empty case, $a is expanded by the shell as whitespace-separated tokens.
+  - Quoting is not reliably preserved; paths with spaces will break.
+- Positional arguments:
+  - Entire arg string is treated as dotnet build arguments.
+  - Common forms:
+    - <path> (project or solution)
+    - -c Release
+    - -f net8.0
+    - /p:Property=Value (may work, but tokenization risks)
+- Optional arguments:
+  - Any dotnet build arguments supported by dotnet CLI.
+- Defaults:
+  - Working directory is /work.
+  - If no args: minimal verbosity.
+- Error conditions:
+  - If `cd /work` fails: exits 2.
+  - If dotnet not installed or not runnable: non-zero.
+  - If build fails: non-zero with errors on stdout/stderr.
+  - If args malformed due to tokenization: dotnet build fails.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Always `cd /work || exit 2` before running build.
+- File system assumptions:
+  - /work contains the project/solution or provided relative path from /work.
+
+OUTPUT:
+- stdout behavior:
+  - Build progress and results from dotnet.
+  - Default (no args): minimal verbosity output.
+- stderr behavior:
+  - dotnet runtime errors and MSBuild errors may appear here.
+- exit codes and meanings:
+  - 0: build succeeded.
+  - 2: /work missing or cannot cd into /work.
+  - Non-zero: build failed or dotnet runtime failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Writes build artifacts such as bin/ and obj/ folders under projects.
+  - May write restore assets (project.assets.json) if restore occurs.
+- Network access:
+  - May contact NuGet feeds during restore if packages not cached.
+- Installed packages:
+  - None via apt.
+- State changes:
+  - Produces compiled outputs and intermediate files.
+
+SAFETY RULES:
+- MUST verify:
+  - The target project/solution path is correct and exists.
+  - If providing args with paths, avoid spaces or verify tokenization won’t break them.
+  - User is okay with build artifacts being created under /work.
+- MUST NEVER guess:
+  - Never invent a project path or solution name.
+  - Never claim build success if exit code is non-zero.
+  - Never assume restore succeeded; check build output.
+- Requires user confirmation:
+  - If building will trigger network restores and user wants offline, confirm before running.
+
+COMMON FAILURE MODES:
+- /work not mounted, cd fails (exit 2).
+- dotnet missing or broken.
+- NuGet restore fails due to network or auth.
+- Missing SDK/workloads for targeted framework.
+- Build errors due to code issues.
+- Args tokenization breaks properties or paths.
+
+EXAMPLES:
+1) build.dotnet
+2) build.dotnet RahOllamaOnly/RahOllamaOnly.csproj
+3) build.dotnet RahOllamaOnly.sln -c Release
+4) build.dotnet RahOllamaOnly/RahOllamaOnly.csproj -v minimal
+5) build.dotnet RahOllamaOnly/RahOllamaOnly.csproj -c Debug -f net8.0
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim a build “should work”; only the build output decides.
+- Do NOT summarize errors without quoting the actual error lines.
+- Do NOT infer missing packages; use the exact restore/build messages.
+- Do NOT treat warnings as errors unless dotnet reports failure.
+- Do NOT claim success if build output is truncated; rely on exit code and final summary line.
+- Do NOT assume Windows-specific projects build in Linux container (WinForms, etc.).
+- Do NOT invent MSBuild properties; use only user-provided args.
+- Do NOT convert /work paths to Windows paths.
+- Do NOT claim you produced binaries; verify bin/ exists if needed.
+- If build fails, do not guess fix; gather exact errors and then plan.
+- Keep conclusions conservative and evidence-based.
+- This tool always builds from /work; do not claim it built elsewhere.
+- Do NOT reference tools not yet written.
+- Never fabricate configuration or framework values.

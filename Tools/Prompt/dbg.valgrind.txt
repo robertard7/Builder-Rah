@@ -1,0 +1,109 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\dbg.valgrind.txt
+TOOL ID:
+dbg.valgrind
+
+CATEGORY:
+debug
+
+PURPOSE:
+Run a binary under Valgrind to detect memory leaks and memory errors.
+Runs: `valgrind --leak-check=full <binary> [args...]`
+
+WHEN TO USE:
+- You suspect memory leaks or invalid memory access in a native program.
+- You want leak reports for heap allocations at program exit.
+- You want to diagnose use-after-free, invalid reads/writes, uninitialized reads.
+- You can run the program non-interactively and tolerate slow execution.
+- You want a standard valgrind invocation with full leak check.
+
+WHEN NOT TO USE:
+- The binary is not a native Linux executable in the container; valgrind won’t run it.
+- Performance matters; valgrind is very slow.
+- The program is huge or long-running; output may be massive.
+- You do not know the exact binary path; do not guess.
+- valgrind is not installed in the container.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `set -- {args}; bin="$1"; shift 1 || true; if [ -z "$bin" ]; then echo 'usage: <binary> [args...]'; exit 2; fi; valgrind --leak-check=full "$bin" "$@"`
+- {args} is split by whitespace into tokens.
+- Quoting is not reliably preserved; avoid spaces in paths and args.
+Positional arguments:
+- 1st token: <binary> required.
+- 2nd..N tokens: [args...] optional, passed to the program.
+Optional arguments:
+- Program args only; valgrind options are fixed by the tool.
+Defaults:
+- Always uses `--leak-check=full`.
+Error conditions:
+- If binary missing:
+  - Prints `usage: <binary> [args...]`
+  - Exits 2.
+- If valgrind missing:
+  - Non-zero and error message.
+- If binary not found/not executable:
+  - valgrind errors.
+- If program crashes:
+  - valgrind may still produce a report; exit non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not cd; uses binary path as provided.
+- File system assumptions:
+  - Binary exists and is executable.
+  - valgrind installed.
+
+OUTPUT:
+- stdout behavior:
+  - Program stdout plus some valgrind messages depending on config.
+- stderr behavior:
+  - Valgrind reports primarily go to stderr.
+- exit codes and meanings:
+  - 0: program completed and valgrind found no fatal execution errors (still may show warnings).
+  - 2: missing binary argument.
+  - Non-zero: program/valgrind failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None by tool, but program may create/modify files.
+- Network access:
+  - None by tool, but program may use network.
+- Installed packages:
+  - None.
+- State changes:
+  - Runs the program under valgrind instrumentation.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - Exact binary path.
+  - Program is safe to run (side effects acceptable).
+  - User accepts slow runtime and large output.
+- What must NEVER be guessed:
+  - Do not guess binary path or args.
+  - Do not claim leaks exist without reading valgrind summary.
+- What requires user confirmation:
+  - If program touches files/network and that matters, confirm before running.
+  - If runtime is expected to be long, confirm before running.
+
+COMMON FAILURE MODES:
+- valgrind not installed.
+- Binary path wrong.
+- Program requires interactive input and hangs.
+- Excessive runtime due to instrumentation.
+- False positives due to system libraries or suppression needs.
+- Out of disk due to program output/logging.
+
+EXAMPLES:
+1) dbg.valgrind /work/bin/myapp
+2) dbg.valgrind /work/bin/myapp --mode test
+3) dbg.valgrind /work/MyProj/build/MyExecutable arg1 arg2
+4) dbg.valgrind /work/repro/crashbin 123
+5) dbg.valgrind /work/components/native_tool --config /work/config.json
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim “no leaks” unless valgrind summary states it.
+- Do NOT claim specific leak sizes without citing valgrind output lines.
+- Do NOT infer root cause; report what valgrind reports.
+- Do NOT convert paths to Windows.
+- Do NOT reference tools not yet written.

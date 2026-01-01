@@ -1,0 +1,110 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\net.ping.txt
+TOOL ID:
+net.ping
+
+CATEGORY:
+network
+
+PURPOSE:
+Ping a single host using ICMP echo requests (4 packets) from inside the rah-linux container.
+Used to test basic network reachability and name resolution (if a hostname is provided).
+
+WHEN TO USE:
+- You need to check whether the container can reach a known host (e.g., 8.8.8.8).
+- You need to verify DNS + connectivity in one shot by pinging a hostname.
+- You need to confirm there is any outbound network path at all.
+- A download or git clone fails and you want a fast connectivity check.
+
+WHEN NOT TO USE:
+- You need DNS resolution details: use net.dns.
+- You need HTTP connectivity or TLS validation: use net.http.head or net.http.get (later tools).
+- ICMP is blocked by firewall and you need alternative checks; ping may fail even when TCP works.
+- You need to diagnose routing tables or interfaces; ping is too shallow.
+- You need to scan ports or perform intrusive network activity: do not misuse this tool.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is read as a single string into h="{args}".
+  - It is NOT split into multiple tokens by the tool template.
+  - Leading/trailing whitespace is preserved unless the runner trims it.
+- Positional arguments:
+  - 1st: <host> required.
+    - Can be an IP address (IPv4/IPv6) or a DNS name.
+- Optional arguments:
+  - None. Packet count is fixed at 4.
+- Defaults:
+  - None. Host is required.
+- Error conditions:
+  - If host is missing or empty, prints "missing host" and exits 2.
+  - If ping command is missing, exits non-zero with stderr.
+  - If host cannot be resolved, ping exits non-zero.
+  - If network blocks ICMP, ping exits non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - None.
+
+OUTPUT:
+- stdout behavior:
+  - Standard ping output for 4 packets, including summary statistics.
+  - If host missing: prints exactly "missing host" on stdout (per tool template).
+- stderr behavior:
+  - ping errors (unknown host, permission issues) may appear on stderr.
+- exit codes and meanings:
+  - 0: ping succeeded (received replies).
+  - 2: missing host (explicit tool check).
+  - Non-zero (other): ping failed (no replies, unreachable, name resolution failure, ping missing).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - Sends ICMP echo requests to the target host.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - The host is explicitly provided by user intent or is a standard public test host.
+  - Do not ping random third-party targets without user intent.
+- MUST NEVER guess:
+  - Never invent a host to ping.
+  - Never replace an empty host with “google.com” or “8.8.8.8” unless user said so.
+- Requires user confirmation:
+  - If the host is internal/private and not clearly intended, ask user to confirm.
+
+COMMON FAILURE MODES:
+- “ping: command not found” if iputils-ping is not installed.
+- “Name or service not known” if DNS is broken.
+- “Destination Host Unreachable” if routing is broken.
+- 100% packet loss if ICMP is blocked.
+- Permission denied if ping requires capabilities (rare in containers).
+
+EXAMPLES:
+1) net.ping 8.8.8.8
+2) net.ping 1.1.1.1
+3) net.ping github.com
+4) net.ping localhost
+5) net.ping 165.245.138.66
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim “network is down” solely from ping failure; ICMP may be blocked.
+- Do NOT claim DNS is broken if pinging an IP fails; that is routing/firewall, not DNS.
+- Do NOT infer latency stability from 4 packets beyond what is shown.
+- Do NOT invent packet loss percentages; read them from output.
+- Do NOT claim the host exists or is reachable without replies.
+- If missing host error occurs, do not guess the intended host.
+- If ping output is truncated by the runner, say so and rerun if needed.
+- Do not convert ping into a general “connectivity test” without caveats.
+- Never change -c 4; tool is fixed.
+- Do not add flags via args; args is host only.
+- Do not attempt to pass multiple hosts; the tool accepts one host string.
+- Do not interpret “unknown host” as “internet down”; it may be DNS config.
+- Keep conclusions conservative and tied to the printed lines.
+- If ping is missing, recommend installing iputils-ping only if allowed by your tool set later.
+- Never fabricate follow-up commands in the tool definition.

@@ -1,0 +1,111 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\rust.test.txt
+TOOL ID:
+rust.test
+
+CATEGORY:
+build
+
+PURPOSE:
+Run Rust tests for a Cargo project inside a specified project directory.
+Runs: `cd <projectDir> && cargo test`
+
+WHEN TO USE:
+- You have a Cargo project and want to run its test suite.
+- You changed Rust code and want to verify tests pass.
+- You want to see which tests fail and their error messages.
+- You want to validate the environment supports running Rust tests.
+- You are diagnosing regressions in Rust components.
+
+WHEN NOT TO USE:
+- The directory is not a Cargo project; cargo test will fail.
+- You only want to compile; use rust.build.
+- You do not know the correct project directory; do not guess.
+- Tests have side effects (network, filesystem) and user has not approved running them; confirm if known.
+- You need specific cargo test flags; tool does not accept them.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into p="{args}".
+  - No token splitting; p is treated as one projectDir path string.
+- Positional arguments:
+  - 1st: <projectDir> required.
+- Optional arguments:
+  - None.
+- Defaults:
+  - None.
+- Error conditions:
+  - If projectDir missing/empty: prints "usage: <projectDir>" and exits 2.
+  - If cd fails: non-zero.
+  - If cargo missing: command not found.
+  - If tests fail: cargo exits non-zero.
+  - Network crate fetch may fail if deps not cached.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into projectDir.
+- File system assumptions:
+  - projectDir exists and is writable for target/ artifacts.
+
+OUTPUT:
+- stdout behavior:
+  - cargo test output with test results.
+- stderr behavior:
+  - compiler errors, test failures, panics, and cargo errors.
+- exit codes and meanings:
+  - 0: all tests passed.
+  - 2: missing projectDir argument.
+  - Non-zero: test failures or cargo/build errors.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Builds test binaries under target/.
+  - May update Cargo.lock depending on project state.
+  - Tests may create temp files depending on project (not controlled by tool).
+- Network access:
+  - cargo may fetch crates if needed.
+  - tests themselves may access network (project-dependent); do not assume.
+- Installed packages:
+  - None.
+- State changes:
+  - Produces build/test artifacts.
+
+SAFETY RULES:
+- MUST verify:
+  - projectDir is correct.
+  - User is okay with running tests (they may have side effects).
+- MUST NEVER guess:
+  - Never claim tests passed unless cargo exit code is 0 and summary indicates pass.
+  - Never invent failing test names.
+- Requires user confirmation:
+  - If you have evidence tests perform external I/O (network, filesystem outside /work), confirm before running.
+
+COMMON FAILURE MODES:
+- Missing args triggers usage exit 2.
+- cargo not installed.
+- Not a Cargo project.
+- Build fails before tests run.
+- Tests fail or panic.
+- Network failure fetching crates.
+
+EXAMPLES:
+1) rust.test /work/rust/MyCrate
+2) rust.test /work/RahTools/RustHelper
+3) rust.test /work/repro/rustapp
+4) rust.test /work/components/rust_cli
+5) rust.test /work/experimental/rust_agent
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim the number of tests or their names unless printed.
+- Do NOT summarize failures without quoting actual failure lines.
+- Do NOT claim tests are “unit” vs “integration” without evidence.
+- Do NOT assume tests are deterministic; only report results.
+- Do NOT claim no side effects; tests can do anything.
+- Do NOT convert paths to Windows.
+- If cargo outputs “running 0 tests”, do not claim coverage; it may be normal.
+- Keep conclusions conservative: passing tests means this run passed, not that code is bug-free.
+- Do NOT add cargo flags; tool does not support args beyond projectDir.
+- Do NOT reference tools not yet written.
+- Treat cargo output as authoritative.
+- Never fabricate panic messages or backtraces.
+- Avoid rerunning repeatedly without addressing failures.

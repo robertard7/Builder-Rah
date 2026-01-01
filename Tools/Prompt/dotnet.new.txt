@@ -1,0 +1,117 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\dotnet.new.txt
+TOOL ID:
+dotnet.new
+
+CATEGORY:
+build
+
+PURPOSE:
+Create a new dotnet project from a template into an output directory under /work.
+Runs `dotnet new <template> -o <outputDir> [extraArgs...]`.
+
+WHEN TO USE:
+- You need to create a new project (console, classlib, winforms, etc.) from a template.
+- You are scaffolding a minimal repro project under /work.
+- You need consistent project creation via the tool manifest without manual commands.
+- You want to pass specific template args (framework, language, etc.) as extraArgs.
+
+WHEN NOT TO USE:
+- You need to modify an existing project: dotnet.new creates a new folder.
+- You don’t know the exact template name: do not guess; list templates outside this tool is not provided here.
+- You need Windows-only templates inside Linux container (e.g., winforms with net*-windows) may not function; do not assume success.
+- OutputDir already exists and contains important files; dotnet new may fail or overwrite depending on template behavior.
+- You need solution-level scaffolding not supported by template; do not guess.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool runs: `set -- {args}; tpl="$1"; out="$2"; shift 2 || true; ... dotnet new "$tpl" -o "$out" "$@"`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved; avoid spaces in tpl/out and be careful with extraArgs.
+- Positional arguments:
+  - 1st: <template> required (tpl).
+  - 2nd: <outputDir> required (out).
+  - 3rd..N: [extraArgs] optional, passed directly to dotnet new.
+- Optional arguments:
+  - extraArgs can include flags like -f net8.0, --langVersion, etc., as supported by the template.
+  - This tool does not validate extraArgs; dotnet will.
+- Defaults:
+  - None. template and outputDir required.
+  - Always runs from /work: `cd /work && dotnet new ...`
+- Error conditions:
+  - If template or outputDir missing: prints "usage: <template> <outputDir> [extraArgs]" and exits 2.
+  - If dotnet missing or cannot run: non-zero.
+  - If template not found: dotnet exits non-zero with template error.
+  - If output directory invalid: dotnet exits non-zero.
+  - If extraArgs invalid: dotnet exits non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd /work before execution.
+  - output directory is created under /work/<outputDir> unless outputDir is an absolute path (allowed by dotnet, but do not assume).
+- File system assumptions:
+  - /work exists and is writable.
+  - dotnet is installed and usable.
+
+OUTPUT:
+- stdout behavior:
+  - dotnet new template creation messages.
+  - On missing args: prints the usage line.
+- stderr behavior:
+  - dotnet errors (template not found, invalid options).
+- exit codes and meanings:
+  - 0: project created successfully.
+  - 2: missing required args.
+  - Non-zero: dotnet new failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates a new directory and project files under /work.
+  - May write restore-related files depending on template (obj, etc.) if it triggers restore.
+- Network access:
+  - Usually none for dotnet new itself, but restore may contact NuGet feeds depending on template and settings.
+- Installed packages:
+  - None via apt, but NuGet packages may be restored.
+- State changes:
+  - Adds files in /work.
+
+SAFETY RULES:
+- MUST verify:
+  - Template name and outputDir are explicitly specified; do not invent.
+  - outputDir will not collide with existing important folders.
+  - extraArgs are user-provided or known-good; do not guess flags.
+- MUST NEVER guess:
+  - Never guess the template name (e.g., “winforms”) unless user provided it.
+  - Never assume restore succeeded; check build output later.
+- Requires user confirmation:
+  - If creating a project will overwrite existing work, get explicit approval to delete/replace folder (this tool does not delete, but collisions happen).
+
+COMMON FAILURE MODES:
+- Template not installed; dotnet prints “No templates … matching”.
+- dotnet missing or broken in container.
+- outputDir already exists.
+- extraArgs include Windows-only framework flags that fail in Linux environment.
+- NuGet restore fails due to network or config (if restore triggers).
+
+EXAMPLES:
+1) dotnet.new console HelloConsole -f net8.0
+2) dotnet.new classlib MyLib -f net8.0
+3) dotnet.new webapi MyApi -f net8.0
+4) dotnet.new xunit MyTests -f net8.0
+5) dotnet.new sln MySolution
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim a template exists; dotnet must confirm.
+- Do NOT claim the project is created if dotnet exits non-zero.
+- Do NOT invent the output directory structure; inspect with repo.ls or repo.tree if needed.
+- Do NOT assume NuGet restore occurred or succeeded.
+- Do NOT convert /work paths to Windows paths.
+- Do NOT add extraArgs not requested.
+- Do NOT assume winforms templates run in Linux; treat as environment-dependent.
+- If dotnet reports a usage error, repeat it exactly; do not guess corrections.
+- Keep conclusions conservative: creation success means files exist, not that build succeeds.
+- If template not found, do not guess another template; ask user for the exact template name they want.
+- Do NOT claim dotnet new is “safe”; it writes files.
+- Treat dotnet output as authoritative.
+- Do NOT reference tools not yet written.
+- Never fabricate additional flags or options.

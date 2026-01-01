@@ -1,0 +1,114 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\node.build.txt
+TOOL ID:
+node.build
+
+CATEGORY:
+build
+
+PURPOSE:
+Run an npm script in a Node.js project directory.
+Defaults to running `npm run build` unless a script name is provided.
+
+WHEN TO USE:
+- You have installed Node dependencies and want to run the build script.
+- You want to run a specific npm script (build by default).
+- You need build output for diagnosing bundler or TypeScript errors.
+- You are following a standard Node pipeline: install then build.
+- You want a bounded, explicit command from the tool manifest.
+
+WHEN NOT TO USE:
+- Dependencies are not installed: run node.install first.
+- The project has no package.json or no scripts: npm will fail.
+- You do not know the correct script name: do not guess.
+- You need to pass extra args to the script; tool does not support additional tokens beyond scriptName.
+- You need yarn/pnpm: not supported.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `set -- {args}; p="$1"; s="$2"; ... if [ -z "$s" ]; then s=build; fi; cd "$p" && npm run "$s"`
+- {args} is split by whitespace into tokens.
+- Quoting is not reliably preserved.
+- Avoid spaces in projectDir.
+Positional arguments:
+- 1st token: <projectDir> (required).
+- 2nd token: [scriptName] (optional).
+Optional arguments:
+- scriptName optional; defaults to "build".
+Defaults:
+- If scriptName is missing/empty:
+  - Runs `npm run build`.
+Error conditions:
+- If projectDir missing:
+  - Prints `usage: <projectDir> [scriptName]`
+  - Exits 2.
+- If `cd` fails:
+  - Non-zero.
+- If npm missing:
+  - Non-zero.
+- If scriptName not defined in package.json:
+  - npm exits non-zero.
+- If build fails:
+  - Non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into <projectDir>.
+- File system assumptions:
+  - Dependencies may need to exist in node_modules.
+  - Build outputs will be written per project configuration.
+
+OUTPUT:
+- stdout behavior:
+  - npm run output, script stdout.
+- stderr behavior:
+  - npm errors, build tool errors.
+- exit codes and meanings:
+  - 0: script completed successfully.
+  - 2: missing projectDir argument.
+  - Non-zero: script failure or environment issue.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Build outputs (dist/, build/, .next/, etc.) depending on project.
+  - May write caches.
+- Network access:
+  - Usually none during build, but project scripts may access network.
+- Installed packages:
+  - None (aside from what node.install already did).
+- State changes:
+  - Generates build artifacts.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - projectDir is correct.
+  - scriptName is explicitly known or accept default "build".
+  - User accepts build artifacts being created.
+- What must NEVER be guessed:
+  - Never guess script names like "prod" or "compile".
+  - Never guess projectDir.
+- What requires user confirmation:
+  - If build script is known to publish/deploy, confirm before running (do not assume).
+
+COMMON FAILURE MODES:
+- Missing node_modules.
+- script not found.
+- Toolchain missing (tsc, vite, webpack) due to install failure.
+- Environment variables required but missing.
+- Out of disk.
+- Build errors in code.
+
+EXAMPLES:
+1) node.build /work/webui
+2) node.build /work/webui build
+3) node.build /work/node/app build
+4) node.build /work/repro/react_app build
+5) node.build /work/tools/node_cli compile
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim script exists; npm will confirm.
+- Do NOT claim output directories; project determines them.
+- Do NOT infer build success without exit 0.
+- Do NOT invent required env vars; read actual errors.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written.

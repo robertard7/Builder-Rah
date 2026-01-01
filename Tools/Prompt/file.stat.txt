@@ -1,0 +1,112 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\file.stat.txt
+TOOL ID:
+file.stat
+
+CATEGORY:
+file
+
+PURPOSE:
+Show file or path metadata using `ls -la` and, if it is a regular file, print its sha256 hash.
+Runs:
+- Validates path exists.
+- Prints `ls -la <path>`.
+- If it is a file: runs `sha256sum <path>` (best effort).
+
+WHEN TO USE:
+- You need to confirm whether a path exists.
+- You want permissions, size, and timestamps for a file or directory.
+- You want a content hash for integrity comparison.
+- You want to detect changes between runs by comparing sha256.
+- You need to confirm whether something is a file vs directory.
+
+WHEN NOT TO USE:
+- You need to read file content; use file.cat/head/tail.
+- You need recursive stats; this is per-path only.
+- You do not have an explicit path; never guess.
+- The file is huge and hashing could be expensive; confirm if that matters.
+- You need a different hash algorithm; tool is fixed to sha256.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool command does: `p="{args}"; if [ -z "$p" ]; then ...; fi; if [ ! -e "$p" ]; then ...; fi; ls -la "$p" && ( [ -f "$p" ] && sha256sum "$p" 2>/dev/null || true )`
+  - {args} is treated as a single string path.
+  - No token splitting by the tool itself.
+- Positional arguments:
+  - 1st: <path> required.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Hash is only computed if path is a regular file.
+  - sha256 errors are suppressed (2>/dev/null || true).
+- Error conditions:
+  - If path missing: prints `missing path` and exits 2.
+  - If path not found: prints `not found` and exits 2.
+  - If ls fails due to permission: non-zero.
+  - sha256sum missing: hash step may be skipped silently due to suppression.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not cd; relative paths resolve from current directory.
+- File system assumptions:
+  - ls exists.
+  - sha256sum likely exists, but do not assume.
+
+OUTPUT:
+- stdout behavior:
+  - `ls -la <path>` output.
+  - If file and sha256sum available: a sha256 line.
+- stderr behavior:
+  - Permission errors from ls.
+  - sha256sum stderr suppressed by tool.
+- exit codes and meanings:
+  - 0: ls succeeded (hash step may or may not have run).
+  - 2: missing path or not found.
+  - Non-zero: ls failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None; read-only.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify before calling:
+  - Path is exact and intended.
+  - If hashing a large file is acceptable.
+- MUST NEVER be guessed:
+  - Never claim hash was computed unless it appears in stdout.
+  - Never guess why hash is missing; could be non-file, sha256sum missing, or suppressed error.
+- Requires user confirmation:
+  - If hashing sensitive files, confirm.
+  - If path points outside /work, confirm.
+
+COMMON FAILURE MODES:
+- Wrong path or typo.
+- Permission denied.
+- sha256sum missing; hash not shown.
+- Path is a directory; no hash (expected).
+- Relative path resolves incorrectly.
+
+EXAMPLES:
+1) file.stat /work/README.md
+2) file.stat /work/RahOllamaOnly/Tools/tools.json
+3) file.stat /work/RahOllamaOnly
+4) file.stat /work/bin/myapp
+5) file.stat /work/logs/build.log
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim a file changed unless hashes differ and you saw both hashes.
+- Do NOT claim timestamps are “recent” without comparing to known dates.
+- Do NOT invent file sizes or permissions; only use ls output.
+- Do NOT assume sha256sum ran; confirm by presence of hash line.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written here.
+- If ls output is shown but hash missing, do not guess; state only what is printed.
+- Treat suppressed errors as “unknown”; do not fill in blanks.
+- Never fabricate metadata.
+- Keep conclusions strictly tied to stdout/stderr displayed.

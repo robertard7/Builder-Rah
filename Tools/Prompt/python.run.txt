@@ -1,0 +1,112 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\python.run.txt
+TOOL ID:
+python.run
+
+CATEGORY:
+language
+
+PURPOSE:
+Run a Python script inside a specified project directory.
+Runs: `cd <projectDir> && python3 <scriptOrModule> [args...]`
+This tool treats the second token as a script path (not `-m` module mode).
+
+WHEN TO USE:
+- You need to execute a Python script in a project directory.
+- You want to pass command-line args to the script.
+- You need runtime error output for debugging.
+- You are running a small utility script under /work.
+- You want an explicit, reproducible invocation via manifest tool.
+
+WHEN NOT TO USE:
+- You need to run a module using `python -m <module>`; this tool does not add `-m`.
+- You do not know the correct script path/name; do not guess.
+- The script requires an activated venv and python3 is not pointing to it; this uses container python3.
+- The script is interactive and requires user input; tool is non-interactive.
+- The script uses secrets not provided; do not run.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `set -- {args}; p="$1"; s="$2"; shift 2 || true; ... cd "$p" && python3 "$s" "$@"`
+- {args} is split by whitespace into tokens.
+- Quoting is not reliably preserved; avoid spaces in paths and arguments if possible.
+Positional arguments:
+- 1st token: <projectDir> required.
+- 2nd token: <scriptOrModule> required (treated as a script path).
+- 3rd..N tokens: [args...] optional, passed to the script.
+Optional arguments:
+- Any remaining tokens are passed verbatim as script arguments.
+Defaults:
+- None.
+Error conditions:
+- If projectDir or script missing:
+  - Prints `usage: <projectDir> <scriptOrModule> [args...]`
+  - Exits 2.
+- If cd fails: non-zero.
+- If python3 missing: non-zero.
+- If script file missing: python3 errors non-zero.
+- If script crashes: non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into <projectDir>.
+- File system assumptions:
+  - script path is resolved relative to <projectDir> unless absolute.
+  - python3 uses the container environment.
+
+OUTPUT:
+- stdout behavior:
+  - Script stdout.
+- stderr behavior:
+  - Python tracebacks, stderr prints from script.
+- exit codes and meanings:
+  - 0: script completed successfully.
+  - 2: missing required args (explicit tool check).
+  - Non-zero: python/script failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Depends on script.
+- Network access:
+  - Depends on script.
+- Installed packages:
+  - None by this tool, but script may run pip itself (do not assume).
+- State changes:
+  - Arbitrary; script-controlled.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - Exact script name/path.
+  - Whether script has side effects (writes, deletes, network).
+  - Whether arguments are correct.
+- What must NEVER be guessed:
+  - Do not guess script path.
+  - Do not guess arguments.
+  - Do not guess environment variables/secrets.
+- What requires user confirmation:
+  - If script can modify many files, run system commands, or contact the network, confirm.
+  - If script touches anything outside /work, confirm.
+
+COMMON FAILURE MODES:
+- Wrong projectDir.
+- Wrong script path.
+- Missing dependencies.
+- Python version mismatch.
+- Permission errors.
+- Script crashes with exceptions.
+- Missing env vars.
+
+EXAMPLES:
+1) python.run /work/py/app main.py
+2) python.run /work/py/app tools/gen.py input.txt output.txt
+3) python.run /work/services/py_backend server.py --port 8080
+4) python.run /work/repro/pyproj repro.py 123
+5) python.run /work/tools/py_util cleanup.py --dry-run
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim module mode; this runs a script path directly.
+- Do NOT claim script succeeded without exit 0.
+- Do NOT invent traceback lines; use actual stderr.
+- Do NOT convert /work paths to Windows.
+- Do NOT assume venv activation; verify python3 path if needed.
+- Do NOT reference tools not yet written.

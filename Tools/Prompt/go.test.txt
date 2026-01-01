@@ -1,0 +1,114 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\go.test.txt
+TOOL ID:
+go.test
+
+CATEGORY:
+build
+
+PURPOSE:
+Run Go tests for all packages in a project directory using `go test ./...`.
+
+WHEN TO USE:
+- You have a Go project and want to run its test suite.
+- You need test failure output for debugging.
+- You changed Go code and want to verify tests still pass.
+- You want to validate the Go toolchain and test runtime in the container.
+- You want the standard recursive test run across packages.
+
+WHEN NOT TO USE:
+- You only want to build without running tests: use go.build.
+- You need specific `go test` flags (run, count, race, tags): this tool does not accept extras.
+- You do not know the correct project directory: do not guess.
+- Tests have known external side effects and the user has not approved running them.
+- You need to run tests for a single package only; this tool always uses ./....
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `p="{args}"; if [ -z "$p" ]; then ...; fi; cd "$p" && go test ./...`
+- {args} is treated as a single string path.
+- No token splitting is performed by the tool itself.
+Positional arguments:
+- 1st: <projectDir> (required) as a single string.
+Optional arguments:
+- None.
+Defaults:
+- Always runs `go test ./...` from <projectDir>.
+Error conditions:
+- If projectDir missing/empty:
+  - Prints: `usage: <projectDir>`
+  - Exits 2.
+- If `cd` fails:
+  - Non-zero exit.
+- If `go` missing:
+  - Non-zero exit.
+- If tests fail:
+  - Non-zero exit from go test.
+- If module downloads required and fail:
+  - Non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Changes directory to <projectDir>.
+- File system assumptions:
+  - <projectDir> exists.
+  - Go may write caches under GOCACHE and module cache.
+
+OUTPUT:
+- stdout behavior:
+  - Package test results, PASS/FAIL lines.
+- stderr behavior:
+  - Build errors, test failures, panic output, race messages (if any, but tool does not enable race).
+- exit codes and meanings:
+  - 0: all tests passed.
+  - 2: missing projectDir argument.
+  - Non-zero: test/build failure or environment issue.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Go may write build/test caches.
+  - Tests may create files depending on test code (not controlled by tool).
+- Network access:
+  - Possible module downloads.
+  - Tests may call network if coded to do so.
+- Installed packages:
+  - None.
+- State changes:
+  - Test run may alter project state if tests are not isolated.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - Exact <projectDir> exists and is intended.
+  - User is okay running tests (possible side effects).
+- What must NEVER be guessed:
+  - Do not guess projectDir.
+  - Do not claim tests are isolated or safe.
+- What requires user confirmation:
+  - If repository context suggests integration tests that hit network/services, confirm first.
+
+COMMON FAILURE MODES:
+- go not installed.
+- Not a valid Go module/project.
+- Compilation fails before tests run.
+- Module download failures.
+- Tests fail or hang.
+- Permission issues writing temp files.
+- Flaky tests.
+
+EXAMPLES:
+1) go.test /work/go/hello
+2) go.test /work/components/go_cli
+3) go.test /work/repro/goapp
+4) go.test /work/tools/go_util
+5) go.test /work/services/go_backend
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim number of tests unless printed.
+- Do NOT claim coverage; tool does not request it.
+- Do NOT claim race detection; tool does not enable it.
+- Do NOT infer why tests failed; use actual output.
+- Do NOT say “tests passed” if exit code non-zero.
+- Do NOT convert /work paths to Windows.
+- Do NOT claim modules were fetched unless output shows it.
+- Do NOT invent package names or failing tests.
+- Do NOT reference tools not yet written.

@@ -1,0 +1,120 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\cpp.build.txt
+TOOL ID:
+cpp.build
+
+CATEGORY:
+build
+
+PURPOSE:
+Compile a single C++ source file into an output binary using g++.
+Runs: `g++ <src.cpp> -o <out> [cxxflags...]`
+
+WHEN TO USE:
+- You have a standalone .cpp file and want to compile it quickly.
+- You are building a small repro program without CMake.
+- You want to validate g++ toolchain works inside the container.
+- You need to compile a quick utility or test harness in C++.
+- You want to pass explicit compiler/linker flags.
+
+WHEN NOT TO USE:
+- You are building a multi-file C++ project; prefer cmake tools or project build system.
+- The source file is C (.c); use c.build.
+- You don’t know the exact source path; locate it first with file.find.
+- You need to build with a specific standard and you are not sure which; do not guess flags.
+- You need to run the resulting binary; this tool only builds.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool runs: `set -- {args}; src="$1"; out="$2"; shift 2 || true; ... g++ "$src" -o "$out" "$@"`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved; avoid spaces in paths.
+- Positional arguments:
+  - 1st: <src.cpp> required.
+  - 2nd: <out> required.
+  - 3rd..N: [cxxflags...] optional, passed directly to g++.
+- Optional arguments:
+  - cxxflags can include:
+    - -std=c++20, -O2, -g, -Wall, -Wextra
+    - -I<dir>, -DNAME=VALUE
+    - -L<dir> -l<lib>
+    - -pthread
+  - Tool does not validate flags.
+- Defaults:
+  - None. src and out required.
+- Error conditions:
+  - If src or out missing: prints "usage: <src.cpp> <out> [cxxflags...]" and exits 2.
+  - If src missing: g++ fails non-zero.
+  - If g++ missing: command not found.
+  - If flags invalid: g++ fails.
+  - If out path not writable: failure.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+  - Relative paths resolve from current working directory.
+- File system assumptions:
+  - g++ exists in PATH.
+  - src path accessible.
+
+OUTPUT:
+- stdout behavior:
+  - g++ usually prints nothing on success.
+- stderr behavior:
+  - Compilation/link warnings and errors.
+- exit codes and meanings:
+  - 0: compilation succeeded.
+  - 2: missing required args.
+  - Non-zero: compile/link failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates output binary at <out>.
+  - May overwrite existing <out>.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - Adds/updates output binary file.
+
+SAFETY RULES:
+- MUST verify:
+  - src is correct and is the intended .cpp file.
+  - out path is safe and preferably under /work.
+  - flags are explicit and user-approved; do not invent.
+- MUST NEVER guess:
+  - Never guess standard version flags (-std=...).
+  - Never invent include/library paths.
+- Requires user confirmation:
+  - If output overwrites an important file, confirm first.
+
+COMMON FAILURE MODES:
+- Missing args triggers usage exit 2.
+- g++ not installed.
+- src file path wrong.
+- Link errors due to missing libraries.
+- ABI issues if linking against libs without correct flags.
+- Tokenization breaks when flags/paths contain spaces.
+
+EXAMPLES:
+1) cpp.build /work/repro/main.cpp /work/repro/main -std=c++20
+2) cpp.build /work/repro/main.cpp /work/repro/main -std=c++20 -O2
+3) cpp.build /work/repro/main.cpp /work/repro/main -std=c++20 -g -Wall -Wextra
+4) cpp.build /work/repro/sqltest.cpp /work/repro/sqltest -std=c++20 -lsqlite3
+5) cpp.build /work/repro/curltest.cpp /work/repro/curltest -std=c++20 -lcurl
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim the program runs; compile success does not prove runtime correctness.
+- Do NOT claim which standard is used unless provided in args.
+- Do NOT invent missing libraries; use linker error output.
+- Do NOT convert /work paths to Windows.
+- Do NOT assume g++ version; check sys.which or run.cmd g++ --version if needed.
+- Do NOT add default flags; tool does not.
+- If compilation fails, do not guess; quote actual error lines.
+- Keep conclusions conservative: success means binary created, not correct behavior.
+- Do NOT compile multiple source files unless user provided them; do not invent.
+- Treat g++ output as authoritative evidence.
+- Do NOT reference tools not yet written.
+- Never claim a dependency exists without checking.
+- Avoid writing output outside /work without explicit user instruction.
