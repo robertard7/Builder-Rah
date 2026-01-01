@@ -122,6 +122,16 @@ public sealed class WorkflowFacade
             return;
         }
 
+        if (!OperatingSystem.IsWindows() || string.Equals(_cfg.General.ExecutionTarget, "LinuxContainer", StringComparison.OrdinalIgnoreCase))
+        {
+            if (IsWindowsDesktopProject())
+            {
+                _trace.Emit("[env:error] WinForms build requires WindowsDesktop SDK. Switch ExecutionTarget to WindowsHost.");
+                EmitWaitUser("WinForms build requires WindowsDesktop SDK. Switch ExecutionTarget to WindowsHost.");
+                return;
+            }
+        }
+
         // Run digest.
         var spec = await RunJobSpecDigestAsync(text, ct).ConfigureAwait(true);
 
@@ -233,4 +243,6 @@ public sealed class WorkflowFacade
         s = s.Replace("\r", "");
         return s.Length <= max ? s : s.Substring(0, max) + "...";
     }
+
+    private static bool IsWindowsDesktopProject() => true; // RahBuilder.csproj uses Microsoft.NET.Sdk.WindowsDesktop
 }

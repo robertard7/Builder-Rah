@@ -1,0 +1,122 @@
+diff --git a/Settings/AppConfig.cs b/Settings/AppConfig.cs
+index 45f1ed8..1779cc6 100644
+--- a/Settings/AppConfig.cs
++++ b/Settings/AppConfig.cs
+@@ -1,5 +1,7 @@
+ #nullable enable
+-namespace RahBuilder.Settings;
++using System;
++
++namespace RahBuilder.Settings;
+ 
+ public sealed class AppConfig
+ {
+@@ -24,12 +26,13 @@ public sealed class GeneralSettings
+     public string SandboxContainerPath { get; set; } = "";
+ 
+     public string ToolsPath { get; set; } = "";                 // tools.json
+-    public string ToolPromptsPath { get; set; } = "";           // folder: Tools/Prompt (files named by toolId)
+-    public string BlueprintTemplatesPath { get; set; } = "";    // folder: BlueprintTemplates (prompt library)
+-
++    public string ToolPromptsPath { get; set; } = "";           // folder: Tools/Prompt (files named by toolId)
++    public string BlueprintTemplatesPath { get; set; } = "";    // folder: BlueprintTemplates (prompt library)
++
+     public bool GraphDriven { get; set; } = true;
+     public bool ContainerOnly { get; set; } = true;
+     public bool EnableGlobalClipboardShortcuts { get; set; } = true;
++    public string ExecutionTarget { get; set; } = OperatingSystem.IsWindows() ? "WindowsHost" : "LinuxContainer";
+ 
+     // SAVE POINT: global digest prompt lives here (JSON-only, no tools)
+     public string JobSpecDigestPrompt { get; set; } =
+diff --git a/Settings/Pages/GeneralSettingsPage.cs b/Settings/Pages/GeneralSettingsPage.cs
+index 7337914..7d0205a 100644
+--- a/Settings/Pages/GeneralSettingsPage.cs
++++ b/Settings/Pages/GeneralSettingsPage.cs
+@@ -77,12 +77,31 @@ public sealed class GeneralSettingsPage : UserControl
+         AddRow("Sandbox Container Path", () => _config.General.SandboxContainerPath, v => _config.General.SandboxContainerPath = v);
+ 
+         AddRow("Tools Manifest Path (tools.json)", () => _config.General.ToolsPath, v => _config.General.ToolsPath = v);
+-        AddRow("Tool Prompts Folder (Tools/Prompt)", () => _config.General.ToolPromptsPath, v => _config.General.ToolPromptsPath = v);
+-        AddRow("BlueprintTemplates Folder", () => _config.General.BlueprintTemplatesPath, v => _config.General.BlueprintTemplatesPath = v);
+-
+-        AddBool("GraphDriven routing enabled", () => _config.General.GraphDriven, v => _config.General.GraphDriven = v);
+-        AddBool("Container-only execution (no host tools)", () => _config.General.ContainerOnly, v => _config.General.ContainerOnly = v);
+-        AddBool("Global clipboard shortcuts + context menus", () => _config.General.EnableGlobalClipboardShortcuts, v => _config.General.EnableGlobalClipboardShortcuts = v);
++        AddRow("Tool Prompts Folder (Tools/Prompt)", () => _config.General.ToolPromptsPath, v => _config.General.ToolPromptsPath = v);
++        AddRow("BlueprintTemplates Folder", () => _config.General.BlueprintTemplatesPath, v => _config.General.BlueprintTemplatesPath = v);
++
++        AddBool("GraphDriven routing enabled", () => _config.General.GraphDriven, v => _config.General.GraphDriven = v);
++        AddBool("Container-only execution (no host tools)", () => _config.General.ContainerOnly, v => _config.General.ContainerOnly = v);
++        AddBool("Global clipboard shortcuts + context menus", () => _config.General.EnableGlobalClipboardShortcuts, v => _config.General.EnableGlobalClipboardShortcuts = v);
++
++        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
++        var execLabel = new Label { Text = "Execution Target (WinForms requires WindowsHost)", AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 10, 0) };
++        var execCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left };
++        execCombo.Items.AddRange(new object[] { "WindowsHost", "LinuxContainer" });
++        var currentTarget = (_config.General.ExecutionTarget ?? "").Trim();
++        if (string.IsNullOrWhiteSpace(currentTarget))
++            currentTarget = OperatingSystem.IsWindows() ? "WindowsHost" : "LinuxContainer";
++        execCombo.SelectedItem = currentTarget;
++        execCombo.SelectedIndexChanged += (_, _) =>
++        {
++            var value = execCombo.SelectedItem?.ToString() ?? "";
++            if (string.IsNullOrWhiteSpace(value)) return;
++            _config.General.ExecutionTarget = value;
++            AutoSave.Touch();
++        };
++        grid.Controls.Add(execLabel, 0, row);
++        grid.Controls.Add(execCombo, 1, row);
++        row++;
+ 
+         AddMultiline(
+             "Global Job Spec Digest Prompt (JSON-only, no tools)",
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index e47f288..d56566c 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -113,17 +113,27 @@ public sealed class WorkflowFacade
+         }
+ 
+         // Validate graph first.
+-        var mermaid = _cfg.WorkflowGraph.MermaidText ?? "";
+-        var gv = _router.ValidateGraph(mermaid);
+-        if (!gv.Ok)
+-        {
+-            _trace.Emit($"[route:error] Invalid Mermaid workflow graph: {gv.Message}");
+-            _trace.Emit("[route:halt] Fix Workflow Graph settings page content, then retry.");
+-            return;
+-        }
+-
+-        // Run digest.
+-        var spec = await RunJobSpecDigestAsync(text, ct).ConfigureAwait(true);
++        var mermaid = _cfg.WorkflowGraph.MermaidText ?? "";
++        var gv = _router.ValidateGraph(mermaid);
++        if (!gv.Ok)
++        {
++            _trace.Emit($"[route:error] Invalid Mermaid workflow graph: {gv.Message}");
++            _trace.Emit("[route:halt] Fix Workflow Graph settings page content, then retry.");
++            return;
++        }
++
++        if (!OperatingSystem.IsWindows() || string.Equals(_cfg.General.ExecutionTarget, "LinuxContainer", StringComparison.OrdinalIgnoreCase))
++        {
++            if (IsWindowsDesktopProject())
++            {
++                _trace.Emit("[env:error] WinForms build requires WindowsDesktop SDK. Switch ExecutionTarget to WindowsHost.");
++                EmitWaitUser("WinForms build requires WindowsDesktop SDK. Switch ExecutionTarget to WindowsHost.");
++                return;
++            }
++        }
++
++        // Run digest.
++        var spec = await RunJobSpecDigestAsync(text, ct).ConfigureAwait(true);
+ 
+         if (!spec.IsComplete)
+         {
+@@ -233,4 +243,6 @@ public sealed class WorkflowFacade
+         s = s.Replace("\r", "");
+         return s.Length <= max ? s : s.Substring(0, max) + "...";
+     }
++
++    private static bool IsWindowsDesktopProject() => true; // RahBuilder.csproj uses Microsoft.NET.Sdk.WindowsDesktop
+ }
