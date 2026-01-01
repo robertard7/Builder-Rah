@@ -1,0 +1,21 @@
+﻿{
+  "id": "pack.service.baseline.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 175 },
+  "title": "Add Service Baseline (config/logging/di/http/health)",
+  "description": "Adds a production-minded baseline bundle (config + structured logs + DI pattern + HTTP client + health).",
+  "tags": ["service", "baseline", "feature"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "routes": {
+      "dotnet": "recipe.service.baseline.dotnet.v1",
+      "node": "recipe.service.baseline.node.v1",
+      "python": "recipe.service.baseline.python.v1",
+      "go": "recipe.service.baseline.go.v1",
+      "rust": "recipe.service.baseline.rust.v1",
+      "java": "recipe.service.baseline.java.v1",
+      "cpp": "recipe.service.baseline.cpp.v1"
+    }
+  }
+}

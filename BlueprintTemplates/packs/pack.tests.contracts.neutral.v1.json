@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.tests.contracts.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 165 },
+  "title": "Contract tests baseline (neutral)",
+  "description": "Defines and scaffolds contract tests for stable boundaries and compatibility.",
+  "tags": ["tests", "contract", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.tests.contracts.neutral.v1"] }
+}

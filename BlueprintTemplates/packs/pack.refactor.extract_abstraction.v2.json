@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.refactor.extract_abstraction.v2",
+  "kind": "pack",
+  "version": 2,
+  "meta": { "visibility": "public", "priority": 165 },
+  "title": "Refactor: Extract abstraction (rails)",
+  "description": "Staged extraction of interfaces/traits/modules with minimal behavior change.",
+  "tags": ["refactor", "abstraction", "safe"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.refactor.extract_abstraction.surgical.v1"] }
+}

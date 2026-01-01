@@ -1,0 +1,19 @@
+﻿{
+  "id": "pack.project.desktop.forms.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 130 },
+  "title": ".NET WinForms Desktop App",
+  "description": "Create a Windows desktop application using WinForms.",
+  "tags": ["dotnet", "winforms", "desktop"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "ecosystem": "dotnet",
+    "profile": "winforms",
+    "uses": [
+      "task.create_project.dotnet.winforms.v1",
+      "task.build.dotnet.v1",
+      "task.run.dotnet.v1"
+    ]
+  }
+}

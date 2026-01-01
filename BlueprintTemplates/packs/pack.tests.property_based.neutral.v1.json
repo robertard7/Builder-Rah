@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.tests.property_based.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 145 },
+  "title": "Property-based tests (neutral)",
+  "description": "Adds invariants and a starter set of property-based tests for deterministic logic.",
+  "tags": ["tests", "property", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.tests.property_based.neutral.v1"] }
+}

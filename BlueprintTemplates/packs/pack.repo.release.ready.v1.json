@@ -1,0 +1,19 @@
+﻿{
+  "id": "pack.repo.release.ready.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 172 },
+  "title": "Repo: Release Ready",
+  "description": "Adds release hygiene docs: versioning, changelog, licensing checklist, and publish gating notes.",
+  "tags": ["repo", "release", "versioning"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.release.bump_version.v1",
+      "task.release.update_changelog.v1",
+      "task.release.ensure_license.v1",
+      "task.publish.gated.v1",
+      "recipe.repo.release.versioning_strategy.v1"
+    ]
+  }
+}

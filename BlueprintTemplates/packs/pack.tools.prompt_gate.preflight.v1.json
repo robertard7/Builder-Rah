@@ -1,0 +1,14 @@
+﻿{
+  "id": "pack.tools.prompt_gate.preflight.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 210 },
+  "title": "Preflight Tool Prompt Gate",
+  "description": "Hard blocks execution if any referenced tool lacks a prompt definition. Produces a clean WAIT_USER remediation list.",
+  "tags": ["tools", "prompts", "preflight", "gate", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": ["recipe.tools.prompt_gate.preflight.v1"],
+    "inputs": ["planContext", "promptRegistrySnapshot"]
+  }
+}

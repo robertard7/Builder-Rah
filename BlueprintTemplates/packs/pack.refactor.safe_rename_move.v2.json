@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.refactor.safe_rename_move.v2",
+  "kind": "pack",
+  "version": 2,
+  "meta": { "visibility": "public", "priority": 170 },
+  "title": "Refactor: Safe rename/move (rails)",
+  "description": "Staged rename/move with budget approval and validation.",
+  "tags": ["refactor", "rename", "move", "safe"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.refactor.safe_rename_move.surgical.v1"] }
+}

@@ -1,0 +1,26 @@
+﻿{
+  "id": "pack.role.repair.default.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 870 },
+  "title": "Role Default: Repair (minimal + safe)",
+  "description": "Universal Repair role purpose. Diagnoses failures (build/runtime/tooling) and produces minimal, surgical fixes. Avoids refactors and preserves existing architecture unless directly required to compile or pass tests.",
+  "tags": ["role", "repair", "default", "minimal_fix", "diagnostics", "surgical", "no_refactor"],
+  "updatedUtc": "2025-12-31T00:00:00Z",
+  "content": {
+    "role": "Repair",
+    "purpose": [
+      "Identify root cause from logs and code, then apply the smallest fix that resolves it.",
+      "Avoid architecture rewrites and unrelated cleanup.",
+      "Preserve settings-driven behavior; remove hardcoded fallbacks."
+    ],
+    "repairRules": [
+      "Prefer handling DataGridView DataError instead of crashing the UI.",
+      "Prefer fixing invalid ComboBox values by normalizing/clearing stale IDs.",
+      "If a referenced template ID no longer exists in manifest, set it to (unset) and warn."
+    ],
+    "outputs": {
+      "patchStyle": "Full file replacement only when necessary; otherwise minimal edits."
+    }
+  }
+}

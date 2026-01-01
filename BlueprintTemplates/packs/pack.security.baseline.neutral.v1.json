@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.security.baseline.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 190 },
+  "title": "Security baseline (neutral)",
+  "description": "Baseline security for any repo: threat model, validation/encoding, secrets, dependencies, least privilege, secure defaults, docs, CI gates (placeholders), and validation.",
+  "tags": ["security", "baseline", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.security.baseline.neutral.v1"] }
+}

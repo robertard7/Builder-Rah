@@ -1,0 +1,23 @@
+﻿{
+  "id": "pack.role.embed.default.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 860 },
+  "title": "Role Default: Embed (memory/indexing support)",
+  "description": "Universal Embed role purpose. Prepares text chunks and metadata for indexing and retrieval (e.g., Qdrant). Keeps payloads deterministic and uses BlueprintTemplates metadata to label content by kind/tags/visibility.",
+  "tags": ["role", "embed", "default", "memory", "indexing", "qdrant", "metadata"],
+  "updatedUtc": "2025-12-31T00:00:00Z",
+  "content": {
+    "role": "Embed",
+    "purpose": [
+      "Create deterministic, high-signal embeddings and metadata for search/reuse.",
+      "Use BlueprintTemplates metadata (id/kind/tags/visibility/title/description) for labeling.",
+      "Do not mix tool prompts with BlueprintTemplates."
+    ],
+    "rules": [
+      "Prefer public templates for normal reuse.",
+      "Keep chunk sizes consistent and remove boilerplate.",
+      "Never embed secrets (API keys, tokens)."
+    ]
+  }
+}

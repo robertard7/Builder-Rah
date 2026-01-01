@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.security.baseline.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 155 },
+  "title": "Security Baseline",
+  "description": "Applies lightweight security hygiene checks and suggests safe defaults.",
+  "tags": ["security", "baseline"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["task.security.baseline.v1"] }
+}

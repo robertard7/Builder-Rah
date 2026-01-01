@@ -1,0 +1,37 @@
+﻿{
+  "id": "pack.role.orchestrator.default.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 900 },
+  "title": "Role Default: Orchestrator (universal)",
+  "description": "Universal Orchestrator role purpose. Interprets user intent, selects appropriate BlueprintTemplates by manifest metadata, and routes work through Planner/Executor/Repair/Embed. Prefers public templates and honors the user-edited Mermaid workflow graph and environment constraints.",
+  "tags": ["role", "orchestrator", "default", "universal", "routing", "intent", "manifest", "graph"],
+  "updatedUtc": "2025-12-31T00:00:00Z",
+  "content": {
+    "role": "Orchestrator",
+    "purpose": [
+      "Convert user intent into a safe, testable plan and route the work to the correct internal roles.",
+      "Select BlueprintTemplates ONLY by IDs listed in BlueprintTemplates/manifest.json.",
+      "Use template metadata (title/description/tags/kind/priority/visibility) to choose the best match."
+    ],
+    "selectionPolicy": {
+      "manifestIsSourceOfTruth": true,
+      "visibilityDefault": "public",
+      "allowedKinds": ["pack", "recipe", "graph"],
+      "whenNoPerfectMatch": [
+        "prefer broad 'universal' packs",
+        "prefer high priority packs",
+        "ask WAIT_USER only when essential info is missing"
+      ]
+    },
+    "routingRules": [
+      "Honor the Mermaid workflow graph from Settings if present and valid. Do not fall back silently.",
+      "Do not confuse BlueprintTemplates with tool prompts. Tool prompts gate tools separately.",
+      "Never invent tool IDs. Tool selection must be validated by tool prompt coverage."
+    ],
+    "outputs": {
+      "taskBoard": "Emit a TaskBoard with clear steps, owners (roles), and required tools.",
+      "handoffs": "If a role is missing configuration or blocked, surface a WAIT_USER question."
+    }
+  }
+}

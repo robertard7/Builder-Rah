@@ -1,0 +1,18 @@
+﻿{
+  "id": "pack.project.library.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 130 },
+  "title": "Library Project",
+  "description": "Create a reusable library package in supported ecosystems.",
+  "tags": ["project", "library"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.create_project.${ecosystem}.library.v1",
+      "task.build.${ecosystem}.v1",
+      "task.test.${ecosystem}.v1",
+      "task.package_publish.${ecosystem}.v1"
+    ]
+  }
+}

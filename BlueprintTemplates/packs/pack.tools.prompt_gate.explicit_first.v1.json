@@ -1,0 +1,15 @@
+﻿{
+  "id": "pack.tools.prompt_gate.explicit_first.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 215 },
+  "title": "Preflight Tool Prompt Gate (explicit toolRefs first)",
+  "description": "Same as the preflight prompt gate, but prefers explicit toolRefs declared in plan templates for deterministic coverage.",
+  "tags": ["tools", "prompts", "preflight", "gate", "toolrefs"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "toolRefs": [],
+    "uses": ["task.tools.prompt_gate.explicit_first.v1"],
+    "inputs": ["planContext", "promptRegistrySnapshot"]
+  }
+}
