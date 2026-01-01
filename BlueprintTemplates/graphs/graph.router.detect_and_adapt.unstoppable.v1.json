@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.detect_and_adapt.unstoppable.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Detect & Adapt (unstoppable)",
+  "description": "Routes generic intents to detect/adapt packs, then to diagnose on failures.",
+  "tags": ["router", "detect", "adapt", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  U[User intent] --> D{Need repo analysis only?}\n  D -->|yes| Intake[pack.detect_and_adapt.repo_intake.v1]\n  D -->|no, execute goal| Goal[pack.detect_and_adapt.goal_runner.v1]\n  Goal -->|success| Done[Done]\n  Goal -->|fail| Diag[pack.diagnose.unstoppable.v1]\n  Intake --> Done\n  Diag --> Done"
+  }
+}

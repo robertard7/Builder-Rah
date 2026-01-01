@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.environment.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Environment",
+  "description": "Routes environment/container/devcontainer requests to appropriate packs.",
+  "tags": ["router", "env", "container"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[env request] --> Pick{intent?}\n  Pick -->|containerize| C[pack.env.containerize.project.v1]\n  Pick -->|devcontainer| D[pack.env.devcontainer.only.v1]\n  Pick -->|docs only| Docs[pack.env.local_and_container.docs.v1]\n  Pick -->|unsure| C"
+  }
+}

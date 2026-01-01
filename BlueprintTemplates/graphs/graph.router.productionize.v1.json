@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.productionize.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Productionize",
+  "description": "Routes productionization requests to observability/health/resilience or full service productionize pack.",
+  "tags": ["router", "productionize"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[productionize] --> Pick{scope?}\n  Pick -->|full service| Full[pack.productionize.service.v1]\n  Pick -->|observability| Obs[pack.feature.observability.v1]\n  Pick -->|health checks| Health[pack.feature.health_checks.v1]\n  Pick -->|resilience| Res[pack.feature.resilience.v1]\n  Pick -->|unsure| Full"
+  }
+}

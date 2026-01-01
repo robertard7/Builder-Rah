@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.api_contract_and_clients.neutral.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: API contract + clients (neutral)",
+  "description": "Routes API contract and client SDK intents to neutral packs.",
+  "tags": ["router", "api", "contract", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[API request] --> Kind{need?}\n  Kind -->|contract baseline| A[pack.api.contract.baseline.neutral.v1]\n  Kind -->|client sdk plan| C[pack.api.client_sdk.neutral.v1]\n  A --> Done[Done]\n  C --> Done"
+  }
+}

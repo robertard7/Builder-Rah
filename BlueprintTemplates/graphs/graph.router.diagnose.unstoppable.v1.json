@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.diagnose.unstoppable.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Diagnose Unstoppable",
+  "description": "Routes build failures to unstoppable diagnose loop or stage playbooks.",
+  "tags": ["router", "diagnose", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Fail[build/test/run/publish failed] --> Ev[task.diagnose.collect_evidence.v1]\n  Ev --> Cl[task.diagnose.classify_stage.v1]\n  Cl -->|high confidence| ByStage[pack.diagnose.minimal_fix.by_stage.v1]\n  Cl -->|low confidence| Unstop[pack.diagnose.unstoppable.v1]\n  ByStage --> MaybeFix{need fix?}\n  MaybeFix -->|yes| Unstop\n  MaybeFix -->|no| Wait[pack.diagnose.wait_user.questions_only.v1]"
+  }
+}

@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.ci_and_convert.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: CI + Convert Folder",
+  "description": "Routes intents: run pipeline, convert folder, add logging/config/http feature.",
+  "tags": ["router", "ci", "convert", "feature"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input --> Intent{intent?}\n  Intent -->|ci pipeline| CI[pack.ci.pipeline.v1]\n  Intent -->|convert folder| Convert[pack.project.convert.from_folder.v1]\n  Intent -->|add logging/config/http| Feature[pack.feature.logging_config_http.v1]\n  Intent -->|other| Fallback[graph.router.default_unstoppable.v1]"
+  }
+}

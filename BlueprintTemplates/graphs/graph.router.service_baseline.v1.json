@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.service_baseline.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Service Baseline",
+  "description": "Routes 'add baseline' and 'productionize' intents to the service baseline pack and optional productionize packs.",
+  "tags": ["router", "service", "baseline"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[Add baseline/productionize] --> Base[pack.service.baseline.v1]\n  Base --> Obs[pack.feature.observability.v1]\n  Base --> Res[pack.feature.resilience.v1]\n  Base --> Health[pack.feature.health_checks.v1]\n  Base --> Done[Done]"
+  }
+}

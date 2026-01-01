@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.tools.capabilities_aware.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Tools preflight (capabilities-aware)",
+  "description": "Routes through capabilities-aware tool prompt gate, then continues to execution or WAIT_USER if coverage is missing.",
+  "tags": ["router", "tools", "capabilities", "prompts", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  A[Goal: run plan safely] --> T[pack.tools.prompt_gate.capabilities_aware.v1]\n  T -->|PASS| OK[Continue to orchestrator]\n  T -->|WAIT_USER missing coverage| W[WAIT_USER]\n  W --> T\n  T -->|FAIL hard| D[pack.diagnose.unstoppable.v1]\n  D --> End[End]"
+  }
+}

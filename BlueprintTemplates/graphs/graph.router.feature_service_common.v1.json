@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.feature_service_common.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Service Features (DB/Auth/Cache/Docs)",
+  "description": "Routes common service feature requests to the correct pack.",
+  "tags": ["router", "feature", "service"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[add feature] --> Pick{which?}\n  Pick -->|database| DB[pack.feature.database.v1]\n  Pick -->|auth| Auth[pack.feature.auth.v1]\n  Pick -->|cache| Cache[pack.feature.cache.v1]\n  Pick -->|api docs| Docs[pack.feature.api_docs.v1]\n  Pick -->|other| Fallback[graph.router.feature_by_shape.v1]"
+  }
+}

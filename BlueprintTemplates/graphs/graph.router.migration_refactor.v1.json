@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.migration_refactor.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Migration + Refactor",
+  "description": "Routes refactor/migration/hardening intents to the appropriate packs.",
+  "tags": ["router", "refactor", "migration", "hardening"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[Refactor/Migrate request] --> Kind{which?}\n  Kind -->|rename/move| R[pack.refactor.safe_rename_move.v1]\n  Kind -->|extract abstraction| A[pack.refactor.extract_abstraction.v1]\n  Kind -->|adapter layer| AD[pack.refactor.introduce_adapter.v1]\n  Kind -->|split monolith| S[pack.refactor.split_monolith.v1]\n  Kind -->|hardening pass| H[pack.harden.baseline_pass.v1]\n  R --> Done[Done]\n  A --> Done\n  AD --> Done\n  S --> Done\n  H --> Done"
+  }
+}

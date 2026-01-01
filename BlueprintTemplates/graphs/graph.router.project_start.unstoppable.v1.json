@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.project_start.unstoppable.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Project Start (Unstoppable Wizard)",
+  "description": "Routes 'start project' intents to the unstoppable wizard pack.",
+  "tags": ["router", "start_project", "wizard"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[start project] --> Wizard[pack.project.start.unstoppable.v1]\n  Input -->|dotnet first| Dot[pack.project.start.unstoppable.dotnet_first.v1]\n  Input -->|unknown| Wizard"
+  }
+}

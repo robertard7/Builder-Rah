@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.perf_and_capacity.neutral.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Performance + capacity (neutral)",
+  "description": "Routes perf/load/profiling/capacity intents to neutral packs and WAIT_USER when targets are missing.",
+  "tags": ["router", "perf", "capacity", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[Perf request] --> Targets{have targets?}\n  Targets -->|no| Q[pack.perf.ask_targets.wait_user.v1]\n  Targets -->|yes| Kind{which?}\n  Kind -->|baseline + gates| B[pack.perf.baseline_and_gates.neutral.v1]\n  Kind -->|optimize| O[pack.perf.optimize_from_evidence.neutral.v1]\n  Kind -->|capacity plan| C[pack.perf.capacity_plan.neutral.v1]\n  Q --> Done[Done]\n  B --> Done\n  O --> Done\n  C --> Done"
+  }
+}

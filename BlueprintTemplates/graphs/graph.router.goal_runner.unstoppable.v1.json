@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.goal_runner.unstoppable.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Unstoppable goal runner",
+  "description": "Routes user intents to the capability-aware goal runner or contract-first publish planning, with diagnose fallback.",
+  "tags": ["router", "goal", "capabilities", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  U[User intent] --> C{Intent type}\n  C -->|build/test/run/format| G[pack.goal_runner.unstoppable.neutral.v1]\n  C -->|package_publish| P[pack.goal.package_publish.plan_only.neutral.v1]\n  C -->|diagnose| D[pack.goal.diagnose.unstoppable.neutral.v1]\n  G -->|WAIT_USER| W[WAIT_USER]\n  P -->|WAIT_USER| W\n  W --> G\n  G --> Done[Done]\n  P --> Done\n  D --> Done\n  G -->|fail| DF[pack.diagnose.unstoppable.v1]\n  DF --> Done"
+  }
+}

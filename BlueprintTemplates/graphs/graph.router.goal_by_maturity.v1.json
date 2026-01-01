@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.goal_by_maturity.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Goal by Project Maturity",
+  "description": "Routes goals differently for new vs active vs release projects.",
+  "tags": ["router", "goal", "maturity"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Goal[User Goal] --> Shape[task.detect.project_shape.v1]\n  Shape --> Maturity[task.detect.project_maturity.v1]\n\n  Maturity -->|new| NewFlow{goal}\n  Maturity -->|active| ActiveFlow{goal}\n  Maturity -->|release| ReleaseFlow{goal}\n\n  NewFlow -->|start project| Start[pack.project.start.wizard.v1]\n  NewFlow -->|add feature| AddF[graph.router.feature_by_shape.v1]\n  NewFlow -->|ci| CI1[pack.ci.pipeline.v1]\n\n  ActiveFlow -->|ci| CI2[pack.ci.pipeline.matrix.v1]\n  ActiveFlow -->|diagnose buildfail| D1[pack.diagnose.classify_and_fix.v1]\n  ActiveFlow -->|upgrade deps| U1[pack.diagnose.dependency_upgrade.v1]\n  ActiveFlow -->|security| S1[pack.security.baseline.v1]\n\n  ReleaseFlow -->|publish| P[pack.package.publish.gated.v1]\n  ReleaseFlow -->|ci| CI3[pack.ci.pipeline.matrix.v1]\n  ReleaseFlow -->|security| S2[pack.security.baseline.v1]\n  ReleaseFlow -->|diagnose| D2[pack.diagnose.classify_and_fix.v1]"
+  }
+}

@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.capabilities_aware.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Capabilities-aware routing",
+  "description": "Routes requests based on ecosystem/profile capabilities and falls back to generic atoms + WAIT_USER when needed.",
+  "tags": ["router", "capabilities", "fallback"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Req[Request] --> Cap[pack.capabilities.matrix.v1]\n  Cap --> Decide{Supported?}\n  Decide -->|yes| Do[Execute verb via task.<verb>.<ecosystem>...]\n  Decide -->|partial| Gen[Use generic atoms + ask clarifying]\n  Gen --> Wait[WAIT_USER]\n  Decide -->|no| Wait"
+  }
+}

@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.project_start.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Project Start Router",
+  "description": "Routes start-project requests into ecosystem-specific packs.",
+  "tags": ["router", "project"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Start --> ChooseEcosystem\n  ChooseEcosystem --> DotNet\n  ChooseEcosystem --> Node\n  ChooseEcosystem --> Python\n  DotNet --> PackDotNet\n  Node --> PackNode\n  Python --> PackPython"
+  }
+}

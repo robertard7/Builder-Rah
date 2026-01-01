@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.testing_quality.neutral.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Testing + quality (neutral)",
+  "description": "Routes testing and quality intents to appropriate packs: pyramid, contracts, goldens, property, fuzz (safe).",
+  "tags": ["router", "tests", "quality", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[Testing request] --> K{Need?}\n  K -->|baseline pyramid| P[pack.tests.pyramid.baseline.neutral.v1]\n  K -->|contract tests| C[pack.tests.contracts.neutral.v1]\n  K -->|golden files| G[pack.tests.golden_files.neutral.v1]\n  K -->|property-based| R[pack.tests.property_based.neutral.v1]\n  K -->|fuzz safe| F[pack.tests.fuzz.safe.neutral.v1]\n  P --> Done[Done]\n  C --> Done\n  G --> Done\n  R --> Done\n  F --> Done"
+  }
+}

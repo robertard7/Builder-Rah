@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.repo_hygiene.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Repo Hygiene",
+  "description": "Routes repo hygiene / contributing / templates / gitignore requests.",
+  "tags": ["router", "repo", "hygiene"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[repo hygiene] --> Pick{intent?}\n  Pick -->|baseline| Base[pack.repo.hygiene.baseline.v1]\n  Pick -->|convert folder| Conv[pack.repo.convert.folder_to_repo.v1]\n  Pick -->|release ready| Rel[pack.repo.release.ready.v1]\n  Pick -->|unsure| Base"
+  }
+}

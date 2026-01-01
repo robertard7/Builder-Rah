@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.security_hardening.neutral.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Security hardening (neutral)",
+  "description": "Routes security-related intents to baseline hardening or docs-first quick path.",
+  "tags": ["router", "security", "hardening", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[Security request] --> Q{Scope?}\n  Q -->|baseline hardening| B[pack.security.baseline.neutral.v1]\n  Q -->|docs-first quick| D[pack.security.quick_hardening_docs_first.v1]\n  B --> Done[Done]\n  D --> Done"
+  }
+}

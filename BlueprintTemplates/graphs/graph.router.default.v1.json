@@ -1,0 +1,13 @@
+{
+  "id": "graph.router.default.v1",
+  "kind": "graph",
+  "version": "v1",
+  "meta": { "visibility": "public", "priority": 100 },
+  "title": "Router graph (default)",
+  "description": "Default router graph placeholder for pack wiring. Replace mermaid later. Stored as data, not code.",
+  "tags": ["graph", "router", "default"],
+  "updatedUtc": "2025-12-28T00:00:00.0000000Z",
+  "content": {
+    "mermaid": "flowchart TD\n  A[\"User Input\"] --> B{\"Route\"}\n  B -->|project start| C[\"Wizard\"]\n  B -->|other| D[\"Normal routing\"]"
+  }
+}

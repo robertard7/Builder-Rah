@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.goal_runner.workspace_aware.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Workspace-aware unstoppable goal runner",
+  "description": "Routes user intents to a workspace-aware goal runner first. Falls back to diagnose and contract-first publishing.",
+  "tags": ["router", "goal", "workspace", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  U[User intent] --> C{Intent type}\n  C -->|build/test/run/format| WG[pack.workspace.goal_runner.unstoppable.neutral.v1]\n  C -->|package_publish| P[pack.goal.package_publish.plan_only.neutral.v1]\n  C -->|diagnose| D[pack.goal.diagnose.unstoppable.neutral.v1]\n  WG -->|WAIT_USER select target| W[WAIT_USER]\n  W --> WG\n  WG --> Done[Done]\n  P --> Done\n  D --> Done\n  WG -->|fail| DF[pack.diagnose.unstoppable.v1]\n  DF --> Done"
+  }
+}

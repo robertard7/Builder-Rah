@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.orchestrator.preflight_tool_prompt_gate.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Orchestrator: Preflight tool prompt gate",
+  "description": "Adds a preflight step that validates tool prompt coverage. If missing prompts, enters WAIT_USER before any execution.",
+  "tags": ["orchestrator", "tools", "prompts", "preflight", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  S[Start] --> G[pack.tools.prompt_gate.preflight.v1]\n  G -->|PASS| N[Next: expand pack/recipe plan]\n  G -->|WAIT_USER missing prompts| W[WAIT_USER]\n  W --> G\n  G -->|FAIL hard| D[pack.diagnose.unstoppable.v1]\n  D --> End[End]"
+  }
+}

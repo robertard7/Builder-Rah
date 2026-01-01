@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.monorepo.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Monorepo / Workspace",
+  "description": "Routes workspace/monorepo requests, including detect+bootstrap and add app/lib.",
+  "tags": ["router", "monorepo", "workspace"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[workspace request] --> Pick{intent?}\n  Pick -->|bootstrap| Boot[pack.monorepo.workspace.bootstrap.v1]\n  Pick -->|add app/lib| Add[pack.monorepo.add_app_or_lib.v1]\n  Pick -->|standardize existing| Std[pack.monorepo.standardize.layout.v1]\n  Pick -->|unsure| Boot"
+  }
+}

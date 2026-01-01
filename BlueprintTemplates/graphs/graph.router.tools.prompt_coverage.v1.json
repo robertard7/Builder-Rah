@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.tools.prompt_coverage.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Tools prompt coverage",
+  "description": "Routes into tool prompt gate and blocks with WAIT_USER if missing prompt definitions for referenced tools.",
+  "tags": ["router", "tools", "prompts", "wait_user", "gate"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  A[Goal: validate tool prompts] --> G[pack.tools.prompt_gate.explicit_first.v1]\n  G -->|PASS| OK[Continue]\n  G -->|WAIT_USER missing prompts| W[WAIT_USER]\n  W --> G\n  G -->|FAIL hard| D[pack.diagnose.unstoppable.v1]\n  D --> End[End]"
+  }
+}
