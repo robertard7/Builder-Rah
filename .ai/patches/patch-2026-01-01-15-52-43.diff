@@ -1,0 +1,453 @@
+diff --git a/BlueprintTemplates/manifest.json b/BlueprintTemplates/manifest.json
+index b57f488..bfffbd8 100644
+--- a/BlueprintTemplates/manifest.json
++++ b/BlueprintTemplates/manifest.json
+@@ -21,23 +21,41 @@
+                     "archive":  "BlueprintTemplates/_archive"
+                 },
+     "entries":  [
+-                    {
+-                        "id":  "task.a11y.baseline_checks.neutral.v1",
+-                        "kind":  "atom",
+-                        "version":  "1",
+-                        "meta":  {
++                    {
++                        "id":  "task.a11y.baseline_checks.neutral.v1",
++                        "kind":  "atom",
++                        "version":  "1",
++                        "meta":  {
+                                      "visibility":  "internal",
+                                      "priority":  6
+                                  },
+                         "file":  "BlueprintTemplates/atoms/task.a11y.baseline_checks.neutral.v1.json",
+-                        "sha256":  "93d875bb86445064b056028a97fe66094d39f6cc7c81ea743ca411e102b8b4d7",
+-                        "updatedUtc":  "2025-12-29T04:04:44.2474154Z",
+-                        "tags":  [
+-                                     "a11y",
+-                                     "accessibility",
+-                                     "ui"
+-                                 ]
+-                    },
++                        "sha256":  "93d875bb86445064b056028a97fe66094d39f6cc7c81ea743ca411e102b8b4d7",
++                        "updatedUtc":  "2025-12-29T04:04:44.2474154Z",
++                        "tags":  [
++                                     "a11y",
++                                     "accessibility",
++                                     "ui"
++                                 ]
++                    },
++                    {
++                        "id":  "attachment.ingest.v1",
++                        "kind":  "atom",
++                        "version":  "1",
++                        "meta":  {
++                                     "visibility":  "public",
++                                     "priority":  10
++                                 },
++                        "file":  "BlueprintTemplates/atoms/attachment.ingest.v1.json",
++                        "sha256":  "4bf23cae9bd76d70e307009f9347f1a122ee63777b63c1ffa76adc6d885a2609",
++                        "updatedUtc":  "2025-12-29T04:04:44.8583533Z",
++                        "tags":  [
++                                     "attachments",
++                                     "ingest",
++                                     "vision",
++                                     "files"
++                                 ]
++                    },
+                     {
+                         "id":  "task.adapt.execute_goal_plan.v1",
+                         "kind":  "atom",
+@@ -11513,4 +11531,4 @@
+                                  ]
+                     }
+                 ]
+-}
+\ No newline at end of file
++}
+diff --git a/Settings/ModelCatalog.cs b/Settings/ModelCatalog.cs
+index a5ecc92..5e76cc2 100644
+--- a/Settings/ModelCatalog.cs
++++ b/Settings/ModelCatalog.cs
+@@ -6,41 +6,73 @@ using System.Linq;
+ 
+ namespace RahBuilder.Settings;
+ 
+-public static class ModelCatalog
+-{
+-    public static readonly string[] DefaultOpenAiModels =
+-    {
+-        "gpt-4o-mini",
+-        "gpt-4.1-mini",
+-        "gpt-4.1",
+-        "o4-mini"
+-    };
+-
+-    public static readonly string[] DefaultHuggingFaceModels =
+-    {
+-        "Qwen/Qwen2.5-7B-Instruct",
+-        "meta-llama/Llama-3.1-8B-Instruct",
+-        "mistralai/Mistral-7B-Instruct-v0.3"
+-    };
+-
+-    public static readonly string[] DefaultOllamaModels =
+-    {
+-        "qwen2.5:7b-instruct",
+-        "qwen2.5:14b-instruct",
+-        "mistral:latest",
+-        "llama3.1:8b",
+-        "phi3:mini",
+-        "nomic-embed-text:latest"
+-    };
+-
+-    public static IReadOnlyList<string> GetModelsForProvider(AppConfig cfg, string provider)
+-        => provider switch
+-        {
+-            "OpenAI" => DefaultOpenAiModels,
+-            "HuggingFace" => DefaultHuggingFaceModels,
+-            "Ollama" => DefaultOllamaModels,
+-            _ => Array.Empty<string>()
+-        };
++public static class ModelCatalog
++{
++    public static readonly string[] DefaultOpenAiModels =
++    {
++        "gpt-4o-mini",
++        "gpt-4.1-mini",
++        "gpt-4.1", // vision-capable
++        "o4-mini"
++    };
++
++    // Vision-capable OpenAI models (multimodal).
++    public static readonly string[] VisionOpenAiModels =
++    {
++        "gpt-4.1",
++        "gpt-4o",
++        "gpt-4o-mini"
++    };
++
++    public static readonly string[] DefaultHuggingFaceModels =
++    {
++        "Qwen/Qwen2.5-7B-Instruct",
++        "meta-llama/Llama-3.1-8B-Instruct",
++        "mistralai/Mistral-7B-Instruct-v0.3"
++    };
++
++    // Vision-capable HuggingFace instruction models (multimodal).
++    public static readonly string[] VisionHuggingFaceModels =
++    {
++        "Qwen/Qwen2-VL-7B-Instruct",
++        "llava-hf/llava-v1.6-mistral-7b-hf",
++        "llava-hf/llava-1.5-7b-hf"
++    };
++
++    public static readonly string[] DefaultOllamaModels =
++    {
++        "qwen2.5:7b-instruct",
++        "qwen2.5:14b-instruct",
++        "mistral:latest",
++        "llama3.1:8b",
++        "phi3:mini",
++        "nomic-embed-text:latest"
++    };
++
++    // Vision-capable Ollama models (multimodal).
++    public static readonly string[] VisionOllamaModels =
++    {
++        "llava:latest",
++        "llava",
++        "bakllava"
++    };
++
++    public static IReadOnlyList<string> GetModelsForProvider(AppConfig cfg, string provider)
++    {
++        var list = provider switch
++        {
++            "OpenAI" => DefaultOpenAiModels.Concat(VisionOpenAiModels),
++            "HuggingFace" => DefaultHuggingFaceModels.Concat(VisionHuggingFaceModels),
++            "Ollama" => DefaultOllamaModels.Concat(VisionOllamaModels),
++            _ => Array.Empty<string>()
++        };
++
++        return list
++            .Where(s => !string.IsNullOrWhiteSpace(s))
++            .Select(s => s.Trim())
++            .Distinct(StringComparer.OrdinalIgnoreCase)
++            .ToList();
++    }
+ 
+     // Role prompts come from BlueprintTemplates (your prompt library), not tool prompts.
+     // Minimal: list BlueprintTemplates\manifest.json entries if present, else return "default".
+diff --git a/Settings/OrchestratorSettings.cs b/Settings/OrchestratorSettings.cs
+index 828219f..79e765d 100644
+--- a/Settings/OrchestratorSettings.cs
++++ b/Settings/OrchestratorSettings.cs
+@@ -17,34 +17,35 @@ public sealed class OrchestratorSettings
+     // Per-role wiring: provider + model + blueprint prompt id
+     public List<OrchestratorRoleConfig> Roles { get; set; } = new();
+ 
+-    public void EnsureDefaults()
+-    {
+-        Roles ??= new List<OrchestratorRoleConfig>();
+-
+-        EnsureRole("Orchestrator");
+-        EnsureRole("Planner");
+-        EnsureRole("Executor");
+-        EnsureRole("Repair");
+-        EnsureRole("Embed");
+-
+-        var order = new[] { "Orchestrator", "Planner", "Executor", "Repair", "Embed" };
+-        Roles = Roles
+-            .OrderBy(r => Array.IndexOf(order, r.Role ?? ""))
+-            .ThenBy(r => r.Role, StringComparer.OrdinalIgnoreCase)
+-            .ToList();
+-    }
+-
+-    private void EnsureRole(string role)
+-    {
+-        if (Roles.Any(r => string.Equals(r.Role, role, StringComparison.OrdinalIgnoreCase)))
+-            return;
+-
+-        Roles.Add(new OrchestratorRoleConfig
+-        {
+-            Role = role,
+-            Provider = "Ollama",
+-            Model = "",
+-            PromptId = "default"
+-        });
+-    }
+-}
++    public void EnsureDefaults()
++    {
++        Roles ??= new List<OrchestratorRoleConfig>();
++
++        EnsureRole("Orchestrator");
++        EnsureRole("Planner");
++        EnsureRole("Executor");
++        EnsureRole("Repair");
++        EnsureRole("Embed");
++        EnsureRole("Vision", provider: "", model: "");
++
++        var order = new[] { "Orchestrator", "Planner", "Executor", "Repair", "Embed", "Vision" };
++        Roles = Roles
++            .OrderBy(r => Array.IndexOf(order, r.Role ?? ""))
++            .ThenBy(r => r.Role, StringComparer.OrdinalIgnoreCase)
++            .ToList();
++    }
++
++    private void EnsureRole(string role, string provider = "Ollama", string model = "")
++    {
++        if (Roles.Any(r => string.Equals(r.Role, role, StringComparison.OrdinalIgnoreCase)))
++            return;
++
++        Roles.Add(new OrchestratorRoleConfig
++        {
++            Role = role,
++            Provider = provider,
++            Model = model,
++            PromptId = "default"
++        });
++    }
++}
+diff --git a/Tools/tools.json b/Tools/tools.json
+index c9b4a32..04cb221 100644
+--- a/Tools/tools.json
++++ b/Tools/tools.json
+@@ -315,6 +315,16 @@
+       "desc": "Run python module/script. args: <projectDir> <scriptOrModule> [args...]",
+       "cmd": "set -- {args}; p=\"$1\"; s=\"$2\"; shift 2 || true; if [ -z \"$p\" ] || [ -z \"$s\" ]; then echo 'usage: <projectDir> <scriptOrModule> [args...]'; exit 2; fi; cd \"$p\" && python3 \"$s\" \"$@\""
+     },
++    {
++      "id": "file.read.text",
++      "desc": "Read a small text file (txt|md|json|csv) and emit JSON {filename,sha256,content}. args: <path>",
++      "cmd": "bash -lc \"p=\\\"{args}\\\"; if [ -z \\\"$p\\\" ]; then echo '{\"error\":\"missing_path\"}'; exit 1; fi; ext=${p##*.}; case \\\"${ext,,}\\\" in txt|md|json|csv) ;; *) echo '{\"error\":\"unsupported_extension\"}'; exit 1;; esac; if [ ! -f \\\"$p\\\" ]; then echo '{\"error\":\"not_found\"}'; exit 1; fi; max=52428800; size=$(stat -c%s \\\"$p\\\" 2>/dev/null || echo 0); if [ \"$size\" -gt \"$max\" ]; then echo '{\"error\":\"too_large\"}'; exit 1; fi; PATH_TO_READ=\\\"$p\\\" python3 - <<'PY'\nimport json, hashlib, os\np=os.environ['PATH_TO_READ']\nwith open(p,'rb') as f:\n    data=f.read()\nsha=hashlib.sha256(data).hexdigest()\ntext=data.decode('utf-8','replace')\nprint(json.dumps({\"filename\":os.path.basename(p),\"sha256\":sha,\"content\":text}))\nPY\n\""
++    },
++    {
++      "id": "vision.describe.image",
++      "desc": "Describe an image using a vision-capable model (requires Vision role). args: <imagePath>",
++      "cmd": "echo 'vision.describe.image requires configured Vision role/model; execution is gated by prompts.'"
++    },
+ 
+     {
+       "id": "java.maven.build",
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 3cd576a..735b48b 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -1,10 +1,13 @@
+ #nullable enable
+ using System;
++using System.Collections.Generic;
+ using System.IO;
++using System.Linq;
+ using System.Text;
+ using System.Threading;
+ using System.Threading.Tasks;
+ using RahBuilder.Settings;
++using RahBuilder.Tools.BlueprintTemplates;
+ using RahOllamaOnly.Tools;
+ using RahOllamaOnly.Tracing;
+ 
+@@ -142,7 +145,7 @@ public sealed class WorkflowFacade
+         // Run digest.
+         var userTextWithAttachments = AppendAttachmentMetadata(text);
+         var spec = await RunJobSpecDigestAsync(userTextWithAttachments, ct).ConfigureAwait(true);
+-
++
+         if (!spec.IsComplete)
+         {
+             var missing = spec.GetMissingFields();
+@@ -165,12 +168,24 @@ public sealed class WorkflowFacade
+             return;
+         }
+ 
+-        _forceEditBecauseInvalidJson = false;
+-
+-        // Save-point honesty: planner not wired yet.
+-        _trace.Emit("[digest:ok] JobSpec complete. Handing off to Planner (not wired in this phase).");
+-        _trace.Emit("[route:graph_ok] Mermaid workflow graph validated. (Planner dispatch not wired yet.)");
+-    }
++        _forceEditBecauseInvalidJson = false;
++
++        var rawJson = spec.Raw?.RootElement.GetRawText() ?? "";
++        var routeDecision = _router.Decide(mermaid, text);
++
++        _trace.Emit("[digest:ok] JobSpec complete. Handing off to Planner (not wired in this phase).");
++        _trace.Emit("[route:graph_ok] Mermaid workflow graph validated. (Planner dispatch not wired yet.)");
++        if (routeDecision.Ok)
++            _trace.Emit($"[route:selected] {routeDecision.SelectedRoute} (routes={routeDecision.RouteCount}) {routeDecision.Why}");
++        else
++            _trace.Emit("[route:error] " + routeDecision.Message);
++
++        if (!string.IsNullOrWhiteSpace(rawJson))
++            _trace.Emit("[jobspec] " + Trunc(rawJson, 800));
++
++        EmitAttachmentSuggestions();
++        _trace.Emit("[planner] not wired: no execution performed.");
++    }
+ 
+     private async Task<JobSpec> RunJobSpecDigestAsync(string userText, CancellationToken ct)
+     {
+@@ -271,4 +286,123 @@ public sealed class WorkflowFacade
+         _trace.Emit($"[digest:attachments] {_attachments.Count} attached");
+         return sb.ToString();
+     }
++
++    private void EmitAttachmentSuggestions()
++    {
++        if (_attachments == null || _attachments.Count == 0)
++        {
++            _trace.Emit("[attachments] none");
++            return;
++        }
++
++        var blueprint = LoadAttachmentBlueprint();
++        if (blueprint == null)
++        {
++            _trace.Emit("[attachments] blueprint attachment.ingest.v1 missing or unreadable.");
++            return;
++        }
++
++        _trace.Emit($"[attachments] {_attachments.Count} attachment(s) present. blueprint={blueprint.TemplatePath} visibility={blueprint.Visibility}");
++
++        foreach (var a in _attachments)
++        {
++            var tools = new List<string>();
++            var kind = (a.Kind ?? "").ToLowerInvariant();
++            if (kind == "image")
++                tools.AddRange(blueprint.ImageTools);
++            else if (kind == "document")
++                tools.AddRange(blueprint.DocumentTools);
++
++            var toolText = tools.Count == 0 ? "none" : string.Join(", ", tools.Distinct(StringComparer.OrdinalIgnoreCase));
++            _trace.Emit($"[attachments:suggest] {a.StoredName} ({kind}, {a.SizeBytes} bytes) -> {toolText}");
++        }
++    }
++
++    private AttachmentBlueprintInfo? LoadAttachmentBlueprint()
++    {
++        var folder = (_cfg.General.BlueprintTemplatesPath ?? "").Trim();
++        if (string.IsNullOrWhiteSpace(folder))
++            return null;
++
++        try
++        {
++            var catalog = BlueprintCatalog.Load(folder);
++            var entry = catalog.FirstOrDefault(e => string.Equals(e.Id, "attachment.ingest.v1", StringComparison.OrdinalIgnoreCase));
++            if (entry == null)
++                return null;
++
++            var path = ResolveTemplatePath(folder, entry.File);
++            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
++                return null;
++
++            using var doc = JsonDocument.Parse(File.ReadAllText(path));
++            var root = doc.RootElement;
++
++            var suggest = root.TryGetProperty("suggest", out var s) && s.ValueKind == JsonValueKind.Object ? s : default;
++            var imageTools = ReadStringArray(suggest, "imageTools");
++            var documentTools = ReadStringArray(suggest, "documentTools");
++
++            if (imageTools.Count == 0 && documentTools.Count == 0)
++            {
++                imageTools.Add("vision.describe.image");
++                documentTools.Add("file.read.text");
++            }
++
++            return new AttachmentBlueprintInfo
++            {
++                TemplatePath = path,
++                Visibility = entry.Visibility,
++                ImageTools = imageTools,
++                DocumentTools = documentTools
++            };
++        }
++        catch
++        {
++            return null;
++        }
++    }
++
++    private static string ResolveTemplatePath(string blueprintTemplatesFolder, string fileFromManifest)
++    {
++        if (string.IsNullOrWhiteSpace(fileFromManifest)) return "";
++
++        var f = fileFromManifest.Replace('\\', '/').Trim();
++        if (f.StartsWith("BlueprintTemplates/", StringComparison.OrdinalIgnoreCase))
++            f = f.Substring("BlueprintTemplates/".Length);
++
++        if (Path.IsPathRooted(f))
++            return f;
++
++        return Path.Combine(blueprintTemplatesFolder, f.Replace('/', Path.DirectorySeparatorChar));
++    }
++
++    private static List<string> ReadStringArray(JsonElement obj, string property)
++    {
++        var list = new List<string>();
++        if (obj.ValueKind != JsonValueKind.Object)
++            return list;
++
++        if (!obj.TryGetProperty(property, out var el) || el.ValueKind != JsonValueKind.Array)
++            return list;
++
++        foreach (var item in el.EnumerateArray())
++        {
++            if (item.ValueKind == JsonValueKind.String)
++            {
++                var s = item.GetString();
++                if (!string.IsNullOrWhiteSpace(s))
++                    list.Add(s.Trim());
++            }
++        }
++
++        return list;
++    }
++
++    private sealed class AttachmentBlueprintInfo
++    {
++        public string TemplatePath { get; init; } = "";
++        public string Visibility { get; init; } = "";
++        public List<string> ImageTools { get; init; } = new();
++        public List<string> DocumentTools { get; init; } = new();
++    }
+ }

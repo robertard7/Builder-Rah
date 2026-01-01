@@ -1,0 +1,36 @@
+{
+  "id": "attachment.ingest.v1",
+  "kind": "atom",
+  "version": "1",
+  "meta": {
+    "visibility": "public",
+    "priority": 10,
+    "tags": [
+      "attachments",
+      "ingest",
+      "vision",
+      "files"
+    ]
+  },
+  "title": "Attachment ingest (metadata-first)",
+  "description": "Summarize attachments by manifest entry and propose gated tools to inspect them without auto-execution.",
+  "inputs": {
+    "attachments": "Attachment manifest entries with storedName, sha256, kind, sizeBytes"
+  },
+  "outputs": {
+    "summary": "Short attachment summary",
+    "suggestedTools": "Tool ids to request (file.read.text, vision.describe.image)"
+  },
+  "suggest": {
+    "imageTools": [
+      "vision.describe.image"
+    ],
+    "documentTools": [
+      "file.read.text"
+    ]
+  },
+  "notes": [
+    "Do not read file bytes in this atom.",
+    "Only propose tools; execution is gated elsewhere."
+  ]
+}
