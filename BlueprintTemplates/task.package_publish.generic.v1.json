@@ -1,0 +1,14 @@
+{
+  "id": "task.package_publish.generic.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Package and Publish (Generic)",
+  "description": "Package and publish using configured credentials and registry settings.",
+  "tags": ["package", "publish"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "package_publish",
+    "inputs": ["projectRoot", "releaseVersion"]
+  }
+}
