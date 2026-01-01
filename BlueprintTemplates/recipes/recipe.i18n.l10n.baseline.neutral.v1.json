@@ -1,0 +1,19 @@
+﻿{
+  "id": "recipe.i18n.l10n.baseline.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 82 },
+  "title": "i18n + l10n baseline (neutral)",
+  "description": "Extracts user-visible strings into a catalog contract, adds locale selection, and defines formatting rules.",
+  "tags": ["i18n", "l10n", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.i18n.detect_user_visible_strings.v1" },
+    { "use": "task.i18n.define_message_catalog_contract.v1" },
+    { "use": "task.i18n.extract_strings_to_catalog.v1" },
+    { "use": "task.i18n.add_locale_selection.v1" },
+    { "use": "task.l10n.formatting_rules.v1" },
+    { "use": "task.i18n.translation_workflow_contract.v1" },
+    { "use": "task.i18n.rtl_and_layout_checks.v1" }
+  ] }
+}

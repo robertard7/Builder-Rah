@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.node.cache.external_hook.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 25 },
+  "title": "Node Cache: External Hook",
+  "description": "Adds an adapter placeholder for an external cache.",
+  "tags": ["node", "cache", "external"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/cache/externalCache.js", "onConflict": "skip", "text": "// Placeholder: integrate external cache via environment/settings.\nfunction get(k){ return null; }\nfunction set(k,v){ }\nmodule.exports = { get, set };\n" } }
+  ] }
+}

@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.monorepo.workspace.go.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": "Workspace: Go conventions",
+  "description": "Generic workspace scaffold plus Go notes.",
+  "tags": ["monorepo", "go"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.monorepo.workspace.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/workspace_go.md", "onConflict": "skip", "text": "# Workspace (Go)\n\n- Keep shared packages in libs/.\n- Consider a workspace approach if you have multiple modules.\n- Build/test via Settings.\n" } }
+  ] }
+}

@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.python.db.sqlite.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 40 },
+  "title": "Python DB: SQLite Skeleton",
+  "description": "Adds a sqlite db helper stub (stdlib sqlite3).",
+  "tags": ["python", "db", "sqlite"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/db_sqlite.py", "onConflict": "skip", "text": "import sqlite3\n\ndef ping(path=':memory:'):\n    con = sqlite3.connect(path)\n    con.execute('select 1')\n    con.close()\n    return 'sqlite:ok'\n" } }
+  ] }
+}

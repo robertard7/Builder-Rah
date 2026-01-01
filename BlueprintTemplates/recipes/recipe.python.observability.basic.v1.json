@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.python.observability.basic.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 40 },
+  "title": "Python Observability: Basic",
+  "description": "Adds JSON logger helper + correlation id context.",
+  "tags": ["python", "observability", "logging"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/obs.py", "onConflict": "skip", "text": "import json, time\n\n_correlation = ''\n\ndef set_correlation_id(cid: str):\n    global _correlation\n    _correlation = cid\n\ndef log(level: str, message: str, **meta):\n    entry = { 'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'level': level, 'message': message, 'correlationId': _correlation }\n    entry.update(meta)\n    print(json.dumps(entry, separators=(',',':')))\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/observability.md", "onConflict": "skip", "text": "# Observability\n\n- JSON logs\n- correlation id per request\n\nWire log sinks/tracing via environment/settings.\n" } }
+  ] }
+}

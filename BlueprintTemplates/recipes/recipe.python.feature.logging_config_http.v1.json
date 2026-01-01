@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.python.feature.logging_config_http.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "Python Feature: Logging + Config + HTTP",
+  "description": "Adds config.json and a tiny requests-based HTTP sample with logging.",
+  "tags": ["python", "logging", "config", "http"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/config.json", "onConflict": "skip", "text": "{\n  \"baseUrl\": \"https://example.com\"\n}\n" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/http_sample.py", "onConflict": "skip", "text": "import json\nimport logging\n\ntry:\n    import requests\nexcept Exception:\n    requests = None\n\nlogging.basicConfig(level=logging.INFO)\n\ndef run():\n    with open('config.json', 'r', encoding='utf-8') as f:\n        cfg = json.load(f)\n    base = cfg.get('baseUrl', 'https://example.com')\n    logging.info('GET %s/', base)\n    if requests is None:\n        logging.warning('requests not installed')\n        return\n    r = requests.get(base + '/')\n    logging.info('Status: %s', r.status_code)\n\nif __name__ == '__main__':\n    run()\n" } }
+    ]
+  }
+}

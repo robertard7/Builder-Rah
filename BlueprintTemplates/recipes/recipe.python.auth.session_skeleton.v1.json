@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.python.auth.session_skeleton.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 25 },
+  "title": "Python Auth: Session Skeleton",
+  "description": "Adds in-memory session store stub.",
+  "tags": ["python", "auth", "session"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/auth_sessions.py", "onConflict": "skip", "text": "import secrets\n_store = {}\n\ndef create(subject: str) -> str:\n    sid = 's_' + secrets.token_hex(8)\n    _store[sid] = subject\n    return sid\n\ndef try_get(sid: str):\n    return _store.get(sid)\n" } }
+  ] }
+}

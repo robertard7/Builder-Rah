@@ -1,0 +1,18 @@
+﻿{
+  "id": "recipe.monorepo.migration.plan_only.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 45 },
+  "title": "Workspace: Migration plan (non-destructive)",
+  "description": "Produces a plan for standardizing layout without moving files automatically.",
+  "tags": ["monorepo", "migration", "plan"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.diagnose_build_fail_triage.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": {
+      "path": "${projectRoot}/docs/workspace_migration_plan.md",
+      "onConflict": "skip",
+      "text": "# Workspace Migration Plan\n\n## Goals\n- Standardize to apps/ and libs/\n- Minimize moving/renaming\n\n## Inventory\nList current projects, their build files, and dependencies.\n\n## Proposed mapping\n- Map each project into apps/ or libs/\n\n## Steps\n- Move in small batches\n- Verify build/test each batch using Settings\n"
+    } }
+  ] }
+}

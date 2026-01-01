@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.monorepo.workspace.node.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": "Workspace: Node conventions",
+  "description": "Generic workspace scaffold plus Node workspace notes.",
+  "tags": ["monorepo", "node"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.monorepo.workspace.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/workspace_node.md", "onConflict": "skip", "text": "# Workspace (Node)\n\n- Consider workspaces for shared packages.\n- Keep apps in apps/ and packages/libs in libs/.\n- Scripts and tooling remain Settings-driven.\n" } }
+  ] }
+}

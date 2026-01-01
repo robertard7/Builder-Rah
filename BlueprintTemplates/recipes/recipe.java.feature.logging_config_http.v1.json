@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.java.feature.logging_config_http.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "Java Feature: Logging + Config + HTTP",
+  "description": "Adds config.properties and a minimal java.net.http client example.",
+  "tags": ["java", "logging", "config", "http"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/config.properties", "onConflict": "skip", "text": "baseUrl=https://example.com\n" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/main/java/${groupPath}/HttpSample.java", "onConflict": "skip", "text": "package ${groupId};\n\nimport java.net.URI;\nimport java.net.http.HttpClient;\nimport java.net.http.HttpRequest;\nimport java.net.http.HttpResponse;\nimport java.util.Properties;\nimport java.io.FileInputStream;\n\npublic final class HttpSample {\n  public static void run() throws Exception {\n    Properties p = new Properties();\n    try (FileInputStream in = new FileInputStream(\"config.properties\")) {\n      p.load(in);\n    }\n    String base = p.getProperty(\"baseUrl\", \"https://example.com\");\n    System.out.println(\"GET \" + base + \"/\");\n    HttpClient c = HttpClient.newHttpClient();\n    HttpRequest r = HttpRequest.newBuilder().uri(new URI(base + \"/\")).GET().build();\n    HttpResponse<String> resp = c.send(r, HttpResponse.BodyHandlers.ofString());\n    System.out.println(\"Status: \" + resp.statusCode());\n  }\n}\n" } }
+    ]
+  }
+}

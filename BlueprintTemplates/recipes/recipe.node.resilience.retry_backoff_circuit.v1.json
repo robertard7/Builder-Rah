@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.node.resilience.retry_backoff_circuit.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 25 },
+  "title": "Node Resilience: Circuit Notes",
+  "description": "Adds circuit breaker notes stub.",
+  "tags": ["node", "resilience", "circuitbreaker"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/circuit_breaker.md", "onConflict": "skip", "text": "# Circuit Breaker\n\nOpen on repeated failures, cool down, probe, then close.\n\nImplementation via environment/settings.\n" } }
+  ] }
+}

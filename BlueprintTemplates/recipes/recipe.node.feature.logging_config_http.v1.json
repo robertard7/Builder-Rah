@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.node.feature.logging_config_http.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "Node Feature: Logging + Config + HTTP",
+  "description": "Adds config.json and a small HTTP fetch sample with console logging.",
+  "tags": ["node", "logging", "config", "http"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/config.json", "onConflict": "skip", "text": "{\n  \"baseUrl\": \"https://example.com\"\n}\n" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/httpSample.js", "onConflict": "skip", "text": "async function run(baseUrl) {\n  console.log(`GET ${baseUrl}/`);\n  const res = await fetch(`${baseUrl}/`);\n  console.log(`Status: ${res.status}`);\n}\n\nmodule.exports = { run };\n" } }
+    ]
+  }
+}

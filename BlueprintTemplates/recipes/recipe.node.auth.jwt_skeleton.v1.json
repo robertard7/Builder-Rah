@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.node.auth.jwt_skeleton.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 45 },
+  "title": "Node Auth: JWT Skeleton",
+  "description": "Adds a tiny token service stub.",
+  "tags": ["node", "auth", "jwt"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/auth/tokenService.js", "onConflict": "skip", "text": "// Placeholder: implement signing/verification with your chosen library.\nfunction issue(subject){ return `token:${subject}`; }\nfunction tryValidate(token){\n  if (!token.startsWith('token:')) return { ok:false };\n  return { ok:true, subject: token.slice('token:'.length) };\n}\nmodule.exports = { issue, tryValidate };\n" } }
+  ] }
+}

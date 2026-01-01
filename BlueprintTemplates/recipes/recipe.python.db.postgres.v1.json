@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.python.db.postgres.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 35 },
+  "title": "Python DB: Postgres Skeleton",
+  "description": "Adds a placeholder postgres helper (no driver assumed).",
+  "tags": ["python", "db", "postgres"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/db_postgres.py", "onConflict": "skip", "text": "def ping():\n    # Placeholder: wire a postgres driver via environment/settings.\n    return 'postgres:ok'\n" } }
+  ] }
+}

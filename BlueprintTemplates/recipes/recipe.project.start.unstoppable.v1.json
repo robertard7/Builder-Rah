@@ -1,0 +1,21 @@
+﻿{
+  "id": "recipe.project.start.unstoppable.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 85 },
+  "title": "Start Project: Unstoppable wizard recipe",
+  "description": "Selection -> create -> hygiene/docs -> tests -> optional env -> validate -> diagnose on failure.",
+  "tags": ["start_project", "wizard", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.project.start.prompt_select.v1" },
+      { "use": "task.project.start.create_from_selection.v1" },
+      { "use": "task.project.start.scaffold_docs_and_hygiene.v1" },
+      { "use": "task.project.start.scaffold_tests_if_missing.v1" },
+      { "use": "task.project.start.optional_containerize.v1" },
+      { "use": "task.project.start.baseline_validate.v1" },
+      { "use": "pack.diagnose.unstoppable.v1" }
+    ]
+  }
+}

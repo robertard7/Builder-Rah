@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.java.cli.maven.hello.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": "Java CLI (Maven): Hello",
+  "description": "Adds a minimal Main class output.",
+  "tags": ["java", "cli", "maven"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.generic.v1", "with": { "path": "${projectRoot}/src/main/java/${groupPath}/Main.java", "text": "package ${groupId};\n\npublic final class Main {\n  public static void main(String[] args) {\n    String name = (args.length > 0) ? args[0] : \"world\";\n    System.out.println(\"Hello, \" + name);\n  }\n}\n" } }
+    ]
+  }
+}
