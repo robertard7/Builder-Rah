@@ -57,6 +57,7 @@ public static class ConfigStore
 
         // Ensure orchestrator has stable required roles
         cfg.Orchestrator.EnsureDefaults();
+        cfg.General.Normalize();
 
         // If you have other migration/normalization hooks, call them here.
         // DO NOT reintroduce legacy scalar RolePrompt_* properties.

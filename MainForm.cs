@@ -15,6 +15,7 @@ namespace RahBuilder;
 public sealed class MainForm : Form
 {
     private readonly AppConfig _config;
+    private AttachmentInbox _inbox;
 
     private readonly RichTextBox _chatView;
 
@@ -32,10 +33,11 @@ public sealed class MainForm : Form
         Width = 1200;
         Height = 800;
 
-        _config = ConfigStore.Load();
-
         _traceWriter = new TracePanelWriter();
         _trace = new RunTrace(new RahOllamaOnly.Tracing.TracePanelTraceSink(_traceWriter));
+
+        _config = ConfigStore.Load();
+        _inbox = new AttachmentInbox(_config.General, _trace);
 
         _workflow = new WorkflowFacade(_trace);
         _workflow.UserFacingMessage += s => AppendChat(s + "\n");
@@ -66,8 +68,10 @@ public sealed class MainForm : Form
             BackColor = SystemColors.Window
         };
 
-        _composer = new ChatComposerControl();
+        _composer = new ChatComposerControl(_inbox);
         _composer.SendRequested += text => _ = SendNowAsync(text);
+        _composer.AttachmentsChanged += att => _workflow.SetAttachments(att);
+        _workflow.SetAttachments(_inbox.List());
 
         leftPanel.Controls.Add(_chatView);
         leftPanel.Controls.Add(_composer);
@@ -140,6 +144,10 @@ public sealed class MainForm : Form
     private void AfterSettingsSaved()
     {
         PublishConfigToRuntime();
+        _inbox = new AttachmentInbox(_config.General, _trace);
+        _composer.SetInbox(_inbox);
+        _composer.ReloadAttachments(_inbox.List());
+        _workflow.SetAttachments(_inbox.List());
 
         if (_config.General.EnableGlobalClipboardShortcuts)
             ClipboardPolicy.Apply(this);

@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using RahBuilder.Settings;
@@ -14,6 +15,7 @@ public sealed class WorkflowFacade
     private readonly RunTrace _trace;
     private readonly WorkflowRouter _router = new();
     private AppConfig _cfg;
+    private IReadOnlyList<AttachmentInbox.AttachmentEntry> _attachments = Array.Empty<AttachmentInbox.AttachmentEntry>();
 
     private string _lastGraphHash = "";
 
@@ -41,6 +43,11 @@ public sealed class WorkflowFacade
         if (cfg != null) _cfg = cfg;
         SyncGraphToHub(_cfg);
         RefreshTooling();
+    }
+
+    public void SetAttachments(IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments)
+    {
+        _attachments = attachments ?? Array.Empty<AttachmentInbox.AttachmentEntry>();
     }
 
     public void RefreshTooling()
@@ -133,7 +140,8 @@ public sealed class WorkflowFacade
         }
 
         // Run digest.
-        var spec = await RunJobSpecDigestAsync(text, ct).ConfigureAwait(true);
+        var userTextWithAttachments = AppendAttachmentMetadata(text);
+        var spec = await RunJobSpecDigestAsync(userTextWithAttachments, ct).ConfigureAwait(true);
 
         if (!spec.IsComplete)
         {
@@ -245,4 +253,22 @@ public sealed class WorkflowFacade
     }
 
     private static bool IsWindowsDesktopProject() => true; // RahBuilder.csproj uses Microsoft.NET.Sdk.WindowsDesktop
+
+    private string AppendAttachmentMetadata(string userText)
+    {
+        if (_attachments == null || _attachments.Count == 0)
+            return userText ?? "";
+
+        var sb = new StringBuilder();
+        sb.AppendLine("ATTACHMENTS:");
+        foreach (var a in _attachments)
+        {
+            sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}");
+        }
+        sb.AppendLine();
+        sb.Append(userText ?? "");
+
+        _trace.Emit($"[digest:attachments] {_attachments.Count} attached");
+        return sb.ToString();
+    }
 }
