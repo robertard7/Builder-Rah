@@ -22,7 +22,7 @@ public static class ClarificationQuestionBank
         {
             if (Map.TryGetValue(m.ToLowerInvariant(), out var q) && !list.Contains(q))
                 list.Add(q);
-            if (list.Count >= max) break;
+            if (list.Count >= Math.Max(1, max)) break;
         }
 
         if (list.Count == 0)
@@ -31,4 +31,3 @@ public static class ClarificationQuestionBank
         return list;
     }
 }
-

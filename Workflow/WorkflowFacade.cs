@@ -37,6 +37,7 @@ public sealed class WorkflowFacade
         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
         _cfg = ConfigStore.Load();
         SyncGraphToHub(_cfg);
+        LogRepoBanner();
     }
 
     public WorkflowFacade(AppConfig cfg, RunTrace trace)
@@ -44,6 +45,7 @@ public sealed class WorkflowFacade
         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
         SyncGraphToHub(_cfg);
+        LogRepoBanner();
     }
 
     public void RefreshTooling(AppConfig cfg)
@@ -143,6 +145,7 @@ public sealed class WorkflowFacade
             }
             else if (action.Action is ReplyActionType.ApproveNextStep or ReplyActionType.ApproveAllSteps)
             {
+                _state.AutoApproveAll = approvedAll;
                 await ExecuteCurrentStepAsync(ct, approvedAll).ConfigureAwait(true);
                 return;
             }
@@ -156,6 +159,7 @@ public sealed class WorkflowFacade
         if (action.Action == ReplyActionType.AnswerClarification && !string.IsNullOrWhiteSpace(action.Payload))
         {
             _state.ClarificationAnswers.Add(action.Payload);
+            _state.PendingQuestion = null;
             text = $"{_state.PendingUserRequest}\n\nAdditional detail: {string.Join("\n", _state.ClarificationAnswers)}";
             _trace.Emit("[clarify] received answer, re-running digest.");
         }
@@ -163,6 +167,7 @@ public sealed class WorkflowFacade
         {
             _state.PendingUserRequest = text;
             _state.ClearClarifications();
+            _state.PendingQuestion = null;
         }
 
         var repoScope = RepoScope.Resolve(_cfg);
@@ -199,6 +204,7 @@ public sealed class WorkflowFacade
             if (IsWindowsDesktopProject())
             {
                 _trace.Emit("[env:error] WinForms build requires WindowsDesktop SDK. Switch ExecutionTarget to WindowsHost.");
+                _trace.Emit("[build:skip] WinForms requires WindowsHost; skipping build/run in container.");
                 EmitWaitUser("WinForms build requires WindowsDesktop SDK. Switch ExecutionTarget to WindowsHost.");
                 return;
             }
@@ -224,10 +230,11 @@ public sealed class WorkflowFacade
             // Normal WAIT_USER (missing real fields)
             _forceEditBecauseInvalidJson = false;
 
-            var qs = ClarificationQuestionBank.PickQuestions(missing);
+            var qs = ClarificationQuestionBank.PickQuestions(missing, 1);
             _state.PendingQuestions = qs;
+            _state.PendingQuestion = qs.FirstOrDefault();
             _trace.Emit("[route:wait_user] JobSpec incomplete; asking clarifications.");
-            EmitWaitUser(string.Join(" ", qs));
+            EmitWaitUser(_state.PendingQuestion ?? "Could you share a bit more detail?");
             return;
         }
 
@@ -446,6 +453,25 @@ public sealed class WorkflowFacade
         return list;
     }
 
+    private void LogRepoBanner()
+    {
+        var scope = RepoScope.Resolve(_cfg);
+        _trace.Emit(scope.Message);
+        if (!string.IsNullOrWhiteSpace(scope.GitTopLevel))
+            _trace.Emit($"[repo] GitTopLevel={scope.GitTopLevel}");
+    }
+
+    private static string DescribeStep(ToolPlanStep step)
+    {
+        var name = step.ToolId.ToLowerInvariant();
+        var stored = step.Inputs.TryGetValue("storedName", out var s) ? s : "";
+        if (name == "file.read.text")
+            return $"read the file {stored}";
+        if (name == "vision.describe.image")
+            return $"describe the image {stored}";
+        return $"{step.ToolId} ({stored})";
+    }
+
     private sealed class AttachmentBlueprintInfo
     {
         public string TemplatePath { get; init; } = "";
@@ -466,6 +492,10 @@ public sealed class WorkflowFacade
 
         var blueprint = LoadAttachmentBlueprint();
         var sb = new StringBuilder();
+        sb.AppendLine("SCHEMA: tool_plan.v1 (mode,tweakFirst,steps[id,toolId,inputs{storedName},why])");
+        sb.AppendLine("ALLOWED_TOOLS: file.read.text, vision.describe.image");
+        sb.AppendLine("STRICT: JSON only, no markdown, no prose, no invented tools.");
+        sb.AppendLine();
         sb.AppendLine("USER REQUEST:");
         sb.AppendLine(userText ?? "");
         sb.AppendLine();
@@ -542,6 +572,7 @@ public sealed class WorkflowFacade
         _state.ToolOutputs = new List<System.Text.Json.JsonElement>();
         _state.LastJobSpecJson = jobSpecJson;
         _state.OriginalUserText = userText;
+        _state.PendingQuestion = null;
         return true;
     }
 
@@ -588,17 +619,32 @@ public sealed class WorkflowFacade
             return;
         }
 
-        var sb = new StringBuilder();
-        sb.AppendLine("ToolPlan Steps:");
-        for (int i = 0; i < _state.PendingToolPlan.Steps.Count; i++)
+        var mode = _cfg.General.ConversationMode;
+        string msg;
+
+        if (mode == ConversationMode.Strict)
         {
-            var step = _state.PendingToolPlan.Steps[i];
-            var prefix = i == _state.PendingStepIndex ? "->" : "  ";
-            sb.AppendLine($"{prefix} Step {i + 1}: {step.ToolId} ({step.Id}) inputs: {string.Join(", ", step.Inputs.Select(kv => $"{kv.Key}={kv.Value}"))} why: {step.Why}");
+            var sb = new StringBuilder();
+            sb.AppendLine("ToolPlan Steps:");
+            for (int i = 0; i < _state.PendingToolPlan.Steps.Count; i++)
+            {
+                var step = _state.PendingToolPlan.Steps[i];
+                var prefix = i == _state.PendingStepIndex ? "->" : "  ";
+                sb.AppendLine($"{prefix} Step {i + 1}: {step.ToolId} ({step.Id}) inputs: {string.Join(", ", step.Inputs.Select(kv => $"{kv.Key}={kv.Value}"))} why: {step.Why}");
+            }
+            msg = WaitUserGate.GateMessage("Approve tool plan to continue.", sb.ToString().TrimEnd(), mode);
+        }
+        else
+        {
+            var remaining = _state.PendingToolPlan.Steps.Skip(_state.PendingStepIndex).ToList();
+            var summary = string.Join(", then ", remaining.Select(DescribeStep));
+            var question = string.IsNullOrWhiteSpace(summary)
+                ? "Ready to proceed with the next step?"
+                : $"I can {summary}. Want me to proceed?";
+            msg = WaitUserGate.GateMessage(question, null, mode);
         }
 
-        var msg = WaitUserGate.GateMessage("Approve tool plan to continue.", sb.ToString().TrimEnd());
-        _state.PendingQuestion = msg;
+        _state.PendingQuestion = null;
         _trace.Emit(msg);
         UserFacingMessage?.Invoke(msg);
     }
@@ -637,8 +683,9 @@ public sealed class WorkflowFacade
             return;
         }
 
-        if (approveAll)
+        if (approveAll || _state.AutoApproveAll)
         {
+            _trace.Emit("[plan:auto] proceeding to next approved step.");
             await ExecuteCurrentStepAsync(ct, true).ConfigureAwait(false);
             return;
         }

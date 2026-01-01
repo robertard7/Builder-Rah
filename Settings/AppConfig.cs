@@ -107,25 +107,26 @@ Rules:
     { ""id"": ""step1"", ""toolId"": ""file.read.text"" or ""vision.describe.image"", ""inputs"": { ""storedName"": ""<storedName>"" }, ""why"": ""<reason>"" }
   ]
 }
-
-public enum ConversationMode
-{
-    Conversational,
-    Strict
-}
 Rules:
 - Allowed tools ONLY: file.read.text, vision.describe.image.
 - Use storedName exactly as provided in attachments.
 - Always set tweakFirst=true.
 - Prefer the smallest steps; NEVER suggest rebuild/rewrite/reinitialize.
-- Use one step per attachment type needed to satisfy the request.";
+- Use one step per attachment type needed to satisfy the request.
+- Do NOT output prose or markdown; ONLY JSON.";
 
     private static string DefaultFinalAnswerPrompt() =>
-        @"You are the Final Responder. Use the TOOL_OUTPUTS JSON plus attachments metadata to answer the user's request in prose.
+        @"You are the Final Responder. Use the TOOL_OUTPUTS JSON plus attachments metadata to answer the user's request in natural, concise language.
 Rules:
-- Never claim to have run tools beyond TOOL_OUTPUTS.
+- Do not mention internal systems or planner details.
 - Reference content and captions from TOOL_OUTPUTS explicitly.
-- Be concise and clear.";
+- Keep it brief and helpful.";
+}
+
+public enum ConversationMode
+{
+    Conversational,
+    Strict
 }
 
 public sealed class ProvidersSettings
