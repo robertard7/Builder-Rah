@@ -1,0 +1,108 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\fs.mkdir.txt
+TOOL ID:
+fs.mkdir
+
+CATEGORY:
+file
+
+PURPOSE:
+Create a directory under /work using `mkdir -p "/work/<relative-path>"`.
+Used to ensure a workspace folder exists before creating files or cloning repos.
+
+WHEN TO USE:
+- You need to create a new folder under /work for a project or output.
+- You want to ensure nested directories exist before writing files.
+- You are setting up a standard workspace layout under /work.
+- You need an idempotent directory creation (mkdir -p).
+- You want a tool-safe way to create directories without custom bash.
+
+WHEN NOT TO USE:
+- You need to create directories outside /work: this tool always prefixes /work/.
+- You have an absolute path: do not pass it; tool treats args as relative.
+- You need to remove directories: not supported.
+- You need to create files: use file tools or run.cmd as appropriate.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into p="{args}".
+  - No token splitting; p is treated as one relative path string.
+- Positional arguments:
+  - 1st: <relative-path> required.
+    - Directory will be created at /work/<relative-path>.
+- Optional arguments:
+  - None.
+- Defaults:
+  - None.
+- Error conditions:
+  - If p missing/empty: prints "missing path" and exits 2.
+  - If /work not writable: mkdir fails non-zero.
+  - If p attempts traversal like ".." it will still be used; do not allow unsafe paths.
+  - If a file exists where a directory is expected, mkdir fails.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - /work exists and is writable.
+
+OUTPUT:
+- stdout behavior:
+  - On success, prints: `created /work/<relative-path>`
+  - On missing args, prints: `missing path`
+- stderr behavior:
+  - mkdir errors (permission denied, not writable, etc.).
+- exit codes and meanings:
+  - 0: directory created or already existed.
+  - 2: missing path argument.
+  - Non-zero: mkdir failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates directories under /work.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - Workspace directory structure changes.
+
+SAFETY RULES:
+- MUST verify:
+  - Path is a safe relative path under /work.
+  - No traversal segments like "../" or leading "/" should be used.
+- MUST NEVER guess:
+  - Never invent directory names; use user intent.
+  - Never assume a directory exists without either creating it or listing it.
+- Requires user confirmation:
+  - If creating directories could conflict with an existing project structure, confirm with user before creating high-level folders.
+
+COMMON FAILURE MODES:
+- /work not mounted or not writable.
+- Path is empty.
+- Path contains illegal characters for filesystem (rare in Linux).
+- Path collides with existing file.
+
+EXAMPLES:
+1) fs.mkdir MiniPad
+2) fs.mkdir RahOllamaOnly/Tools/Prompt
+3) fs.mkdir src
+4) fs.mkdir build/output
+5) fs.mkdir Data/ComponentDbCli
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim directories were created unless tool output confirms.
+- Do NOT claim absolute paths are supported; they are not intended here.
+- Do NOT accept path traversal; do not run if args contain ".." or start with "/".
+- Do NOT invent a “standard layout”; only create what user requested.
+- Do NOT assume mkdir -p means safe; verify the resulting location is under /work.
+- Do NOT translate /work to Windows paths.
+- Do NOT claim files were created; this tool creates directories only.
+- If mkdir fails, do not guess; use stderr message to explain.
+- Keep conclusions conservative and tied to output.
+- Do NOT reference tools not yet written.
+- Never fabricate “already existed” unless you checked; mkdir -p success could mean existed or created.
+- If user needs verification, use repo.ls or repo.tree separately.
+- Do NOT use this tool to “fix” permissions; it cannot.
+- Treat path argument as authoritative user input.
+- Never claim network or package changes; none occur.

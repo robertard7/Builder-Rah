@@ -1,0 +1,123 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\cmake.configure.txt
+TOOL ID:
+cmake.configure
+
+CATEGORY:
+build
+
+PURPOSE:
+Configure a CMake project using Ninja generator.
+Runs: `cmake -S <srcDir> -B <buildDir> -G Ninja [extraArgs...]`
+
+WHEN TO USE:
+- You have a CMake-based project and need to generate build files.
+- You want a clean out-of-source build directory for reproducibility.
+- You want to pass explicit CMake cache definitions (e.g., -DCMAKE_BUILD_TYPE=Release).
+- You are using Ninja as the build backend in the container.
+- You need to reconfigure after changing toolchain options or CMakeLists.txt.
+
+WHEN NOT TO USE:
+- You do not have a CMakeLists.txt in the source directory; configuration will fail.
+- You want to build without configuring; use cmake.build after configure succeeds.
+- You need a different generator than Ninja; tool forces `-G Ninja`.
+- You do not know the correct source/build directories; do not guess.
+- You need to run on Windows host; this runs in container only.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool runs: `set -- {args}; src="$1"; b="$2"; shift 2 || true; ... cmake -S "$src" -B "$b" -G Ninja "$@"`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved; avoid spaces in directory paths and in -D values.
+- Positional arguments:
+  - 1st: <srcDir> required.
+  - 2nd: <buildDir> required.
+  - 3rd..N: [extraArgs...] optional; passed directly to cmake.
+- Optional arguments:
+  - Typical extraArgs:
+    - -DCMAKE_BUILD_TYPE=Release
+    - -DCMAKE_C_COMPILER=clang
+    - -DCMAKE_CXX_COMPILER=clang++
+    - -DCMAKE_PREFIX_PATH=/some/prefix
+  - Tool does not validate; cmake validates.
+- Defaults:
+  - None. srcDir and buildDir required.
+  - Generator always Ninja.
+- Error conditions:
+  - If srcDir or buildDir missing: prints "usage: <srcDir> <buildDir> [extraArgs...]" and exits 2.
+  - If cmake missing: command not found.
+  - If Ninja missing: cmake config fails because generator requires ninja.
+  - If srcDir invalid or lacks CMakeLists.txt: cmake error.
+  - If buildDir not writable: failure.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+  - Paths can be absolute or relative to current working directory; do not assume.
+- File system assumptions:
+  - cmake is installed.
+  - ninja-build is installed for the Ninja generator.
+
+OUTPUT:
+- stdout behavior:
+  - CMake configure output, including detected compilers, options, cache lines.
+- stderr behavior:
+  - CMake errors and diagnostics.
+- exit codes and meanings:
+  - 0: configuration succeeded and build files generated.
+  - 2: missing required args.
+  - Non-zero: cmake configuration failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates/updates the build directory contents:
+    - CMakeCache.txt, CMakeFiles/, build.ninja, etc.
+- Network access:
+  - None by default, unless project’s CMake invokes network operations (rare); do not assume.
+- Installed packages:
+  - None.
+- State changes:
+  - Build tree generated/updated.
+
+SAFETY RULES:
+- MUST verify:
+  - srcDir and buildDir are correct and explicitly provided.
+  - buildDir is a safe location (prefer under /work).
+  - Any -D options are explicitly specified; do not invent.
+- MUST NEVER guess:
+  - Never guess compiler/toolchain flags.
+  - Never assume project uses CMake; confirm CMakeLists.txt exists if uncertain.
+- Requires user confirmation:
+  - If extraArgs include toolchain paths or cache values not explicitly provided, request confirmation before running.
+
+COMMON FAILURE MODES:
+- Missing args triggers usage exit 2.
+- cmake not installed.
+- ninja not installed.
+- Source directory has no CMakeLists.txt.
+- Compiler missing (gcc/clang) causes CMake to fail.
+- Build dir permission issues.
+- Tokenization breaks -D values that include spaces.
+
+EXAMPLES:
+1) cmake.configure /work/MyProj /work/MyProj/build
+2) cmake.configure /work/MyProj /work/MyProj/build -DCMAKE_BUILD_TYPE=Release
+3) cmake.configure /work/MyProj /work/MyProj/build -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+4) cmake.configure /work/MyProj /work/MyProj/build -DCMAKE_BUILD_TYPE=Debug
+5) cmake.configure /work/MyProj /work/MyProj/build -DCMAKE_PREFIX_PATH=/work/deps/prefix
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim configure succeeded without seeing CMake success output and exit 0.
+- Do NOT invent CMake options; only use user-provided extraArgs.
+- Do NOT claim Ninja files exist unless CMake reports generation.
+- Do NOT assume buildDir is created; CMake usually creates it, but verify if needed.
+- Do NOT claim which compiler was selected unless CMake output shows it.
+- Do NOT infer build type if not provided; CMake default varies.
+- Do NOT convert paths to Windows.
+- If configuration fails, do not guess; use the exact CMake error messages.
+- Do NOT claim network activity; CMake config is typically local.
+- Keep conclusions conservative: config success means build system generated, not that build will succeed.
+- Do NOT reference tools not yet written.
+- Never fabricate cache values or detected features.
+- Avoid scanning system directories; keep within /work unless user says otherwise.
+- Do NOT add flags like -Wdev unless requested; tool passes only provided args.

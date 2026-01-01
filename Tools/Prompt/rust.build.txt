@@ -1,0 +1,115 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\rust.build.txt
+TOOL ID:
+rust.build
+
+CATEGORY:
+build
+
+PURPOSE:
+Build a Rust project using Cargo inside a specified project directory.
+Runs: `cd <projectDir> && cargo build ${mode:-}`
+Where mode is an optional second token, typically `--release`.
+
+WHEN TO USE:
+- You have a Rust Cargo project (Cargo.toml) and want to compile it.
+- You want a standard debug build (default) or release build (--release).
+- You want to confirm cargo/rustc are installed and working.
+- You need build output for diagnosing Rust compile errors.
+- You want to compile all workspace crates under the project directory.
+
+WHEN NOT TO USE:
+- The directory is not a Cargo project (no Cargo.toml); cargo will fail.
+- You need to run tests: use rust.test.
+- You don’t know the projectDir; do not guess.
+- You need specific cargo flags beyond --release; tool only supports a single optional mode token.
+- You need to build outside container; container-only.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool runs: `set -- {args}; p="$1"; mode="$2"; ... cd "$p" && cargo build ${mode:-}`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved; avoid spaces in projectDir.
+- Positional arguments:
+  - 1st: <projectDir> required.
+  - 2nd: [--release] optional. Any value here is inserted as `${mode:-}`.
+- Optional arguments:
+  - Only one optional token is supported; intended usage is `--release`.
+  - If token is something else, cargo will try to interpret it; do not guess.
+- Defaults:
+  - If mode missing, runs `cargo build` (debug).
+- Error conditions:
+  - If projectDir missing: prints "usage: <projectDir> [--release]" and exits 2.
+  - If cd fails: command returns non-zero.
+  - If cargo missing: command not found.
+  - If Cargo.toml missing: cargo error.
+  - Compilation errors: non-zero.
+  - Dependency fetch may fail due to network restrictions.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into the provided projectDir.
+- File system assumptions:
+  - projectDir exists and is readable/writable for target/ outputs.
+
+OUTPUT:
+- stdout behavior:
+  - Cargo build progress, compilation messages.
+- stderr behavior:
+  - Rust compiler errors, cargo errors, network errors.
+- exit codes and meanings:
+  - 0: build succeeded.
+  - 2: missing projectDir argument.
+  - Non-zero: cargo failure or cd failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates target/ directory with build artifacts.
+  - Writes Cargo.lock updates depending on project settings.
+- Network access:
+  - Cargo may download crates from registries if not cached.
+- Installed packages:
+  - None.
+- State changes:
+  - Produces Rust build outputs.
+
+SAFETY RULES:
+- MUST verify:
+  - projectDir is correct and is a Cargo project.
+  - mode token is explicitly intended (usually --release).
+- MUST NEVER guess:
+  - Never invent cargo flags or features.
+  - Never claim dependencies were fetched successfully unless output shows it.
+- Requires user confirmation:
+  - If network is required for fetching crates and user expects offline, confirm before running.
+
+COMMON FAILURE MODES:
+- Missing args triggers usage exit 2.
+- cargo not installed.
+- No Cargo.toml.
+- Network failures fetching crates.
+- Rust toolchain mismatch (edition/features) causing build errors.
+- Permission issues writing target/.
+
+EXAMPLES:
+1) rust.build /work/rust/MyCrate
+2) rust.build /work/rust/MyCrate --release
+3) rust.build /work/RahTools/RustHelper
+4) rust.build /work/repro/rustapp --release
+5) rust.build /work/components/rust_cli
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim a binary exists; Rust output location depends on crate type and target.
+- Do NOT claim build is “fast” or “slow”; not relevant and not guaranteed.
+- Do NOT claim which crates were compiled unless printed.
+- Do NOT invent Cargo features or profiles; only default or --release supported.
+- Do NOT assume offline builds; cargo may need network.
+- Do NOT convert paths to Windows.
+- If build fails, do not guess; use cargo/rustc error output exactly.
+- Keep conclusions conservative: build success means compilation succeeded, not runtime correctness.
+- Do NOT suggest adding flags beyond what tool supports unless user asks.
+- Do NOT claim lockfile changes unless verified.
+- Do NOT reference tools not yet written.
+- Treat cargo output as authoritative.
+- Never fabricate dependency versions.
+- Avoid re-running repeatedly without addressing the cause of failure.

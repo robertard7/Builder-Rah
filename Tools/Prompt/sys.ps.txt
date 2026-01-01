@@ -1,0 +1,109 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\sys.ps.txt
+TOOL ID:
+sys.ps
+
+CATEGORY:
+system
+
+PURPOSE:
+Show the top processes by CPU usage and by memory usage inside the rah-linux container.
+This is used to diagnose performance issues, runaway processes, and memory pressure.
+
+WHEN TO USE:
+- The container feels slow and you suspect a process is pegging CPU.
+- A build is stalling and you want to see whether it is actively compiling or blocked.
+- Memory usage is high and you want to identify the biggest consumers.
+- You suspect multiple dotnet, node, or compiler processes are stuck.
+- You need a quick “what’s running” snapshot without interactive tools.
+
+WHEN NOT TO USE:
+- You need detailed profiling or stack traces: use dbg tools, not this.
+- You need kernel logs: use sys.dmesg.
+- You need disk usage: use sys.info.
+- You need to manage or kill processes: this tool does not kill anything.
+- You need process tree / parent-child context: sys.ps is flat; use other shell commands via run.cmd if needed.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool does not accept arguments.
+  - Any provided {args} is ignored by the command template.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Prints:
+    - `ps aux --sort=-%cpu | head -n 40`
+    - then a separator line "-----"
+    - then `ps aux --sort=-%mem | head -n 40`
+- Error conditions:
+  - ps missing (rare).
+  - head missing (rare).
+  - Output truncation is intentional.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - /proc must be present for ps to show correct info.
+
+OUTPUT:
+- stdout behavior:
+  - Two lists:
+    - Top 40 lines by CPU, including header.
+    - Top 40 lines by memory, including header.
+  - Includes a literal separator line: "-----".
+- stderr behavior:
+  - Command failures emit stderr.
+- exit codes and meanings:
+  - 0: all commands succeeded.
+  - Non-zero: one of the commands failed.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - If the user asks to terminate a process, do not do it with sys.ps; require explicit command via run.cmd and confirmation.
+- MUST NEVER guess:
+  - Do not guess what a process is doing beyond what ps shows.
+  - Do not guess PID ownership or permissions if not shown.
+- Requires user confirmation:
+  - Any destructive action (kill, renice) is not part of this tool and needs explicit user request.
+
+COMMON FAILURE MODES:
+- Processes inside the container may be limited, so “nothing interesting” is normal.
+- Sorting by %cpu/%mem can be misleading for short-lived bursts.
+- Output truncated to 40 lines may omit the process you care about.
+
+EXAMPLES:
+1) sys.ps
+2) sys.ps 
+3) sys.ps ignored_args
+4) sys.ps anything_here_is_ignored
+5) sys.ps show_me_processes
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT invent process names, PIDs, or resource values.
+- Do NOT assume the presence of GUI processes; this is a container.
+- Do NOT infer host machine process list; this is container-only.
+- Do NOT claim you can “see everything” beyond the top 40 in each list.
+- If a specific process is missing, say it might be outside the top 40.
+- Do NOT claim a process is malicious without evidence.
+- Do NOT assume “docker not available” from process list; that is separate.
+- Keep analysis anchored to the printed columns.
+- If you need more detail, use run.cmd with exact ps flags only when requested.
+- Never pretend sys.ps can filter; it cannot.
+- Do not rename columns; ps output format is fixed.
+- If a process appears twice (threads vs processes), do not guess why; report it.
+- Do not interpret CPU % as multi-core normalized unless stated; ps behavior varies.
+- Treat this as a moment-in-time snapshot.
+- If output is empty due to error, report the error text verbatim.

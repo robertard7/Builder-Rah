@@ -1,0 +1,123 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\test.dotnet.txt
+TOOL ID:
+test.dotnet
+
+CATEGORY:
+build
+
+PURPOSE:
+Run dotnet tests from the /work workspace using `dotnet test`.
+If no args are provided, runs `dotnet test` in /work.
+If args are provided, passes them directly to `dotnet test`.
+
+WHEN TO USE:
+- You need to run unit/integration tests for a dotnet project/solution under /work.
+- You changed code and want to ensure tests still pass.
+- You need test failure output to diagnose regressions.
+- You want to run tests for a specific project/solution by passing a path.
+- You want to pass standard dotnet test args (configuration, filter, framework) as needed.
+
+WHEN NOT TO USE:
+- You only need to build/compile without running tests: use build.dotnet.
+- You need to create a new test project: use dotnet.new.
+- There are no test projects in the repo; this will fail or do nothing depending on context.
+- You need to run tests outside /work: tool forces `cd /work` first.
+- You need specialized test runners beyond dotnet test; not supported here.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into a="{args}".
+  - If a is empty:
+    - Runs: `dotnet test`
+  - Else:
+    - Runs: `dotnet test $a`
+  - In the non-empty case, $a is expanded by the shell as whitespace-separated tokens.
+  - Quoting is not reliably preserved; paths with spaces and complex filters may break.
+- Positional arguments:
+  - Entire arg string is treated as dotnet test arguments.
+  - Common forms:
+    - <path> (project or solution)
+    - -c Release
+    - --filter FullyQualifiedName~Something
+- Optional arguments:
+  - Any dotnet test args supported by dotnet CLI.
+- Defaults:
+  - Working directory is /work.
+  - No implicit verbosity setting; dotnet default.
+- Error conditions:
+  - If `cd /work` fails: exits 2.
+  - dotnet missing or broken: non-zero.
+  - Tests failing: non-zero with failure output.
+  - Restore failures due to NuGet: non-zero.
+  - Args malformed due to tokenization: non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Always `cd /work || exit 2` before running tests.
+- File system assumptions:
+  - /work contains test projects or specified path exists.
+
+OUTPUT:
+- stdout behavior:
+  - dotnet test output including discovery, run summary, pass/fail counts.
+- stderr behavior:
+  - dotnet runtime errors, MSBuild errors, some test runner errors.
+- exit codes and meanings:
+  - 0: all tests passed.
+  - 2: /work missing or cannot cd into /work.
+  - Non-zero: failures (tests failed, restore failed, build failed, etc.).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Builds test projects (bin/obj).
+  - May create test result files depending on frameworks and settings.
+  - May perform restore and write assets.
+- Network access:
+  - May contact NuGet feeds during restore if needed.
+- Installed packages:
+  - None via apt.
+- State changes:
+  - Produces build/test artifacts.
+
+SAFETY RULES:
+- MUST verify:
+  - The test target exists (solution/project path).
+  - User is okay with test/build artifacts in /work.
+- MUST NEVER guess:
+  - Never claim tests passed unless exit code is 0 and summary indicates pass.
+  - Never invent failing test names; report what output shows.
+  - Never assume tests exist; verify output.
+- Requires user confirmation:
+  - If tests will contact external services (integration tests), confirm intent if known from repo context before running (do not assume).
+
+COMMON FAILURE MODES:
+- /work missing (exit 2).
+- dotnet missing or runtime broken.
+- No tests found leading to errors or zero tests (framework-dependent).
+- Build failures prevent tests.
+- NuGet restore failures.
+- Platform-specific tests fail in Linux container.
+- Tokenization breaks filter expressions.
+
+EXAMPLES:
+1) test.dotnet
+2) test.dotnet RahOllamaOnly.sln
+3) test.dotnet RahOllamaOnly/Tests/RahOllamaOnly.Tests.csproj
+4) test.dotnet RahOllamaOnly.sln -c Release
+5) test.dotnet RahOllamaOnly.sln --filter FullyQualifiedName~Workflow
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim “all good” unless output shows passing summary and exit 0.
+- Do NOT reinterpret skipped tests as passes; report counts accurately.
+- Do NOT claim coverage results; this tool does not request coverage.
+- Do NOT guess why a test failed; use the failure output.
+- Do NOT claim tests ran if dotnet exited before discovery.
+- Do NOT assume Windows-only tests will work in Linux.
+- Do NOT convert /work paths to Windows paths.
+- Do NOT invent filter syntax; use user-provided args only.
+- If output is long, do not summarize unseen sections; rely on summary lines.
+- Keep conclusions conservative and evidence-based.
+- This tool runs from /work only; do not claim it ran elsewhere.
+- Do NOT reference tools not yet written.
+- Never fabricate time durations, counts, or test names.

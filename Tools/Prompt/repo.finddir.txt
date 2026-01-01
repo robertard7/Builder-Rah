@@ -1,0 +1,106 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\repo.finddir.txt
+TOOL ID:
+repo.finddir
+
+CATEGORY:
+repo
+
+PURPOSE:
+List directories under /work up to a maximum depth.
+Defaults maxdepth to 4 if not provided or invalid.
+Caps output to 600 lines.
+This is a safer directory inventory tool than a full recursive find.
+
+WHEN TO USE:
+- You need to quickly see what directories exist under /work.
+- You want to find candidate project roots under /work.
+- You are debugging path selection and need a bounded directory list.
+- You want a deterministic depth-limited scan.
+- You want to avoid file listing and focus on directory layout.
+
+WHEN NOT TO USE:
+- You need to find files by name; use file.find.
+- You need recursive beyond the max depth; tool is intentionally bounded.
+- You want to scan outside /work; this tool is fixed to /work.
+- You do not have /work mounted; this will fail.
+- You need a full list without truncation; tool caps output.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool command does: `d="{args}"; if [ -z "$d" ]; then d=4; fi; case "$d" in ''|*[!0-9]*) d=4;; esac; find /work -maxdepth "$d" -type d -print | head -n 600`
+  - {args} is treated as a single string intended to be an integer.
+  - No token splitting is used; any non-numeric content is treated as invalid and resets to default 4.
+- Positional arguments:
+  - 1st: <maxdepth> optional (integer).
+- Optional arguments:
+  - None.
+- Defaults:
+  - If args empty: maxdepth=4.
+  - If args invalid (non-numeric): maxdepth=4.
+- Error conditions:
+  - If /work missing: find errors, non-zero.
+  - If permissions deny scanning: find errors (may still print partial results).
+  - If head fails (rare): non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not cd.
+- File system assumptions:
+  - /work exists and is accessible.
+
+OUTPUT:
+- stdout behavior:
+  - Prints directory paths found, one per line, up to 600 lines.
+- stderr behavior:
+  - Errors from find if access denied or /work missing.
+- exit codes and meanings:
+  - 0: completed (even if truncated).
+  - Non-zero: /work missing or fatal find failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify before calling:
+  - If user expects scanning /work is acceptable; it reveals directory names.
+  - If maxdepth provided, it is an integer.
+- MUST NEVER be guessed:
+  - Never guess a “better” maxdepth than user requested.
+  - Do not infer that directories do not exist if not shown; output may be truncated.
+- Requires user confirmation:
+  - None typically; read-only.
+  - If user considers directory names sensitive, confirm.
+
+COMMON FAILURE MODES:
+- /work not mounted.
+- Permission denied on some directories.
+- Maxdepth too large produces truncated output and hides deeper directories.
+- User passes non-numeric args; tool silently defaults to 4.
+
+EXAMPLES:
+1) repo.finddir
+2) repo.finddir 2
+3) repo.finddir 4
+4) repo.finddir 6
+5) repo.finddir 10
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim all directories are shown; output is capped at 600 lines.
+- Do NOT claim maxdepth applied if /work missing; check stderr.
+- Do NOT invent directory names.
+- Do NOT interpret the list as “projects”; it is just directories.
+- Do NOT convert paths to Windows.
+- Do NOT reference tools not yet written here.
+- If args were invalid, do not pretend maxdepth was used; note the default behavior internally.
+- Keep conclusions strictly tied to the printed directory lines.
+- Do not claim performance metrics; not provided.
+- Treat find output as authoritative.
+- Never fabricate that a directory “must contain source”.

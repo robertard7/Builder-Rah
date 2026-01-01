@@ -1,0 +1,105 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\git.log.txt
+TOOL ID:
+git.log
+
+CATEGORY:
+git
+
+PURPOSE:
+Show recent git commits for a repository using `git --no-pager log --oneline -n 80`.
+Used to inspect recent history quickly without full commit details.
+
+WHEN TO USE:
+- You need to see the last several commits and their messages.
+- You need commit IDs for referencing or diffing (outside this tool).
+- You want to confirm which branch history you are on (indirectly via commits).
+- You need to verify whether a change might already be committed.
+- You want to identify a regression window by scanning recent commit subjects.
+
+WHEN NOT TO USE:
+- You need working tree status: use git.status.
+- You need diffs: use git.diff.
+- You need full commit details (author, date, body, files): this tool is oneline only.
+- You need more than 80 commits: tool is fixed to 80.
+- The path is not a git repo: this will fail.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into p="{args}".
+  - No token splitting; p is used as a directory path.
+- Positional arguments:
+  - 1st: <path> optional.
+- Optional arguments:
+  - <path>: directory to run git log inside.
+- Defaults:
+  - If args empty, p defaults to /work.
+- Error conditions:
+  - If cd to p fails: exits 2.
+  - If p is not a git repo: git exits non-zero and prints an error.
+  - If git not installed: command fails.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into p (or /work) before running git.
+- File system assumptions:
+  - Repo exists locally and is readable.
+
+OUTPUT:
+- stdout behavior:
+  - Up to 80 lines, each containing "<shortsha> <subject>".
+- stderr behavior:
+  - git errors (not a repo) appear here.
+- exit codes and meanings:
+  - 0: git log succeeded.
+  - 2: cd failed (explicit tool behavior).
+  - Non-zero: git failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Path is the intended repository directory.
+- MUST NEVER guess:
+  - Never invent commit hashes or messages.
+  - Never assume commit order beyond what is printed.
+- Requires user confirmation:
+  - None. Read-only.
+
+COMMON FAILURE MODES:
+- Path wrong; cd fails and exits 2.
+- Not a git repository; git prints error.
+- Repo has fewer than 80 commits; output shorter (normal).
+- Detached HEAD or shallow clone still works but history may be limited.
+
+EXAMPLES:
+1) git.log
+2) git.log /work
+3) git.log /work/RahOllamaOnly
+4) git.log /work/MiniPad
+5) git.log /work/SomeRepo
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim authors, dates, or branches; output is oneline only.
+- Do NOT infer merge structure from subjects alone.
+- Do NOT claim a commit includes specific files unless you inspect it elsewhere.
+- Do NOT claim “latest commit” relative to remote; this is local history only.
+- Do NOT translate hashes or shorten further; use exactly what is printed.
+- Do NOT interpret a missing commit as proof it doesn’t exist; history may be shallow.
+- If command fails, do not guess why; report stderr and exit meaning.
+- Do NOT assume /work is a repo; verify by output.
+- Do NOT treat commit subjects as truth; they are human text.
+- Keep any conclusions grounded in printed lines only.
+- Never fabricate additional commit lines beyond 80.
+- This tool does not show tags; do not claim tag names.
+- Treat output as a snapshot.
+- Do not run other git commands unless requested and available in manifest.
+- If user needs more detail, use other permitted tools, not guesses.

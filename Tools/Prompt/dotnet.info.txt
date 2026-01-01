@@ -1,0 +1,104 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\dotnet.info.txt
+TOOL ID:
+dotnet.info
+
+CATEGORY:
+build
+
+PURPOSE:
+Print dotnet SDK and runtime information by running `dotnet --info`.
+Used to verify dotnet availability and diagnose environment issues.
+
+WHEN TO USE:
+- You need to confirm whether dotnet is installed and accessible in PATH.
+- You need to see installed SDK versions and runtimes.
+- You need to diagnose dotnet runtime dependency errors in the container.
+- You want environment details like RID, base path, OS version as dotnet sees it.
+- You are verifying the container can run dotnet builds.
+
+WHEN NOT TO USE:
+- dotnet is known to be missing and you are ready to install prereqs: use apt tools first.
+- You need to build a project: use build.dotnet.
+- You need to run tests: use test.dotnet.
+- You want Windows host dotnet info: this runs inside container only.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool does not accept arguments.
+  - Any provided {args} is ignored.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Runs `dotnet --info`.
+- Error conditions:
+  - If dotnet not installed or not in PATH: command fails non-zero.
+  - If required system libraries missing: dotnet may print an error and exit non-zero.
+  - If permissions prevent access to dotnet install directories: failure.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - dotnet binary is present somewhere on PATH for success.
+
+OUTPUT:
+- stdout behavior:
+  - dotnet --info output including SDKs, runtimes, environment.
+- stderr behavior:
+  - dotnet errors, missing library messages, hostfxr issues.
+- exit codes and meanings:
+  - 0: dotnet --info succeeded.
+  - Non-zero: dotnet missing or runtime failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - None; this is read-only.
+- MUST NEVER guess:
+  - Never claim a specific SDK version is installed without output.
+  - Never claim dotnet is present if command fails.
+- Requires user confirmation:
+  - None.
+
+COMMON FAILURE MODES:
+- dotnet not found in PATH.
+- libicu or zlib missing causing host failure.
+- Running in a minimal container without required runtime deps.
+- Misconfigured DOTNET_ROOT or PATH.
+- Permission issues.
+
+EXAMPLES:
+1) dotnet.info
+2) dotnet.info now
+3) dotnet.info ignored
+4) dotnet.info check
+5) dotnet.info status
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT summarize versions unless they are printed.
+- Do NOT infer that dotnet can build WinForms in Linux; the tool only reports environment.
+- Do NOT claim workloads are installed; dotnet --info lists what exists.
+- Do NOT claim a preview vs stable status unless output indicates.
+- Do NOT claim path locations beyond what dotnet prints.
+- If dotnet fails, use the exact error text; do not guess missing libraries.
+- Do NOT treat partial output as success; check exit code if available.
+- Do NOT claim host machine dotnet is affected; container-only.
+- Do NOT advise installing random libraries; base on error output and available apt tools.
+- Keep conclusions conservative: dotnet.info success means dotnet runs, not that builds succeed.
+- Do NOT add flags; tool is fixed.
+- Treat output as authoritative snapshot.
+- Do NOT reference tools not yet written.
+- If user requests install guidance, require explicit package list or use apt.install.dotnet prereqs with approval.
+- Never invent RID or OS details; quote from output only.

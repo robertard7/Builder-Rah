@@ -1,0 +1,121 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\c.build.txt
+TOOL ID:
+c.build
+
+CATEGORY:
+build
+
+PURPOSE:
+Compile a single C source file into an output binary using gcc.
+Runs: `gcc <src.c> -o <out> [cflags...]`
+
+WHEN TO USE:
+- You have a standalone .c file and want to compile it quickly.
+- You are building a small repro program without a build system.
+- You want to validate that gcc toolchain works inside the container.
+- You need to compile a utility C file for debugging or testing.
+- You want to pass specific compiler flags (include paths, defines, libs) explicitly.
+
+WHEN NOT TO USE:
+- You are building a multi-file C project; use a build system (cmake) or a dedicated tool if available.
+- The source file is C++ (.cpp); use cpp.build.
+- You don’t know the exact source path; locate it first with file.find.
+- You need to run the resulting binary; this tool only builds.
+- You want to compile under a different working directory context; this tool does not cd.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool runs: `set -- {args}; src="$1"; out="$2"; shift 2 || true; ... gcc "$src" -o "$out" "$@"`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved; avoid spaces in paths.
+- Positional arguments:
+  - 1st: <src.c> required.
+  - 2nd: <out> required.
+  - 3rd..N: [cflags...] optional, passed directly to gcc.
+- Optional arguments:
+  - cflags can include:
+    - -O2, -g, -Wall, -Wextra
+    - -I<dir>, -DNAME=VALUE
+    - -L<dir> -l<lib>
+  - This tool does not validate flags; gcc does.
+- Defaults:
+  - None. You must specify src and out.
+- Error conditions:
+  - If src or out missing: prints "usage: <src.c> <out> [cflags...]" and exits 2.
+  - If src does not exist: gcc fails non-zero.
+  - If gcc not installed: command not found.
+  - If flags incorrect: gcc fails.
+  - If out path not writable: gcc fails.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+  - Relative paths are resolved from current working directory.
+- File system assumptions:
+  - gcc exists in PATH.
+  - src path is accessible in container.
+
+OUTPUT:
+- stdout behavior:
+  - gcc typically prints nothing on success.
+- stderr behavior:
+  - Compilation warnings and errors appear here.
+- exit codes and meanings:
+  - 0: compilation succeeded.
+  - 2: missing required args.
+  - Non-zero: gcc compilation/link failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates output file at <out> (binary).
+  - May overwrite existing <out>.
+  - May create intermediate files only if gcc is instructed (not by default here).
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - Adds/updates output binary file.
+
+SAFETY RULES:
+- MUST verify:
+  - src path is correct and points to a .c file.
+  - out path is intended and safe (prefer under /work).
+  - flags are explicitly provided; do not invent.
+- MUST NEVER guess:
+  - Never guess include/lib flags.
+  - Never assume gcc exists; check sys.which gcc if unsure.
+- Requires user confirmation:
+  - If output path overwrites an existing important file, confirm before compiling.
+
+COMMON FAILURE MODES:
+- Missing args triggers usage and exit 2.
+- src path wrong or file missing.
+- gcc not installed (needs apt.install.core or apt.install).
+- Link errors due to missing -l libs or wrong order.
+- Permissions prevent writing output.
+- Flags tokenization breaks if flags include spaces.
+
+EXAMPLES:
+1) c.build /work/tools/hello.c /work/tools/hello
+2) c.build /work/repro/test.c /work/repro/test -O2
+3) c.build /work/repro/test.c /work/repro/test -g -Wall -Wextra
+4) c.build /work/net/pingtest.c /work/net/pingtest -I/work/include
+5) c.build /work/repro/zlibtest.c /work/repro/zlibtest -lz
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim the binary runs; this tool only compiles.
+- Do NOT claim warnings mean failure; only exit code matters.
+- Do NOT invent missing libraries; use gcc error output to decide.
+- Do NOT assume output location; it is exactly <out>.
+- Do NOT translate paths to Windows.
+- Do NOT claim optimization/debug flags were used unless provided in args.
+- If gcc fails, do not guess; use the exact error lines.
+- Do NOT add default flags; tool does not.
+- Keep conclusions conservative: success means binary file created, not correctness.
+- Do NOT compile multiple files unless user provided them in flags explicitly (not typical); do not invent extra inputs.
+- Treat gcc output as authoritative.
+- Do NOT reference tools not yet written.
+- Never fabricate file existence; verify with file.stat if needed.
+- Avoid using system directories for outputs; prefer /work.

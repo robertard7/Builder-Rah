@@ -1,0 +1,114 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\docker.logs.txt
+TOOL ID:
+docker.logs
+
+CATEGORY:
+debug
+
+PURPOSE:
+Show the last N lines of logs for a Docker container by running `docker logs --tail <n> <container>`.
+If docker is not available inside the container, prints a fallback message.
+Used to inspect service logs (e.g., memory service, registry service) when debugging.
+
+WHEN TO USE:
+- You need recent logs from a named container to diagnose startup failures.
+- You need to verify whether a container is running and producing expected output.
+- You want to inspect crash loops, exceptions, or configuration errors inside a container.
+- You want a bounded log tail to avoid dumping huge logs.
+- You are debugging connectivity issues and need server-side logs.
+
+WHEN NOT TO USE:
+- You do not know the container name; do not guess.
+- Docker is not available inside the rah-linux container (tool will say so).
+- You need logs from the host Docker environment not visible inside container; this tool may not access them.
+- You need full logs beyond tail; tool is capped by tail default.
+- You need to attach/stream logs live; this tool is a one-shot tail.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool runs: `set -- {args}; c="$1"; n="$2"; ...`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved; container name must be a single token.
+- Positional arguments:
+  - 1st: <container> required.
+  - 2nd: [n] optional number of lines to tail.
+- Optional arguments:
+  - n defaults to 300 if missing/empty.
+- Defaults:
+  - If n is empty, uses 300.
+  - Runs: `docker logs --tail "$n" "$c" 2>/dev/null || echo 'docker not available inside container'`
+- Error conditions:
+  - If container missing: prints "usage: <container> [n]" and exits 2.
+  - If docker command exists but container name is wrong: docker logs exits non-zero; stderr is suppressed to /dev/null, then fallback message may appear depending on failure.
+  - If docker not installed or socket not available: fallback message prints.
+  - If n is not numeric, docker may error; stderr suppressed.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - Docker CLI may or may not be installed.
+  - Access to docker daemon/socket may or may not exist.
+
+OUTPUT:
+- stdout behavior:
+  - If docker logs succeeds: prints last n lines of container logs.
+  - If docker logs fails or docker unavailable: prints "docker not available inside container".
+  - On missing container arg: prints "usage: <container> [n]".
+- stderr behavior:
+  - docker logs stderr is redirected to /dev/null in the tool command, so errors may not appear.
+- exit codes and meanings:
+  - 0: logs printed successfully OR fallback message printed (because command uses `|| echo ...`).
+  - 2: missing required container argument.
+  - Non-zero is unlikely to propagate because of `|| echo`, except for the explicit usage exit.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None directly; reads local Docker logs if accessible.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Container name is correct and user-provided; do not guess.
+  - n value is reasonable (avoid huge numbers).
+- MUST NEVER guess:
+  - Never invent container names.
+  - Never claim docker is available if you see the fallback message.
+- Requires user confirmation:
+  - None. Read-only log access.
+
+COMMON FAILURE MODES:
+- Container name typo results in fallback message with no detail because stderr is suppressed.
+- Docker CLI exists but daemon socket missing inside container.
+- n not numeric causes docker error but suppressed; fallback message shown.
+- Container logs are huge; tail still prints only last n.
+- Container has no logs yet; output may be empty.
+
+EXAMPLES:
+1) docker.logs rah-memory
+2) docker.logs rah-qdrant 200
+3) docker.logs rah-registry 500
+4) docker.logs ollama 300
+5) docker.logs postgres 150
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT interpret the fallback message as proof docker is missing; it can also mean container not found or socket inaccessible because stderr is suppressed.
+- Do NOT claim a container is running based solely on logs existing; logs can persist after stop.
+- Do NOT invent missing log lines; only what is printed matters.
+- Do NOT assume the container is the one user intended; confirm name from user input.
+- Do NOT claim timestamps or severity levels if not present.
+- Do NOT summarize errors that are not visible; stderr is suppressed.
+- If output is empty, do not guess; it may have no recent logs.
+- Do NOT use this tool to access host-only Docker logs if not supported; accept limitations.
+- Keep conclusions conservative: logs show what the container wrote, nothing more.
+- Do NOT attempt docker exec or other docker commands; not in this tool.
+- Do NOT reference tools not yet written.
+- Never claim network activity occurred; this tool reads local logs only.
+- Treat printed logs as authoritative evidence.
+- If diagnostics need more detail, require tools that expose docker errors; do not guess them.

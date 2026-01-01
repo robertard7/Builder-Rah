@@ -1,0 +1,113 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\repo.clean.txt
+TOOL ID:
+repo.clean
+
+CATEGORY:
+repo
+
+PURPOSE:
+Remove common build artifact directories under /work using a set of “safe patterns”.
+Attempts to remove folders named bin, obj, dist, build, .next, target under any subdirectory.
+Runs: `cd /work; rm -rf **/bin **/obj **/dist **/build **/.next **/target 2>/dev/null || true; echo '[repo.clean] done'`
+
+WHEN TO USE:
+- You want to remove build outputs to force a clean rebuild.
+- You want to reduce disk usage from repeated builds.
+- You are diagnosing issues caused by stale build artifacts.
+- You want to reset generated directories for .NET, Node, Rust, etc.
+- You want a one-shot cleanup across /work before building again.
+
+WHEN NOT TO USE:
+- You cannot afford to delete build outputs; this is destructive.
+- You have important data stored in a directory named “build” or “dist” inside /work; do not run.
+- You want to selectively clean one project only; this tool targets all of /work patterns.
+- You want to clean outside /work; this tool is fixed to /work.
+- You need guaranteed cleanup; globbing behavior may differ (depends on shell options); verify results.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool ignores {args}; it has no parameters.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Always cleans patterns under /work.
+- Error conditions:
+  - If /work missing: cd fails and command may fail.
+  - If shell does not expand `**` as expected: fewer deletions occur, but command still echoes done.
+  - Permission denied: rm may fail silently due to stderr redirected to /dev/null.
+  - This tool intentionally suppresses many errors; do not assume success.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Changes directory to /work.
+- File system assumptions:
+  - /work exists and is writable.
+  - Shell supports the glob patterns used by the runner (bash usually does, but `globstar` may matter).
+
+OUTPUT:
+- stdout behavior:
+  - Always prints `[repo.clean] done` at end.
+  - Does not report what was removed.
+- stderr behavior:
+  - Mostly suppressed (`2>/dev/null`), so you may not see errors.
+- exit codes and meanings:
+  - Typically 0 because errors are suppressed with `|| true`.
+  - Non-zero can occur if cd /work fails badly under `set -e` (but tool does not set -e here).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Deletes directories matching:
+    - **/bin
+    - **/obj
+    - **/dist
+    - **/build
+    - **/.next
+    - **/target
+  - Deletion is recursive and permanent within the container filesystem.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - Build artifacts removed, which affects subsequent builds/tests.
+
+SAFETY RULES:
+- MUST verify before calling:
+  - User explicitly wants destructive cleanup.
+  - /work is the intended workspace.
+  - There is no critical data in directories named build/dist/target under /work.
+- MUST NEVER be guessed:
+  - Never assume cleanup succeeded; verify by listing affected directories afterward.
+  - Never assume `**` expansion happened; confirm with repo.finddir or repo.tree if needed.
+- Requires user confirmation:
+  - Always confirm before running if there is any risk of deleting user-important artifacts.
+
+COMMON FAILURE MODES:
+- /work not mounted; cd fails.
+- Globstar not enabled; patterns don’t match deeply.
+- Permissions prevent deletion; errors are hidden.
+- User expects only one project cleaned but tool cleans broadly.
+- Hidden errors because stderr redirected to /dev/null.
+
+EXAMPLES:
+1) repo.clean
+2) repo.clean ""
+3) repo.clean (no args)
+4) repo.clean (used before build.dotnet)
+5) repo.clean (used before cmake.build)
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim specific directories were deleted; tool does not report deletions.
+- Do NOT claim cleanup “worked” just because it printed done.
+- Do NOT invent a list of removed folders; verify with repo.tree or file.stat after.
+- Do NOT claim this is safe for all repos; it can delete meaningful “build” folders.
+- Do NOT convert paths to Windows.
+- Do NOT reference tools not yet written here.
+- Treat this as destructive and high-risk.
+- If user did not request cleanup, do not run it.
+- Keep conclusions conservative and evidence-based.
+- Never fabricate disk space reclaimed numbers.
+- Never pretend errors did not happen; stderr is suppressed.

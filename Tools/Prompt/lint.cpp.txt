@@ -1,0 +1,106 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\lint.cpp.txt
+TOOL ID:
+lint.cpp
+
+CATEGORY:
+debug
+
+PURPOSE:
+Run cppcheck static analysis on a path if cppcheck is installed.
+Runs: `cppcheck --enable=warning,style,performance --inline-suppr <path> || true`
+If cppcheck is not installed, prints `cppcheck not installed` and exits 2.
+
+WHEN TO USE:
+- You want static analysis warnings for C/C++ code.
+- You have cppcheck installed in the container.
+- You want a quick pass over a codebase to catch obvious issues.
+- You are diagnosing potential undefined behavior or style warnings.
+- You want analysis output without failing the whole pipeline on findings (tool uses `|| true`).
+
+WHEN NOT TO USE:
+- cppcheck is not installed; tool exits 2.
+- You need clang-tidy or compiler sanitizers; this is cppcheck only.
+- You do not know the correct path; do not guess.
+- You want the tool to fail the build on warnings; this tool does not, because it `|| true`.
+- You want analysis for non-C/C++ code.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `p="{args}"; if [ -z "$p" ]; then echo 'usage: <path>'; exit 2; fi; if command -v cppcheck ...; then cppcheck ... "$p" || true; else ...`
+- {args} is treated as a single string path.
+- No token splitting is performed by the tool itself.
+Positional arguments:
+- 1st: <path> required.
+Optional arguments:
+- None.
+Defaults:
+- None.
+Error conditions:
+- If path missing/empty:
+  - Prints `usage: <path>`
+  - Exits 2.
+- If cppcheck missing:
+  - Prints `cppcheck not installed`
+  - Exits 2.
+- If path invalid:
+  - cppcheck errors; exit code suppressed by `|| true` but stderr will show issues.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not cd; runs cppcheck on given path.
+- File system assumptions:
+  - Path exists and is readable.
+  - cppcheck installed and in PATH.
+
+OUTPUT:
+- stdout behavior:
+  - cppcheck may output to stdout, but typically outputs to stderr.
+- stderr behavior:
+  - Primary channel for cppcheck findings and errors.
+- exit codes and meanings:
+  - 0: tool completed; findings may still exist.
+  - 2: missing args or cppcheck not installed.
+  - Note: cppcheck non-zero exit codes are suppressed by `|| true` when installed.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None expected; analysis only.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None, aside from console output.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - Path is correct and intended.
+  - User expects lint output that might be noisy.
+- What must NEVER be guessed:
+  - Do not guess include paths or suppressions; tool uses fixed flags.
+  - Do not guess that “no output means clean”; cppcheck behavior varies.
+- What requires user confirmation:
+  - If analysis scope is huge (entire /work), confirm.
+
+COMMON FAILURE MODES:
+- cppcheck not installed.
+- Path wrong.
+- Too many false positives if project uses unusual macros.
+- Long runtime on large codebases.
+- Permission denied reading files.
+
+EXAMPLES:
+1) lint.cpp /work/MyCppProject
+2) lint.cpp /work/MyCppProject/src
+3) lint.cpp /work/components/cpp_cli
+4) lint.cpp /work/repro/cmake_proj
+5) lint.cpp /work/rah/native
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim code is “clean” based on lack of output.
+- Do NOT claim warnings are real bugs; cppcheck is heuristic.
+- Do NOT claim the tool fails builds; it suppresses non-zero via `|| true`.
+- Do NOT invent which files were scanned; check path.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written.

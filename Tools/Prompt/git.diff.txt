@@ -1,0 +1,113 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\git.diff.txt
+TOOL ID:
+git.diff
+
+CATEGORY:
+git
+
+PURPOSE:
+Show a trimmed git diff for a repository: first prints `git diff --stat`, then prints the unified diff truncated to 1200 lines.
+Used to review changes without dumping an unlimited diff.
+
+WHEN TO USE:
+- You need to review what changed before building or committing.
+- You want a quick summary of modified files and change sizes (stat).
+- You need to inspect the actual code changes for debugging.
+- You are validating that an automated patch did what it claimed.
+- You need to capture a diff excerpt for reporting.
+
+WHEN NOT TO USE:
+- The path is not a git repo: tool will fail.
+- You need commit history: use git.log.
+- You need status only: use git.status.
+- You need diff against a specific commit/branch: this tool is fixed to default `git diff`.
+- You need more than 1200 lines of diff output: tool truncates; use targeted file inspection instead.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into p="{args}".
+  - No token splitting; p is used as a directory path.
+- Positional arguments:
+  - 1st: <path> optional.
+    - Defaults to /work when empty.
+- Optional arguments:
+  - <path>: repo directory.
+- Defaults:
+  - p defaults to /work.
+  - Always runs:
+    - `git diff --stat`
+    - separator "-----"
+    - `git diff | head -n 1200`
+- Error conditions:
+  - If cd to p fails: exits 2.
+  - If p not a git repo: git diff fails non-zero.
+  - If git missing: command fails.
+  - Large diffs are truncated; not an error but incomplete.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into p (or /work) before running git commands.
+- File system assumptions:
+  - Repository exists locally.
+
+OUTPUT:
+- stdout behavior:
+  - `git diff --stat` output.
+  - Then "-----".
+  - Then first 1200 lines of `git diff`.
+- stderr behavior:
+  - git errors appear on stderr.
+- exit codes and meanings:
+  - 0: git commands succeeded.
+  - 2: cd failed.
+  - Non-zero: git command failed (not a repo, etc.).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None. Purely local diff.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Path is the intended repo.
+  - User is okay with printing code diffs (may include secrets).
+- MUST NEVER guess:
+  - Never invent diff hunks or file stats.
+  - Never assume truncation did not occur; diff is capped at 1200 lines.
+- Requires user confirmation:
+  - If diffs might include credentials, confirm before printing.
+
+COMMON FAILURE MODES:
+- Path wrong: cd fails and exit 2.
+- Not a git repository: git outputs error.
+- No changes: diff output may be empty after stat; not an error.
+- Large diffs truncated; user may misinterpret as complete.
+
+EXAMPLES:
+1) git.diff
+2) git.diff /work
+3) git.diff /work/RahOllamaOnly
+4) git.diff /work/MiniPad
+5) git.diff /work/SomeRepo
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim you saw the entire diff; it is truncated to 1200 lines.
+- Do NOT infer “only these files changed” if output truncated; stat is not truncated but diff is.
+- Do NOT claim code compiles based on diff; compile must be run separately.
+- Do NOT interpret empty diff as “no changes anywhere” unless you confirmed repo and status.
+- Do NOT invent context lines; only quote what is shown.
+- Do NOT claim line numbers; git diff shows hunk headers, not absolute file line numbers.
+- Do NOT claim change intent; diff shows changes, not reasons.
+- Do NOT translate paths to Windows.
+- Do NOT run git add/commit; this tool is read-only.
+- If git reports errors, repeat them exactly; do not guess.
+- If user needs diff for a single file, use file tools; do not pretend this supports file arguments.
+- Keep conclusions conservative and grounded in printed output.
+- Never expose secrets found in diff in summaries unless user explicitly requests.
+- Treat output as authoritative snapshot.

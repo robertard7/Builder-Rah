@@ -1,0 +1,116 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\cmake.build.txt
+TOOL ID:
+cmake.build
+
+CATEGORY:
+build
+
+PURPOSE:
+Build a configured CMake build directory using `cmake --build`.
+Runs: `cmake --build <buildDir>` or with optional target `cmake --build <buildDir> --target <target>`.
+
+WHEN TO USE:
+- You already configured a CMake build directory and want to compile.
+- You want to build default target(s) using CMake’s build wrapper.
+- You want to build a specific target (e.g., all, install, a named executable/library).
+- You are using Ninja generator from cmake.configure and want a consistent build command.
+- You want build output to diagnose compile/link errors.
+
+WHEN TO USE:
+- You need to configure first; use cmake.configure.
+- You don’t know the build directory; do not guess.
+- You want to clean build artifacts; this tool does not clean.
+- You need to pass parallelism flags; not supported directly here unless CMake honors env; do not assume.
+- You need to build outside container; container-only.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool runs: `set -- {args}; b="$1"; t="$2"; ...`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved; avoid spaces in buildDir.
+- Positional arguments:
+  - 1st: <buildDir> required.
+  - 2nd: [target] optional.
+- Optional arguments:
+  - target is passed as `--target <target>`.
+  - No other arguments supported by tool.
+- Defaults:
+  - If target missing: builds default target for that build system.
+- Error conditions:
+  - If buildDir missing: prints "usage: <buildDir> [target]" and exits 2.
+  - If buildDir invalid or not configured: cmake fails.
+  - If cmake missing: command not found.
+  - If target does not exist: build system error.
+  - Compiler errors cause non-zero exit.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+  - buildDir path used as provided.
+- File system assumptions:
+  - buildDir exists and contains CMake-generated build files.
+  - Compiler toolchain exists (gcc/clang) as required.
+
+OUTPUT:
+- stdout behavior:
+  - Build progress and compilation output.
+- stderr behavior:
+  - Compiler and linker errors, CMake wrapper errors.
+- exit codes and meanings:
+  - 0: build succeeded.
+  - 2: missing buildDir argument.
+  - Non-zero: build failure or invalid build directory.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Writes build outputs in buildDir (object files, binaries, libraries).
+  - Updates build logs/metadata as produced by generator.
+- Network access:
+  - None typical; do not assume.
+- Installed packages:
+  - None.
+- State changes:
+  - Produces/updates compiled artifacts.
+
+SAFETY RULES:
+- MUST verify:
+  - buildDir is correct and was configured.
+  - Target name (if provided) is explicit; do not guess.
+- MUST NEVER guess:
+  - Never invent target names like “install” unless user requested.
+  - Never claim success without exit 0 and final success output.
+- Requires user confirmation:
+  - If running a target that performs installation or writes outside buildDir (like “install”), confirm intent before using that target.
+
+COMMON FAILURE MODES:
+- Missing args triggers usage exit 2.
+- buildDir not configured (no build.ninja/Makefiles).
+- Compiler missing.
+- Compilation errors.
+- Link errors due to missing libs.
+- Target name wrong.
+- Permissions prevent writing build outputs.
+
+EXAMPLES:
+1) cmake.build /work/MyProj/build
+2) cmake.build /work/MyProj/build all
+3) cmake.build /work/MyProj/build MyExecutable
+4) cmake.build /work/MyProj/build install
+5) cmake.build /work/MyProj/build test
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim configure happened; this tool only builds.
+- Do NOT invent buildDir contents; verify if needed.
+- Do NOT claim which generator is used; build works if directory is configured.
+- Do NOT assume “install” is safe; it can write outside buildDir depending on CMAKE_INSTALL_PREFIX.
+- Do NOT claim parallelism; CMake chooses defaults based on generator.
+- If build fails, do not guess fix; use exact error output.
+- Do NOT convert paths to Windows.
+- Keep conclusions conservative: build success means compilation succeeded, not that binaries run correctly.
+- Do NOT assume targets exist; require explicit target names.
+- Do NOT hide stderr; compile errors are the point.
+- Do NOT reference tools not yet written.
+- Never fabricate success summaries; rely on exit code and build output.
+- Avoid rerunning repeatedly without addressing real errors.
+- Treat build output as authoritative evidence.

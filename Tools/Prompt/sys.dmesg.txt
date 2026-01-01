@@ -1,0 +1,104 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\sys.dmesg.txt
+TOOL ID:
+sys.dmesg
+
+CATEGORY:
+system
+
+PURPOSE:
+Print the tail end of the kernel message buffer (dmesg) without color codes.
+Used to diagnose kernel-level issues visible from inside the container (if permitted).
+
+WHEN TO USE:
+- You suspect kernel messages explain a failure (OOM kill, filesystem errors, network driver warnings).
+- A tool fails with low-level errors and you want recent kernel context.
+- You see “Killed” processes and want to check for OOM killer messages.
+- You suspect mount issues or permission issues that might emit kernel logs.
+- You need the last N kernel messages quickly.
+
+WHEN NOT TO USE:
+- You need user-space application logs: use the app-specific log tool (not this).
+- You need Docker daemon logs: use docker.logs (later tool) not this.
+- You need complete dmesg history: this tool only tails; use a larger N if allowed.
+- You are in an environment where dmesg is restricted; do not assume it will work.
+- You need to debug code-level exceptions; use build/test outputs, not kernel logs.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is treated as a single optional parameter: <n>
+  - The tool assigns n="{args}" exactly as provided (string), then checks if empty.
+  - If {args} is empty, n defaults to 220.
+- Positional arguments:
+  - 1st (optional): n = number of lines to print from the end of dmesg.
+- Optional arguments:
+  - n: integer-like string. If non-empty but not a valid integer, tail will fail.
+- Defaults:
+  - n=220 when no args provided.
+- Error conditions:
+  - If n is non-numeric (e.g., "abc"), tail will error and exit non-zero.
+  - If dmesg is not permitted, dmesg may exit non-zero with “Operation not permitted”.
+  - If dmesg is missing, command fails.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - Kernel ring buffer access may be restricted based on container privileges.
+
+OUTPUT:
+- stdout behavior:
+  - Plain text lines from `dmesg --color=never`, tail -n <n>.
+- stderr behavior:
+  - Permission errors or command failures appear here.
+- exit codes and meanings:
+  - 0: dmesg succeeded and tail succeeded.
+  - Non-zero: dmesg failed (permission/missing) or tail failed (bad n).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - If you provide n, it must be a positive integer string.
+- MUST NEVER guess:
+  - Do not invent kernel messages.
+  - Do not assume OOM or disk errors without matching lines.
+- Requires user confirmation:
+  - None. Read-only. But do not share sensitive host kernel info outside user’s context.
+
+COMMON FAILURE MODES:
+- “dmesg: read kernel buffer failed: Operation not permitted” due to container restrictions.
+- Bad n (non-numeric) causes tail error.
+- Output truncation due to small n hiding relevant lines; rerun with larger n.
+
+EXAMPLES:
+1) sys.dmesg
+2) sys.dmesg 50
+3) sys.dmesg 220
+4) sys.dmesg 500
+5) sys.dmesg 1000
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim dmesg contains something unless it is printed.
+- Do NOT paraphrase errors into made-up causes; include exact stderr text when present.
+- Do NOT assume host kernel logs are accessible; container may block it.
+- Do NOT suggest changing kernel parameters based on guesses.
+- Do NOT recommend privileged container changes unless the user asks.
+- If permission denied, stop and report that; do not pretend output is complete.
+- Do NOT “clean up” timestamps or prefixes; keep lines as-is.
+- If a line looks like an OOM kill, verify PID and process name from the line.
+- Do NOT infer application-level stack traces from kernel logs.
+- Never invent additional commands; this tool is fixed to dmesg|tail.
+- Keep n within reasonable bounds; huge values can be noisy and slow.
+- If asked for “all dmesg”, be explicit this tool tails only; choose a large n but do not claim completeness.
+- Do not interpret driver/module names beyond reporting them.
+- Do not treat warnings as fatal errors unless explicitly indicated.
+- Treat output as time-ordered tail only, not full context.

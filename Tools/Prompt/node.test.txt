@@ -1,0 +1,107 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\node.test.txt
+TOOL ID:
+node.test
+
+CATEGORY:
+build
+
+PURPOSE:
+Run an npm script intended for tests in a Node.js project directory.
+Defaults to running `npm run test` unless a script name is provided.
+
+WHEN TO USE:
+- You want to run a project’s test script after installing dependencies.
+- You want to run a specific test-related npm script (default: test).
+- You need test output for debugging failures.
+- You are validating CI behavior in the container.
+- You want a bounded tool call rather than a free-form command.
+
+WHEN NOT TO USE:
+- Dependencies are not installed: use node.install first.
+- The project does not define a test script: npm will fail.
+- You do not know the correct script name: do not guess.
+- You need additional args passed to the test runner; tool does not support extra tokens beyond scriptName.
+- Tests have side effects and user has not approved running them.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `set -- {args}; p="$1"; s="$2"; ... if [ -z "$s" ]; then s=test; fi; cd "$p" && npm run "$s"`
+- {args} is split by whitespace into tokens.
+- Quoting is not reliably preserved.
+Positional arguments:
+- 1st token: <projectDir> required.
+- 2nd token: [scriptName] optional.
+Optional arguments:
+- scriptName optional; defaults to "test".
+Defaults:
+- If scriptName missing: runs `npm run test`.
+Error conditions:
+- If projectDir missing:
+  - Prints `usage: <projectDir> [scriptName]`
+  - Exits 2.
+- If cd fails: non-zero.
+- If npm missing: non-zero.
+- If scriptName not in package.json scripts: non-zero.
+- If tests fail: non-zero exit.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into <projectDir>.
+- File system assumptions:
+  - node_modules likely required.
+  - Test runner may create temp files/artifacts.
+
+OUTPUT:
+- stdout behavior:
+  - npm run output and test runner output.
+- stderr behavior:
+  - npm errors and test failures.
+- exit codes and meanings:
+  - 0: tests succeeded.
+  - 2: missing projectDir argument.
+  - Non-zero: tests failed or environment issue.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Test artifacts, coverage output, snapshots, caches depending on project.
+- Network access:
+  - Tests may access network depending on code; do not assume.
+- Installed packages:
+  - None.
+- State changes:
+  - May alter working tree if tests write snapshots or logs.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - projectDir is correct.
+  - User accepts running tests.
+- What must NEVER be guessed:
+  - Do not guess script names or test flags.
+  - Do not guess environment requirements.
+- What requires user confirmation:
+  - If tests are likely integration tests touching external services, confirm.
+
+COMMON FAILURE MODES:
+- Missing dependencies.
+- Script not defined.
+- Headless browser requirements missing (playwright/puppeteer).
+- Node version mismatch.
+- Tests fail or hang.
+- Missing env vars (API keys).
+- Out of disk.
+
+EXAMPLES:
+1) node.test /work/webui
+2) node.test /work/webui test
+3) node.test /work/node/app test
+4) node.test /work/repro/react_app test
+5) node.test /work/services/node_backend test:ci
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim tests ran if script missing.
+- Do NOT claim coverage was produced unless output shows it.
+- Do NOT invent failing test names.
+- Do NOT assume side effects are absent.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written.

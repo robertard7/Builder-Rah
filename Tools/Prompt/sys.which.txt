@@ -1,0 +1,106 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\sys.which.txt
+TOOL ID:
+sys.which
+
+CATEGORY:
+system
+
+PURPOSE:
+Locate one or more executables in PATH using `command -v`.
+Prints a header per requested name and then the resolved path (or nothing).
+
+WHEN TO USE:
+- A tool call fails with “command not found” and you need to confirm it exists.
+- You need to check whether `dotnet`, `git`, `cmake`, `ninja`, `rg`, etc. are installed.
+- You need to confirm which version path will be used when multiple copies exist.
+- You want a quick check before deciding to run apt.install.* tools.
+
+WHEN NOT TO USE:
+- You need full package installation: use apt.install or apt.install.core (later tools).
+- You need OS identity: use sys.os.
+- You need environment PATH variables: use sys.env.
+- You need to locate files in /work: use file.find or repo tools, not this.
+- You need to locate libraries, headers, or non-executable files: command -v is for executables only.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is expanded into a shell word list in `for x in {args}; do ...; done`
+  - That means it is split by shell whitespace.
+  - Quoting is not preserved through the manifest substitution.
+- Positional arguments:
+  - name1 name2 ... = executable names to locate.
+- Optional arguments:
+  - None.
+- Defaults:
+  - None. If you pass no args, the loop runs zero times and prints nothing, but `set -e` means syntax issues can still fail.
+- Error conditions:
+  - If {args} is empty: loop executes zero times; tool likely exits 0 but produces no useful output.
+  - If a name contains spaces, it will be split into multiple tokens and treated as multiple names.
+  - command -v failing does NOT fail the tool because it is followed by `|| true`.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - PATH is set for the running process.
+
+OUTPUT:
+- stdout behavior:
+  - For each token x:
+    - prints `== <x> ==`
+    - prints resolved path from `command -v "<x>"` if found
+    - prints blank line if not found (because command -v returns non-zero but output suppressed by || true)
+- stderr behavior:
+  - Unusual; command -v errors are suppressed by || true, but shell errors may appear.
+- exit codes and meanings:
+  - 0: tool ran the loop successfully.
+  - Non-zero: shell failure before completing loop (rare).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Provide at least one executable name token.
+  - Use simple names like `git` not paths.
+- MUST NEVER guess:
+  - Do not guess that a tool exists if command -v prints nothing.
+  - Do not guess versions from paths; use `run.cmd` with `--version` only if requested.
+- Requires user confirmation:
+  - Installing missing tools requires explicit user intent (apt.install*), not sys.which.
+
+COMMON FAILURE MODES:
+- Passing a path like `/usr/bin/git` instead of `git` gives confusing output (command -v may echo it or fail).
+- Passing quoted strings with spaces will be split and treated as multiple names.
+- PATH differences between interactive and non-interactive shells.
+
+EXAMPLES:
+1) sys.which git
+2) sys.which dotnet
+3) sys.which git dotnet cmake ninja
+4) sys.which rg grep sed awk
+5) sys.which python3 pip3 cargo go
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT invent resolved paths.
+- If output only shows the `== name ==` lines with no path, treat it as “not found”.
+- Do NOT claim “installed” unless a concrete path is printed.
+- Do NOT infer package names to install unless you have an exact mapping (use apt.install.* tools later).
+- Do NOT assume command -v output implies correct permissions; it only resolves PATH.
+- Do NOT claim the executable is runnable if it is not in PATH.
+- Do NOT assume that because one tool exists, related tools exist (e.g., cmake vs ninja).
+- Keep tokenization in mind: spaces split arguments.
+- Never propose passing flags (like `--version`) to sys.which; it only accepts names.
+- Never treat sys.which as a search tool for files; it is for PATH executables only.
+- Do not suggest using it to find DLLs, headers, or scripts outside PATH.
+- If user needs exact location of multiple tools, list them all in one call to reduce noise.
+- If tool output differs from expectation, do not guess; use sys.env to inspect PATH.
+- Keep conclusions strictly tied to printed output.

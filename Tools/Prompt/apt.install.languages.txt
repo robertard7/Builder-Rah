@@ -1,0 +1,114 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\apt.install.languages.txt
+TOOL ID:
+apt.install.languages
+
+CATEGORY:
+build
+
+PURPOSE:
+Install a broad language toolchain inside the rah-linux container.
+Installs: gcc g++ clang make cmake ninja-build git curl wget python3 python3-venv python3-pip nodejs npm openjdk-17-jdk maven gradle golang-go rustc cargo php-cli phpunit ruby-full.
+
+WHEN TO USE:
+- You need a “kitchen sink” dev container to build and test multiple languages.
+- You are running cross-language components and want all major toolchains available.
+- You plan to build projects that could be C/C++/Rust/Go/Node/Java/Python/PHP/Ruby.
+- Tools like cargo, go, npm, mvn are missing and you want them installed quickly.
+
+WHEN NOT TO USE:
+- You want minimal container footprint; this installs many packages.
+- You only need a small subset: use apt.install or apt.install.core.
+- Network access is not allowed.
+- Disk space is limited.
+- You are on the Windows host; this changes only the container.
+- You need specific versions pinned; this uses apt repo defaults.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool does not accept arguments.
+  - Any provided {args} is ignored.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Always runs apt-get update and installs the fixed package list above.
+- Error conditions:
+  - apt update/install failures.
+  - dpkg lock.
+  - disk full (more likely due to size).
+  - repo signature issues.
+  - package conflicts or unavailable packages.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - apt-get available and configured.
+  - Sufficient disk space for many toolchains.
+
+OUTPUT:
+- stdout behavior:
+  - apt-get update output then install progress for many packages.
+- stderr behavior:
+  - apt/dpkg errors.
+- exit codes and meanings:
+  - 0: installation succeeded.
+  - Non-zero: failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Installs many packages and dependencies into container.
+  - Updates apt lists and dpkg database.
+- Network access:
+  - Yes.
+- Installed packages:
+  - Yes, fixed list plus dependencies.
+- State changes:
+  - Adds many executables: gcc, g++, clang, python3, pip, node, npm, java, mvn, gradle, go, rustc, cargo, php, phpunit, ruby, etc.
+
+SAFETY RULES:
+- MUST verify:
+  - User explicitly wants broad toolchain installed (size/impact).
+  - Network access is allowed.
+  - Disk constraints are acceptable.
+- MUST NEVER guess:
+  - Never claim “only a few packages”; this is large.
+  - Never add extra packages; list is fixed.
+  - Never claim specific versions; apt decides.
+- Requires user confirmation:
+  - Strongly required if user did not explicitly request this broad install.
+
+COMMON FAILURE MODES:
+- Disk full during install.
+- apt update network failures.
+- Package conflicts.
+- Repo signature errors.
+- Slow mirrors/timeouts.
+- dpkg lock.
+
+EXAMPLES:
+1) apt.install.languages
+2) apt.install.languages toolchain
+3) apt.install.languages now
+4) apt.install.languages ignored-args
+5) apt.install.languages bootstrap
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim every language build will succeed after this; toolchains may still need project-specific deps.
+- Do NOT claim host system changed; container-only.
+- Do NOT claim exact language versions; verify using each tool’s version command separately if needed.
+- Do NOT infer that node uses a modern version; apt repo versions vary by distro.
+- Do NOT assume gradle or maven settings; only installs binaries.
+- Do NOT claim python venvs are created; only packages installed.
+- Do NOT hide apt errors; they are essential.
+- Do NOT re-run repeatedly; diagnose failure from output.
+- Do NOT add flags; tool is fixed.
+- Treat installed package list as authoritative.
+- If user wants minimal, do not recommend this tool; it is intentionally broad.
+- Do NOT claim security posture improvements; more packages increases surface area.
+- Keep conclusions conservative and tied to apt output.
+- Do NOT reference other tools not in scope here.
+- Do NOT assume npm will work behind proxies; that is environment-specific.
+- Validate availability with sys.which after install; do not assume.

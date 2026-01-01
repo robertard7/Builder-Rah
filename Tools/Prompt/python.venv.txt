@@ -1,0 +1,107 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\python.venv.txt
+TOOL ID:
+python.venv
+
+CATEGORY:
+language
+
+PURPOSE:
+Create a Python virtual environment under a project directory.
+Runs: `python3 -m venv <projectDir>/<venvName>` and prints the created path.
+Defaults venvName to `.venv` if not provided.
+
+WHEN TO USE:
+- You need an isolated Python environment for a project under /work.
+- You want to avoid installing Python packages globally in the container.
+- You are preparing to install requirements via python.pip.install.
+- You need a reproducible venv location inside the project tree.
+- You want a standard `.venv` folder.
+
+WHEN NOT TO USE:
+- Python3 or venv module is not installed: this will fail.
+- You do not want per-project venvs (container-level installs instead).
+- The projectDir is not writable.
+- You need conda or another environment manager; not supported.
+- You want to activate the venv interactively; this tool only creates it.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `set -- {args}; p="$1"; v="$2"; ... if [ -z "$v" ]; then v=.venv; fi; python3 -m venv "$p/$v"`
+- {args} is split by whitespace into tokens.
+- Quoting is not reliably preserved; avoid spaces in projectDir and venvName.
+Positional arguments:
+- 1st token: <projectDir> required.
+- 2nd token: [venvName] optional.
+Optional arguments:
+- venvName optional; defaults to `.venv`.
+Defaults:
+- If venvName missing: v=.venv.
+Error conditions:
+- If projectDir missing:
+  - Prints `usage: <projectDir> [venvName]`
+  - Exits 2.
+- If python3 missing: non-zero.
+- If projectDir does not exist: venv creation fails.
+- If permission denied writing venv: non-zero.
+- If venv module missing: python error.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not cd; uses the provided path.
+- File system assumptions:
+  - projectDir exists.
+  - python3 is installed.
+  - Disk space available.
+
+OUTPUT:
+- stdout behavior:
+  - Prints `created <projectDir>/<venvName>`
+- stderr behavior:
+  - Python errors, permission errors.
+- exit codes and meanings:
+  - 0: venv created successfully.
+  - 2: missing projectDir argument.
+  - Non-zero: failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates a directory tree under <projectDir>/<venvName>.
+  - Writes Python binaries, scripts, and metadata inside the venv.
+- Network access:
+  - None for venv creation.
+- Installed packages:
+  - None beyond what python bundles; pip may exist in venv depending on Python build.
+- State changes:
+  - Adds venv directory.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - projectDir is correct and exists.
+  - venvName is safe and does not overwrite important folders.
+- What must NEVER be guessed:
+  - Do not guess projectDir.
+  - Do not guess venvName beyond default .venv.
+- What requires user confirmation:
+  - If creating venv could overwrite an existing directory, confirm intent.
+
+COMMON FAILURE MODES:
+- python3 not installed.
+- python3-venv package missing (depending on distro).
+- projectDir missing.
+- Permission denied.
+- Disk full.
+
+EXAMPLES:
+1) python.venv /work/py/app
+2) python.venv /work/py/app .venv
+3) python.venv /work/tools/py_util venv
+4) python.venv /work/repro/pyproj env
+5) python.venv /work/services/py_backend .venv
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim the venv is activated; tool only creates it.
+- Do NOT claim packages are installed; none are installed here.
+- Do NOT invent interpreter paths; verify inside venv if needed.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written.

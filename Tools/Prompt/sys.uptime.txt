@@ -1,0 +1,106 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\sys.uptime.txt
+TOOL ID:
+sys.uptime
+
+CATEGORY:
+system
+
+PURPOSE:
+Report how long the container has been up and show load averages.
+Also prints the raw /proc/loadavg values.
+
+WHEN TO USE:
+- You want to see whether the environment was just restarted.
+- You are diagnosing slow builds and need current load averages.
+- You want a quick signal of CPU pressure (load) without full process listing.
+- You need to confirm /proc is accessible and loadavg is readable.
+- You are comparing load before and after starting a task.
+
+WHEN NOT TO USE:
+- You need memory usage: use sys.info.
+- You need process-level CPU/mem: use sys.ps.
+- You need kernel logs: use sys.dmesg.
+- You need OS release details: use sys.os.
+- You need disk usage: use sys.info.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool does not accept arguments.
+  - Any provided {args} is ignored by the command template.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Runs:
+    - `uptime`
+    - `cat /proc/loadavg`
+- Error conditions:
+  - uptime missing (rare).
+  - /proc/loadavg missing or not readable (abnormal container).
+  - cat missing (rare).
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - /proc exists and provides load average data.
+
+OUTPUT:
+- stdout behavior:
+  - First line: output of `uptime`.
+  - Second line: exact contents of `/proc/loadavg`.
+- stderr behavior:
+  - Failures emit stderr.
+- exit codes and meanings:
+  - 0: both commands succeeded.
+  - Non-zero: one of the commands failed.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Nothing. Read-only.
+- MUST NEVER guess:
+  - Do not interpret “load average” as CPU usage percent.
+  - Do not claim the number of CPU cores unless separately confirmed (sys.info).
+- Requires user confirmation:
+  - None.
+
+COMMON FAILURE MODES:
+- Some container environments may show host load averages, not container-only.
+- Load averages can be high during compile bursts; that is not automatically an error.
+- uptime output format varies across distros.
+
+EXAMPLES:
+1) sys.uptime
+2) sys.uptime 
+3) sys.uptime ignored
+4) sys.uptime anything
+5) sys.uptime check_load
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT invent uptime duration or load values.
+- Do NOT assume a load of “1.00” means healthy; core count matters and must be verified separately.
+- Do NOT claim container restart time unless uptime shows it clearly.
+- Do NOT infer memory pressure from loadavg.
+- Keep the output as authoritative text; quote exact values when needed.
+- If /proc/loadavg is unreadable, do not guess; report failure.
+- Do not confuse “load average” with “system load” marketing language.
+- Do not interpret the last fields of /proc/loadavg unless you know them; if explaining, keep it minimal and factual.
+- This tool is a snapshot; do not claim trend without repeated calls.
+- Never pretend it can reset or change load.
+- If user asks for “CPU usage”, route to sys.ps and sys.info.
+- If user asks for “why load is high”, do not guess; request further diagnostics.
+- Do not fabricate timestamps.
+- Do not claim the host OS uptime; this is container context.
+- Keep comparisons grounded in actual printed outputs only.

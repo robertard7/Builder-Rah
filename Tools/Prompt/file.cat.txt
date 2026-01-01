@@ -1,0 +1,107 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\file.cat.txt
+TOOL ID:
+file.cat
+
+CATEGORY:
+file
+
+PURPOSE:
+Print the beginning of a file (up to 340 lines) safely.
+Validates the path exists and is a regular file, then runs `sed -n '1,340p' <path>`.
+
+WHEN TO USE:
+- You need to inspect a file’s content quickly without dumping huge logs.
+- You want to read a config file, source file, or log snippet.
+- You want a safe read that checks existence and file type.
+- You want consistent output capped at 340 lines.
+- You need exact text for debugging or patching.
+
+WHEN NOT TO USE:
+- You need more than 340 lines; use file.head or multiple reads with offsets (not provided here).
+- You need to read binary files; printing binary is unsafe.
+- You do not have an explicit path; never guess.
+- You need to search within the file; use file.searchpath or grep tools.
+- You need to read a directory listing; use repo.ls or file.stat.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool command does: `p="{args}"; if [ -z "$p" ]; then ...; fi; if [ ! -f "$p" ]; then ...; fi; sed -n '1,340p' "$p"`
+  - {args} is treated as a single string path.
+  - No token splitting by the tool itself.
+- Positional arguments:
+  - 1st: <path> required (absolute or relative to current working directory).
+- Optional arguments:
+  - None.
+- Defaults:
+  - Always prints lines 1..340.
+- Error conditions:
+  - If path missing: prints `missing path` and exits 2.
+  - If path is not a file: prints `not a file: <path>` and exits 2.
+  - If file unreadable: sed errors, non-zero.
+  - If sed missing (unlikely): command not found.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not cd; relative paths resolve from the runner’s current directory.
+- File system assumptions:
+  - File is accessible inside container filesystem.
+
+OUTPUT:
+- stdout behavior:
+  - Prints up to the first 340 lines of the file.
+  - No line numbers are added.
+- stderr behavior:
+  - sed errors or permission errors.
+- exit codes and meanings:
+  - 0: file printed successfully (or file shorter than 340 lines).
+  - 2: missing path or not a regular file.
+  - Non-zero: sed/read failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None; read-only.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify before calling:
+  - The file path is explicitly known.
+  - The file does not contain secrets that should not be printed.
+  - The file is text, not binary.
+- MUST NEVER be guessed:
+  - Never guess file paths.
+  - Never guess that a file is safe to print; treat unknown files cautiously.
+- Requires user confirmation:
+  - If file may contain credentials (tokens, keys, connection strings), confirm before printing.
+
+COMMON FAILURE MODES:
+- Wrong path (file not found or is a directory).
+- Permission denied reading file.
+- Path is relative to unexpected current directory.
+- File is huge and user expects more than 340 lines (tool truncates).
+- File contains binary content and output becomes unreadable.
+
+EXAMPLES:
+1) file.cat /work/README.md
+2) file.cat /work/RahOllamaOnly/appsettings.json
+3) file.cat /work/RahOllamaOnly/Tools/tools.json
+4) file.cat /work/src/Program.cs
+5) file.cat /work/logs/build.log
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim the file has more content beyond what is printed.
+- Do NOT invent lines not shown.
+- Do NOT claim encoding; output is raw text as sed prints it.
+- Do NOT assume relative path base; verify with repo.ls or pwd output from repo.ls/sys tools.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written here.
+- If tool errors, do not guess what file contains.
+- Keep any summary strictly tied to printed lines.
+- Treat truncation as truncation, not “file ended”.
+- Never fabricate file contents.
+- Never claim secrets are absent; you can only see what was printed.

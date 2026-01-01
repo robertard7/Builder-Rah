@@ -1,0 +1,121 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\node.install.txt
+TOOL ID:
+node.install
+
+CATEGORY:
+build
+
+PURPOSE:
+Install Node.js project dependencies in a given directory.
+If package-lock.json exists, runs `npm ci`.
+Otherwise runs `npm install`.
+
+WHEN TO USE:
+- You have a Node project and need dependencies installed before building/testing.
+- You want deterministic installs using npm ci when a lockfile exists.
+- You are preparing a fresh workspace for a Node build.
+- You need to reproduce a Node toolchain issue with clean install behavior.
+- You want the minimal standard install step without custom npm flags.
+
+WHEN NOT TO USE:
+- The directory is not a Node project (no package.json): npm will fail.
+- You need yarn/pnpm; this tool only uses npm.
+- You need custom registry/auth tokens; do not run without explicit user-provided configuration.
+- You want to install global packages; not supported.
+- You do not know the correct project directory: do not guess.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `p="{args}"; if [ -z "$p" ]; then ...; fi; cd "$p" && ( [ -f package-lock.json ] && npm ci || npm install )`
+- {args} is treated as a single string path.
+- No token splitting is performed by the tool itself.
+Positional arguments:
+- 1st: <projectDir> (required).
+Optional arguments:
+- None.
+Defaults:
+- If <projectDir>/package-lock.json exists:
+  - Runs `npm ci`
+- Else:
+  - Runs `npm install`
+Error conditions:
+- If projectDir missing:
+  - Prints `usage: <projectDir>`
+  - Exits 2.
+- If `cd` fails:
+  - Non-zero exit.
+- If npm not installed:
+  - Non-zero exit.
+- If package.json missing:
+  - npm fails.
+- If install fails (network, auth, integrity):
+  - Non-zero exit.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into <projectDir>.
+- File system assumptions:
+  - <projectDir> exists and writable.
+  - node_modules may be created.
+  - npm cache directory exists/writable.
+
+OUTPUT:
+- stdout behavior:
+  - npm install/ci logs.
+- stderr behavior:
+  - npm errors, network failures, permission errors.
+- exit codes and meanings:
+  - 0: dependencies installed successfully.
+  - 2: missing projectDir argument.
+  - Non-zero: install failed.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates/updates node_modules.
+  - May update package-lock.json when using npm install (npm ci does not update lockfile).
+  - Writes npm cache.
+- Network access:
+  - Yes, typically required to download packages.
+- Installed packages:
+  - Installs Node dependencies into project, not system packages.
+- State changes:
+  - Project dependency tree changes.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - Exact projectDir exists and contains package.json.
+  - User accepts network access and dependency downloads.
+  - No secrets are required (private registry tokens) unless user provided them.
+- What must NEVER be guessed:
+  - Do not guess projectDir.
+  - Do not guess registry URLs or tokens.
+  - Do not guess npm flags.
+- What requires user confirmation:
+  - Any private registry authentication setup.
+  - If install will be large and disk is constrained.
+
+COMMON FAILURE MODES:
+- node/npm missing.
+- No package.json.
+- Lockfile mismatch causing npm ci to fail.
+- Network/DNS/proxy issues.
+- Integrity or checksum failures.
+- Permission denied writing node_modules.
+- Out of disk space.
+
+EXAMPLES:
+1) node.install /work/node/app
+2) node.install /work/webui
+3) node.install /work/tools/node_cli
+4) node.install /work/repro/react_app
+5) node.install /work/services/node_backend
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim install used npm ci unless package-lock.json existed and npm output confirms.
+- Do NOT claim versions installed; npm decides based on lockfile or semver.
+- Do NOT claim offline install; npm generally needs network.
+- Do NOT invent missing environment variables or tokens.
+- Do NOT convert /work paths to Windows.
+- Do NOT claim node_modules exists without verifying.
+- Do NOT reference tools not yet written.

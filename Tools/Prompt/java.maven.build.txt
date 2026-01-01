@@ -1,0 +1,115 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\java.maven.build.txt
+TOOL ID:
+java.maven.build
+
+CATEGORY:
+build
+
+PURPOSE:
+Build a Java/Maven project by running Maven goals in a project directory.
+If no goals are provided, runs `mvn -q -DskipTests package`.
+If goals are provided, runs `mvn <goals...>`.
+
+WHEN TO USE:
+- You have a Maven project (pom.xml) and want to build it.
+- You want the default packaging step without tests (default behavior of this tool).
+- You want to run specific Maven goals (e.g., clean package, test, verify) explicitly.
+- You need Maven output for debugging compilation or dependency resolution issues.
+- You want a consistent tool invocation inside the container.
+
+WHEN NOT TO USE:
+- The directory is not a Maven project (no pom.xml).
+- You need Gradle builds: use java.gradle.build.
+- You do not know the correct project directory: do not guess.
+- You need to pass Maven flags that include spaces/quotes; tokenization may break them.
+- You need to ensure tests run; default skips tests, so provide explicit goals if you want tests.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `set -- {args}; p="$1"; shift 1 || true; ... cd "$p" && if [ $# -eq 0 ]; then mvn -q -DskipTests package; else mvn "$@"; fi`
+- {args} is split by whitespace into tokens.
+- Quoting is not reliably preserved.
+Positional arguments:
+- 1st token: <projectDir> required.
+- 2nd..N tokens: [goals...] optional, passed to mvn.
+Optional arguments:
+- Any number of Maven goals/phases/options as separate tokens.
+Defaults:
+- If no goals are provided after projectDir:
+  - Runs: `mvn -q -DskipTests package`
+Error conditions:
+- If projectDir missing:
+  - Prints `usage: <projectDir> [goals...]`
+  - Exits 2.
+- If cd fails: non-zero.
+- If mvn missing: non-zero.
+- If pom.xml missing: mvn fails.
+- Dependency resolution fails: non-zero.
+- Build fails: non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into <projectDir>.
+- File system assumptions:
+  - projectDir exists.
+  - Maven local repo (~/.m2) writable.
+  - Java JDK installed.
+
+OUTPUT:
+- stdout behavior:
+  - Maven logs (quiet mode for default case reduces output).
+- stderr behavior:
+  - Maven errors, Java compilation errors.
+- exit codes and meanings:
+  - 0: build succeeded.
+  - 2: missing projectDir argument.
+  - Non-zero: mvn failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Creates target/ build outputs.
+  - Downloads dependencies into ~/.m2 repository.
+  - May write generated sources/resources.
+- Network access:
+  - Yes, typically for downloading Maven dependencies/plugins.
+- Installed packages:
+  - None via apt.
+- State changes:
+  - Maven caches and build artifacts updated.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - projectDir is correct.
+  - Whether skipping tests is acceptable (default) or goals should include tests.
+  - User accepts network dependency downloads.
+- What must NEVER be guessed:
+  - Do not guess Maven goals.
+  - Do not guess repository credentials or settings.xml content.
+- What requires user confirmation:
+  - If using goals that deploy/publish (deploy, release), confirm explicitly.
+  - If using goals that might modify remote repos, confirm.
+
+COMMON FAILURE MODES:
+- mvn missing.
+- JDK missing or wrong version.
+- No pom.xml.
+- Network issues downloading dependencies.
+- Corporate proxy requirements.
+- Compilation errors.
+- Disk full in ~/.m2 or target/.
+
+EXAMPLES:
+1) java.maven.build /work/java/MyApp
+2) java.maven.build /work/java/MyApp clean package
+3) java.maven.build /work/java/MyApp test
+4) java.maven.build /work/java/MyLib clean install
+5) java.maven.build /work/services/java_backend -DskipTests=false verify
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim tests ran unless goals included test/verify and output confirms.
+- Do NOT claim dependencies were downloaded unless output shows it.
+- Do NOT invent Maven profiles or settings.
+- Do NOT convert /work paths to Windows.
+- Do NOT claim artifacts produced without checking target/ if needed.
+- Do NOT reference tools not yet written.

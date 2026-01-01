@@ -1,0 +1,114 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\java.gradle.build.txt
+TOOL ID:
+java.gradle.build
+
+CATEGORY:
+build
+
+PURPOSE:
+Build a Gradle project inside a project directory.
+If gradlew exists, runs `./gradlew <task>`.
+Otherwise runs `gradle <task>`.
+Defaults task to `build` if not provided.
+
+WHEN TO USE:
+- You have a Gradle project and want to run its build task.
+- You want to use the project’s Gradle wrapper when available (preferred).
+- You want to run a specific Gradle task explicitly (build by default).
+- You need Gradle output for debugging dependency or compilation issues.
+- You want consistent invocation inside the container.
+
+WHEN NOT TO USE:
+- The directory is not a Gradle project (no build.gradle, settings.gradle, etc.).
+- You need Maven builds: use java.maven.build.
+- You do not know the correct project directory: do not guess.
+- You need multiple tasks or complex Gradle args; tool supports only one optional task token.
+- You need interactive Gradle input; tool is non-interactive.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `set -- {args}; p="$1"; t="$2"; ... if [ -z "$t" ]; then t=build; fi; cd "$p" && ( [ -f gradlew ] && ./gradlew "$t" || gradle "$t" )`
+- {args} is split by whitespace into tokens.
+- Quoting is not reliably preserved.
+Positional arguments:
+- 1st token: <projectDir> required.
+- 2nd token: [task] optional.
+Optional arguments:
+- task optional; defaults to `build`.
+Defaults:
+- If task missing: t=build.
+- Uses gradlew if present, otherwise uses system gradle.
+Error conditions:
+- If projectDir missing:
+  - Prints `usage: <projectDir> [task]`
+  - Exits 2.
+- If cd fails: non-zero.
+- If neither gradlew nor gradle exists: non-zero.
+- If task is invalid: gradle exits non-zero.
+- If build fails: non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - cd into <projectDir>.
+- File system assumptions:
+  - gradlew may need execute permission.
+  - Gradle cache directories writable (~/.gradle).
+  - JDK installed.
+
+OUTPUT:
+- stdout behavior:
+  - Gradle output, task execution logs.
+- stderr behavior:
+  - Gradle errors, stack traces if enabled by project.
+- exit codes and meanings:
+  - 0: task succeeded.
+  - 2: missing projectDir argument.
+  - Non-zero: build/task failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Build outputs (build/ directory).
+  - Downloads dependencies into Gradle caches.
+  - May create/modify wrapper distributions in cache.
+- Network access:
+  - Yes, typically for downloading dependencies and wrapper distribution.
+- Installed packages:
+  - None via apt.
+- State changes:
+  - Gradle caches and build artifacts updated.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - projectDir is correct.
+  - Task name is explicit or accept default build.
+  - User accepts network downloads.
+- What must NEVER be guessed:
+  - Do not guess task names (test, publish, etc.) without user intent.
+  - Do not guess gradle properties or environment variables.
+- What requires user confirmation:
+  - If task can publish/deploy (publish, uploadArchives), confirm explicitly.
+
+COMMON FAILURE MODES:
+- gradle/gradlew missing.
+- gradlew not executable.
+- JDK missing or incompatible.
+- Network issues downloading wrapper/deps.
+- Build script errors.
+- Out of disk in caches.
+- Permission issues writing build outputs.
+
+EXAMPLES:
+1) java.gradle.build /work/java/GradleApp
+2) java.gradle.build /work/java/GradleApp build
+3) java.gradle.build /work/java/GradleApp test
+4) java.gradle.build /work/services/java_backend assemble
+5) java.gradle.build /work/repro/gradleproj clean
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim wrapper was used unless gradlew existed and output indicates it ran.
+- Do NOT claim task exists; gradle will confirm.
+- Do NOT claim tests ran unless task is test and it succeeded.
+- Do NOT invent Gradle properties or args; tool only passes one task token.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written.

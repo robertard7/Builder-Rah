@@ -1,0 +1,119 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\sys.info.txt
+TOOL ID:
+sys.info
+
+CATEGORY:
+system
+
+PURPOSE:
+Collect a quick snapshot of the runtime system state inside the rah-linux container.
+It prints kernel info, CPU details, memory usage, disk usage, and current mounts.
+This tool is read-only and is used to understand the environment before debugging or running builds.
+
+WHEN TO USE:
+- You need to confirm what kernel and architecture the container is running.
+- You need CPU model, core counts, and flags to reason about build or runtime compatibility.
+- You need to see RAM totals and current memory pressure before heavy tasks.
+- You need to confirm what disks are visible and how full /work is before cloning/building.
+- You need to confirm mounts exist and what is mounted where (e.g., /work, /rah/tools).
+- You are triaging “works on my machine” differences between host and container.
+- You are investigating unexpected slowness and want load-bearing basics first.
+
+WHEN NOT TO USE:
+- You need detailed per-process analysis: use sys.ps instead.
+- You need OS distribution metadata: use sys.os instead.
+- You need to confirm a specific binary exists in PATH: use sys.which instead.
+- You need to confirm mount writability: use sys.mount.check instead.
+- You need network diagnostics: use net.* tools instead.
+- You need kernel ring buffer logs: use sys.dmesg instead.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - This tool does not accept arguments.
+  - Any provided {args} is ignored by the underlying command template.
+- Positional arguments:
+  - None.
+- Optional arguments:
+  - None.
+- Defaults:
+  - Always runs the same fixed set of commands.
+- Error conditions:
+  - If a subcommand is missing (unlikely), output may be incomplete.
+  - If permissions restrict a subcommand, that subcommand may fail and stop output if the shell pipeline halts.
+  - Disk/mount commands can fail if /proc or /sys is unavailable (should not happen in normal containers).
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+  - Uses whatever current working directory the runner has.
+- File system assumptions:
+  - /proc is available for lscpu/free/mount context.
+  - /work exists (but may be empty).
+  - /rah/tools may exist as a mount.
+
+OUTPUT:
+- stdout behavior:
+  - Combined output of:
+    - uname -a
+    - lscpu (first 120 lines)
+    - free -h
+    - df -h
+    - mount (first 200 lines)
+  - Output is plain text, multi-section, in that order.
+- stderr behavior:
+  - If any command errors, it may emit stderr.
+  - Expect stderr if a command is missing or access is restricted.
+- exit codes and meanings:
+  - 0: All commands succeeded.
+  - Non-zero: One of the commands failed and caused the overall command chain to fail.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Nothing. This tool is safe and read-only.
+- MUST NEVER guess:
+  - Do not infer host OS/hardware from this output; it is container context.
+  - Do not infer availability of Docker daemon from mount output alone.
+- Requires user confirmation:
+  - None. Read-only diagnostics.
+
+COMMON FAILURE MODES:
+- lscpu not present in minimal images (rare).
+- free not present in minimal images (rare).
+- mount output truncated (it is intentionally limited to 200 lines).
+- df -h may not show host disks; only container-visible mounts.
+
+EXAMPLES:
+1) sys.info
+2) sys.info 
+3) sys.info   
+4) sys.info ignored_extra_text
+5) sys.info anything_here_is_ignored
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT invent fields that are not printed.
+- Do NOT assume /work is mounted just because the tool exists.
+- Do NOT claim RAM/disk totals beyond what is shown.
+- If output is truncated, say it is truncated and use a more specific tool (sys.mount.check, repo.ls, etc.) instead.
+- Do NOT reinterpret CPU flags; report them as shown.
+- Do NOT claim this reveals host machine hardware; it reveals the container’s view.
+- Do NOT fabricate “GPU” info; this tool does not query GPUs.
+- Do NOT pretend it reports container runtime (Docker vs Podman); it does not.
+- If something is missing, state “not present in output” rather than guessing.
+- If an error appears, keep the exact error text; do not paraphrase into invented causes.
+- If you need more detail (e.g., mount writability), call the correct tool instead.
+- Never append new commands; this tool is fixed by the manifest.
+- Never modify the intended order of sections when describing output.
+- Treat this output as a snapshot, not a guarantee of future state.
+- If asked for “exact disk free in /work”, use df -h section, not assumptions.
+- If /proc is unavailable, do not guess; report failure and stop.

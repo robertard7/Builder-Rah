@@ -1,0 +1,126 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\go.build.txt
+TOOL ID:
+go.build
+
+CATEGORY:
+build
+
+PURPOSE:
+Build a Go project using the Go toolchain.
+Runs inside the specified project directory.
+If no output name is given, runs `go build ./...`.
+If an output name is given, runs `go build -o <outName> ./...`.
+
+WHEN TO USE:
+- You have a Go module/project and want to compile it.
+- You need a quick build to verify the Go toolchain works.
+- You want a single output binary name for the build (optional outName).
+- You want to build all packages under the project (./...).
+- You want compiler errors and messages from `go build`.
+
+WHEN NOT TO USE:
+- The directory is not a Go project/module and `go build` will fail.
+- You need to run tests: use go.test.
+- You need a custom build command (tags, ldflags, specific package): this tool does not expose extra flags.
+- You do not know the correct project directory: do not guess.
+- You need to build outside the container: this runs in rah-linux only.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `set -- {args}; p="$1"; out="$2"; ...`
+- {args} is split by shell whitespace into tokens.
+- Quoting is not reliably preserved.
+- Avoid spaces in projectDir and outName.
+Positional arguments:
+- 1st token: <projectDir> (required)
+- 2nd token: [outName] (optional)
+Optional arguments:
+- outName is optional.
+- If outName is empty, tool builds without -o.
+Defaults:
+- If outName is not provided:
+  - Runs: `cd "<projectDir>" && go build ./...`
+- If outName is provided:
+  - Runs: `cd "<projectDir>" && go build -o "<outName>" ./...`
+Error conditions:
+- If projectDir missing:
+  - Prints: `usage: <projectDir> [outName]`
+  - Exits with code 2.
+- If `cd` fails:
+  - Non-zero exit from shell.
+- If `go` is not installed:
+  - Command not found, non-zero.
+- If build fails:
+  - Non-zero exit from `go build`.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Changes directory to <projectDir> before building.
+- File system assumptions:
+  - <projectDir> exists inside container.
+  - Write access in <projectDir> if output binary is created there.
+  - Go build may write to module cache (GOMODCACHE) and build cache.
+
+OUTPUT:
+- stdout behavior:
+  - Usually minimal output on success.
+  - May print package build lines depending on Go version/config.
+- stderr behavior:
+  - Compiler errors and diagnostics.
+- exit codes and meanings:
+  - 0: build succeeded.
+  - 2: missing projectDir argument (explicit tool check).
+  - Non-zero: build failed, `cd` failed, or `go` missing.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - If outName provided, creates/overwrites that file path relative to <projectDir> unless absolute.
+  - Go may create/update build cache files.
+- Network access:
+  - May download modules if not present in module cache (depends on env and project).
+- Installed packages:
+  - None.
+- State changes:
+  - Produces compiled binaries and cache artifacts.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - The exact <projectDir> path exists.
+  - Whether the repo is intended to be built with default `./...`.
+  - Whether an output file name is desired and safe to overwrite.
+- What must NEVER be guessed:
+  - Do not guess projectDir.
+  - Do not guess an outName.
+  - Do not guess extra Go build flags (not supported).
+- What requires user confirmation:
+  - If outName would overwrite an existing important file.
+  - If the build is expected to fetch modules from the internet and user wants offline behavior.
+
+COMMON FAILURE MODES:
+- go binary not installed.
+- projectDir wrong or missing.
+- No go.mod in module-mode project and build fails.
+- Module download fails due to network/DNS/proxy.
+- CGO dependencies missing (C compiler, headers).
+- Build errors in code (syntax/type errors).
+- Output path unwritable.
+
+EXAMPLES:
+1) go.build /work/go/hello
+2) go.build /work/go/hello hello_bin
+3) go.build /work/components/go_cli rahcli
+4) go.build /work/repro/goapp app
+5) go.build /work/tools/go_util util
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim the binary exists unless build exited 0 and you can verify output path.
+- Do NOT claim modules were downloaded unless output shows it or you verified module cache changes.
+- Do NOT assume build tags, race detector, or ldflags were used; they were not.
+- Do NOT invent a main package; tool builds ./... indiscriminately.
+- Do NOT convert /work paths to Windows.
+- Do NOT claim offline behavior; Go may fetch modules.
+- Do NOT claim success from partial logs; rely on exit code.
+- Do NOT invent error causes; use actual stderr lines.
+- Do NOT infer the output location when outName not provided; Go chooses defaults.
+- Do NOT reference tools not yet written.

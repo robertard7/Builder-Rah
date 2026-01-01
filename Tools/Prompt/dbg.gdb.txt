@@ -1,0 +1,110 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\dbg.gdb.txt
+TOOL ID:
+dbg.gdb
+
+CATEGORY:
+debug
+
+PURPOSE:
+Start gdb with a specified binary and optional arguments.
+Runs: `gdb --args <binary> [args...]`
+This tool launches gdb and expects interactive use.
+
+WHEN TO USE:
+- You need to debug a native binary crash (segfault, abort).
+- You want to run a program under gdb to inspect stack traces.
+- You want to set breakpoints and step through execution.
+- You have a compiled binary available in the container filesystem.
+- You need backtrace output to diagnose issues.
+
+WHEN NOT TO USE:
+- You cannot interact with gdb in your current execution environment; non-interactive runs won’t help.
+- You do not have the exact binary path; do not guess.
+- You want memory leak detection; use dbg.valgrind instead.
+- You are debugging managed code (C#) where gdb is not appropriate.
+- The binary is not built with symbols and you expect full source debugging; you may still get addresses but not full info.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `set -- {args}; bin="$1"; shift 1 || true; if [ -z "$bin" ]; then echo 'usage: <binary> [args...]'; exit 2; fi; gdb --args "$bin" "$@"`
+- {args} is split by whitespace into tokens.
+- Quoting is not reliably preserved; avoid spaces in binary path and args.
+Positional arguments:
+- 1st token: <binary> required (path to executable inside container).
+- 2nd..N tokens: [args...] optional, passed to the program under gdb.
+Optional arguments:
+- Program args only; gdb commands are not passed here.
+Defaults:
+- None.
+Error conditions:
+- If binary missing:
+  - Prints `usage: <binary> [args...]`
+  - Exits 2.
+- If gdb missing:
+  - Non-zero.
+- If binary not found or not executable:
+  - gdb errors.
+- If environment does not support interactive session:
+  - You may not be able to use gdb effectively.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not cd; uses binary path as provided.
+- File system assumptions:
+  - Binary exists in container filesystem.
+  - gdb installed and in PATH.
+
+OUTPUT:
+- stdout behavior:
+  - gdb prompt and messages.
+- stderr behavior:
+  - gdb errors.
+- exit codes and meanings:
+  - 0: gdb exited cleanly.
+  - 2: missing binary argument.
+  - Non-zero: gdb invocation failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None by default.
+  - gdb may create history files depending on config; do not assume.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - Starts an interactive debugger session.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - Exact binary path and that it is safe to run.
+  - Whether interactive debugging is acceptable/possible in the environment.
+- What must NEVER be guessed:
+  - Do not guess the binary path.
+  - Do not guess arguments.
+  - Do not invent gdb output; rely on actual session output.
+- What requires user confirmation:
+  - If running the binary could modify files or contact network, confirm before launching under gdb.
+
+COMMON FAILURE MODES:
+- gdb not installed.
+- Binary path incorrect.
+- Binary lacks execute permission.
+- Running gdb is non-interactive in current pipeline.
+- Missing debug symbols reduces usefulness.
+- Program requires input or environment variables not set.
+
+EXAMPLES:
+1) dbg.gdb /work/bin/myapp
+2) dbg.gdb /work/bin/myapp --help
+3) dbg.gdb /work/MyProj/build/MyExecutable arg1 arg2
+4) dbg.gdb /work/repro/crashbin 123
+5) dbg.gdb /work/components/native_tool --config /work/config.json
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim you obtained a backtrace unless you actually ran `bt` and saw it.
+- Do NOT claim line numbers without debug symbols/output.
+- Do NOT claim crash cause; only report what gdb shows.
+- Do NOT convert paths to Windows.
+- Do NOT reference tools not yet written.

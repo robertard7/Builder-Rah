@@ -1,0 +1,112 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\lang.detect.txt
+TOOL ID:
+lang.detect
+
+CATEGORY:
+language
+
+PURPOSE:
+Detect likely languages in a directory tree by counting file extensions for known code types.
+Scans for specific extensions under a path (default /work) and prints counts, sorted by frequency.
+
+WHEN TO USE:
+- You need a quick overview of what languages exist in /work or a project folder.
+- You are triaging a repo and want to know if it’s mostly C#, C++, Rust, etc.
+- You want to confirm whether certain file types exist before choosing build tools.
+- You need to sanity-check that expected files were created (e.g., *.cs after dotnet new).
+- You want a fast, non-semantic scan without reading file contents.
+
+WHEN NOT TO USE:
+- You need to detect language by content, not extension; this tool is extension-only.
+- You need a list of files, not counts; use file.find or repo tools.
+- You need to search inside files; use grep tools.
+- You need to scan outside /work; it can scan a provided path, but keep within container filesystem.
+- You need deep scan beyond the listed extensions; tool only includes a fixed extension set.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into p="{args}".
+  - No token splitting; p is treated as one path string.
+- Positional arguments:
+  - 1st: <path> optional.
+    - If empty, defaults to /work.
+- Optional arguments:
+  - None.
+- Defaults:
+  - If p empty: p=/work.
+  - Scans with find for files with extensions:
+    - .cs .cpp .c .h .hpp .rs .go .py .js .ts .java .kt .php .rb .swift .lua .sh .ps1
+  - Outputs top 40 extension counts.
+- Error conditions:
+  - If path does not exist or is not readable: find errors and may exit non-zero.
+  - Very large trees may be slow.
+  - If find is missing (unlikely), tool fails.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - Path exists and is readable.
+  - find/sed/sort/uniq are available.
+
+OUTPUT:
+- stdout behavior:
+  - First prints: `[lang.detect] scanning: <path>`
+  - Then prints counts like: `123 cs` (count then extension)
+  - Sorted descending by count.
+- stderr behavior:
+  - find permission errors, etc.
+- exit codes and meanings:
+  - 0: scan completed (even with warnings).
+  - Non-zero: find pipeline failure (rare, but possible).
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Path is intended and safe to scan (avoid scanning sensitive system dirs unless user asked).
+- MUST NEVER guess:
+  - Do not claim a language is present unless its extension appears in output.
+  - Do not infer framework or build system from extensions alone.
+- Requires user confirmation:
+  - If scanning outside /work into sensitive areas, confirm intent.
+
+COMMON FAILURE MODES:
+- Path not found.
+- Permission denied on some subdirectories causing incomplete results.
+- Repo contains unusual extensions not counted; output may look misleading.
+- Extensions with multiple dots (e.g., .d.ts) are counted as "ts" only; nuance lost.
+- Large trees cause slow execution.
+
+EXAMPLES:
+1) lang.detect
+2) lang.detect /work/RahOllamaOnly
+3) lang.detect /work/MiniPad
+4) lang.detect /work/Data
+5) lang.detect /work/SomeRepo
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim this is “accurate language detection”; it is extension counting only.
+- Do NOT infer code quality, buildability, or primary language from counts alone without context.
+- Do NOT invent missing extensions; only the listed set is scanned.
+- Do NOT claim files are valid code; extension does not guarantee content.
+- Do NOT translate output into Windows paths.
+- Do NOT assume missing output means absence; it might be permission or path issues.
+- Do NOT assume .h implies C vs C++; both use headers.
+- Keep conclusions conservative and tied strictly to printed counts.
+- If user needs exact file lists, use file.find; do not guess.
+- Do NOT change extension set; tool is fixed.
+- Treat the count output as authoritative for what the tool scanned.
+- If stderr shows permission errors, note that results may be incomplete.
+- Do NOT claim hidden files were excluded; find includes them if matched.
+- Do NOT reference tools not yet written.
+- Never claim network or package effects; none occur.

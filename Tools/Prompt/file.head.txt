@@ -1,0 +1,107 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\file.head.txt
+TOOL ID:
+file.head
+
+CATEGORY:
+file
+
+PURPOSE:
+Show the first N lines of a file using `head -n`.
+Default N is 180 if not provided.
+
+WHEN TO USE:
+- You need the beginning portion of a file.
+- You need more or fewer lines than file.cat’s fixed cap.
+- You want a simple, predictable “top of file” view.
+- You are previewing a log, source file, or config.
+- You need to confirm file header or first entries.
+
+WHEN NOT TO USE:
+- You need the end of a file; use file.tail.
+- You need to search for a string; use file.searchpath or grep tools.
+- You do not have an explicit path; never guess.
+- The file is binary; avoid printing binary.
+- You need a mid-file slice; this tool cannot offset.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - Tool command does: `set -- {args}; p="$1"; n="$2"; ... head -n "$n" "$p"`
+  - {args} is split by shell whitespace into tokens.
+  - Quoting is not reliably preserved; avoid spaces in file path.
+- Positional arguments:
+  - 1st token: <path> required.
+  - 2nd token: [n] optional integer number of lines.
+- Optional arguments:
+  - [n] must be a valid integer; otherwise head may fail.
+- Defaults:
+  - If n missing: n=180.
+- Error conditions:
+  - If path missing: prints `missing path` and exits 2.
+  - If file missing/unreadable: head errors, non-zero.
+  - If n invalid: head errors, non-zero.
+  - If set parsing breaks due to spaces in path: wrong p token; treat as user input error.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not cd; relative paths resolve from current directory.
+- File system assumptions:
+  - head is available.
+
+OUTPUT:
+- stdout behavior:
+  - Prints the first N lines of the file.
+- stderr behavior:
+  - head errors and permission errors.
+- exit codes and meanings:
+  - 0: printed successfully.
+  - 2: missing path argument (tool check).
+  - Non-zero: head failure.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None; read-only.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify before calling:
+  - Exact file path.
+  - N is reasonable and numeric if provided.
+  - File does not contain secrets the user doesn’t want printed.
+- MUST NEVER be guessed:
+  - Never guess file paths.
+  - Never guess line count unless user asked; default is fine.
+- Requires user confirmation:
+  - If printing credentials or keys is possible, confirm.
+
+COMMON FAILURE MODES:
+- Path wrong.
+- Path contains spaces and breaks tokenization.
+- Permission denied.
+- Invalid n.
+- Binary output pollution.
+
+EXAMPLES:
+1) file.head /work/README.md
+2) file.head /work/logs/build.log 120
+3) file.head /work/RahOllamaOnly/Tools/tools.json 200
+4) file.head /work/src/Program.cs 80
+5) file.head /work/appsettings.json 60
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT invent content beyond what is printed.
+- Do NOT claim the file ends at N lines; it is truncated.
+- Do NOT infer line numbers; head prints raw lines.
+- Do NOT assume encoding.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written here.
+- If output is empty, do not guess; file could be empty or read failed.
+- Treat stderr as authoritative for errors.
+- Keep any interpretation strictly tied to shown text.
+- Never fabricate config values or code not shown.
+- Avoid summarizing secrets; redact if user requests, otherwise just print as requested.

@@ -1,0 +1,111 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\fmt.format.txt
+TOOL ID:
+fmt.format
+
+CATEGORY:
+format
+
+PURPOSE:
+Format C/C++ source files under a path using clang-format, if installed.
+Finds files ending in .c, .h, .cpp, .hpp under the provided path and runs clang-format -i on them.
+Fails if clang-format is not installed.
+
+WHEN TO USE:
+- You want to apply consistent formatting to C/C++ code under a directory.
+- You have clang-format installed in the container and want in-place formatting.
+- You want a bulk formatting pass across a project tree.
+- You are preparing code before committing.
+- You want to reduce diffs caused by inconsistent formatting.
+
+WHEN NOT TO USE:
+- clang-format is not installed; the tool exits 2 with "clang-format not installed".
+- You need formatting for languages other than C/C++.
+- You do not want in-place changes; tool always edits files.
+- You do not know the correct target path; do not guess.
+- The path includes third-party code you do not want reformatted; avoid running on vendored directories.
+
+INPUT PARAMETERS:
+Explain EXACTLY how {args} is parsed.
+- The tool command uses: `p="{args}"; if [ -z "$p" ]; then echo 'usage: <path>'; exit 2; fi; ... find "$p" ... | xargs ... clang-format -i`
+- {args} is treated as a single string path.
+- No token splitting is performed by the tool itself.
+Positional arguments:
+- 1st: <path> required.
+Optional arguments:
+- None.
+Defaults:
+- None.
+Error conditions:
+- If path missing/empty:
+  - Prints `usage: <path>`
+  - Exits 2.
+- If clang-format missing:
+  - Prints `clang-format not installed`
+  - Exits 2.
+- If find fails due to invalid path:
+  - Non-zero from find/xargs/clang-format.
+- If file permissions prevent editing:
+  - Non-zero.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not cd; operates on provided path.
+- File system assumptions:
+  - Path exists and contains files.
+  - clang-format is in PATH.
+  - xargs and find available.
+
+OUTPUT:
+- stdout behavior:
+  - On success: prints `[fmt.format] clang-format done`
+- stderr behavior:
+  - Errors from find/xargs/clang-format.
+- exit codes and meanings:
+  - 0: formatting pass completed.
+  - 2: missing args or clang-format not installed.
+  - Non-zero: formatting failed mid-run.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - Modifies files in place: .c .h .cpp .hpp under the path.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - Working tree changes; git diffs will change.
+
+SAFETY RULES:
+- What the model MUST verify before calling:
+  - The exact path is correct.
+  - The user intends in-place formatting changes.
+  - Whether to exclude vendored/third-party code (tool cannot exclude).
+- What must NEVER be guessed:
+  - Do not guess the path.
+  - Do not guess formatting style files; clang-format uses project config if present (.clang-format) but do not invent it.
+- What requires user confirmation:
+  - If formatting could touch many files or rewrite vendor code, confirm.
+
+COMMON FAILURE MODES:
+- clang-format not installed.
+- Path incorrect.
+- Permission denied editing files.
+- Files with unusual encodings causing format errors.
+- Very large file sets causing long runs.
+- xargs errors due to file names with special chars (tool uses -print0 and xargs -0, so safer, but still).
+
+EXAMPLES:
+1) fmt.format /work/MyCppProject
+2) fmt.format /work/MyCppProject/src
+3) fmt.format /work/components/cpp_cli
+4) fmt.format /work/repro/cmake_proj
+5) fmt.format /work/rah/native
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim formatting occurred if clang-format missing or exit non-zero.
+- Do NOT claim style rules used; clang-format decides based on config/defaults.
+- Do NOT claim which files changed unless you check git diff or file stats.
+- Do NOT assume idempotence; format may change code layout.
+- Do NOT convert /work paths to Windows.
+- Do NOT reference tools not yet written.

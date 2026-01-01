@@ -1,0 +1,113 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\file.find.txt
+TOOL ID:
+file.find
+
+CATEGORY:
+file
+
+PURPOSE:
+Find files under /work whose names match a case-insensitive pattern and print up to 800 matching paths.
+Used to locate files when you know part of the filename or extension.
+
+WHEN TO USE:
+- You need to locate a file by name but don’t know the exact path.
+- You want to find project files like *.csproj, *.sln, *.json, *.md under /work.
+- You want to confirm whether a file exists anywhere in the workspace.
+- You want to find all occurrences of a given filename pattern (e.g., "tools.json", "*.inf", "*.cpp").
+- You need candidate paths before using file.cat/head/stat.
+
+WHEN NOT TO USE:
+- You need to search inside file contents: use grep.text or file.searchpath.
+- You need to find directories: use repo.finddir.
+- You need complex search (multiple patterns, regex): this tool supports only a single -iname pattern.
+- You need more than 800 results: tool is intentionally capped; use narrower pattern.
+- You want to search outside /work: this tool only searches /work.
+
+INPUT PARAMETERS:
+- {args} parsing:
+  - {args} is captured as a single string into pat="{args}".
+  - No token splitting; pat is the entire argument string.
+- Positional arguments:
+  - 1st: <pattern> required.
+    - This is passed to `find /work -type f -iname "<pattern>"`.
+    - Pattern should include wildcards like *.cs, *Tools*.txt, etc.
+- Optional arguments:
+  - None.
+- Defaults:
+  - None. Pattern is required.
+- Error conditions:
+  - If pattern missing/empty: prints "missing pattern" and exits 2.
+  - If /work does not exist: find fails with non-zero exit.
+  - If pattern contains unescaped characters that break the shell, find may fail.
+  - Permission denied may cause partial results.
+
+EXECUTION ENVIRONMENT:
+- Runs inside rah-linux container.
+- Working directory behavior:
+  - Does not change directory.
+- File system assumptions:
+  - /work is the workspace root.
+  - `find` is available.
+  - Output is truncated to 800 lines via head.
+
+OUTPUT:
+- stdout behavior:
+  - Prints full paths of matching files, one per line.
+  - Output capped to 800 paths.
+  - On missing pattern: prints exactly "missing pattern".
+- stderr behavior:
+  - Errors from find (missing /work, permission denied) appear on stderr.
+- exit codes and meanings:
+  - 0: find succeeded (even if zero matches).
+  - 2: missing pattern (explicit tool check).
+  - Non-zero: find error.
+
+SIDE EFFECTS:
+- Files created/modified:
+  - None.
+- Network access:
+  - None.
+- Installed packages:
+  - None.
+- State changes:
+  - None.
+
+SAFETY RULES:
+- MUST verify:
+  - Provide a specific pattern that is safe and narrow enough to avoid huge results.
+  - Pattern should be user-provided or derived from known filenames; do not invent.
+- MUST NEVER guess:
+  - Never invent a file path.
+  - Never assume a match exists if none printed.
+- Requires user confirmation:
+  - None. Read-only.
+
+COMMON FAILURE MODES:
+- User provides a literal filename without wildcard, but case differs; -iname handles case, so usually OK.
+- Pattern includes spaces; pat becomes a single string, but shell quoting may be tricky in the runner.
+- Too-broad pattern (e.g., "*") produces massive results but still capped at 800, hiding many.
+- /work not mounted.
+
+EXAMPLES:
+1) file.find *.csproj
+2) file.find tools.json
+3) file.find *.sln
+4) file.find *Workflow*.cs
+5) file.find *.txt
+
+ANTI-HALLUCINATION NOTES:
+- Do NOT claim you found a file if it is not printed.
+- Do NOT claim the list is complete; results are capped at 800.
+- Do NOT infer content from filename; open the file to confirm.
+- Do NOT infer directory existence from file matches beyond what is shown.
+- Do NOT translate printed paths into Windows paths.
+- If there are no matches, say “no matches shown” and stop; do not guess where it is.
+- Do NOT widen the pattern automatically; ask for a better pattern via user instruction (do not guess).
+- Do NOT assume hidden directories are excluded; find includes them if under /work.
+- Do NOT assume permission errors mean “file missing”; it may be inaccessible.
+- Do NOT add additional find filters; tool is fixed.
+- Keep conclusions tied to printed paths only.
+- If output is truncated, do not summarize unseen paths.
+- Use file.stat next for existence/metadata confirmation.
+- Never infer build status from presence of certain filenames.
+- Pattern matching is name-based only; not content-based.
