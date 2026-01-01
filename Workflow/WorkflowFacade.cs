@@ -4,11 +4,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using RahBuilder.Settings;
 using RahBuilder.Tools.BlueprintTemplates;
 using RahOllamaOnly.Tools;
+using RahOllamaOnly.Tools.Prompt;
 using RahOllamaOnly.Tracing;
 
 namespace RahBuilder.Workflow;
@@ -19,6 +21,9 @@ public sealed class WorkflowFacade
     private readonly WorkflowRouter _router = new();
     private AppConfig _cfg;
     private IReadOnlyList<AttachmentInbox.AttachmentEntry> _attachments = Array.Empty<AttachmentInbox.AttachmentEntry>();
+    private readonly WorkflowState _state = new();
+    private ToolManifest _toolManifest = new();
+    private ToolPromptRegistry _toolPrompts = new();
 
     private string _lastGraphHash = "";
 
@@ -70,13 +75,19 @@ public sealed class WorkflowFacade
         }
 
         int promptFiles = 0;
+        var prompts = new ToolPromptRegistry();
         try
         {
             if (!string.IsNullOrWhiteSpace(promptDir) && Directory.Exists(promptDir))
-                promptFiles = Directory.GetFiles(promptDir).Length;
+            {
+                prompts.LoadFromDirectory(promptDir);
+                promptFiles = prompts.AllToolIds.Count;
+            }
         }
         catch { }
 
+        _toolManifest = manifest;
+        _toolPrompts = prompts;
         _trace.Emit($"[tooling] tools={manifest.ToolsById.Count} toolPrompts(files)={promptFiles}");
     }
 
@@ -111,6 +122,49 @@ public sealed class WorkflowFacade
 
             // We have new input, try digest again.
             _forceEditBecauseInvalidJson = false;
+        }
+
+        if (_state.PendingToolPlan != null)
+        {
+            var resp = WaitUserGate.ParseResponse(text);
+            if (resp.Action == WaitUserAction.Edit)
+            {
+                var edited = resp.EditText ?? "";
+                if (string.IsNullOrWhiteSpace(edited))
+                {
+                    EmitToolPlanWait();
+                    return;
+                }
+
+                _trace.Emit("[plan:edit] user provided new text, clearing pending tool plan.");
+                _state.ClearPlan();
+                text = edited;
+            }
+            else if (resp.Action == WaitUserAction.Reject)
+            {
+                _trace.Emit("[plan:reject] user rejected pending tool plan.");
+                _state.ClearPlan();
+                EmitWaitUser("Tool plan rejected. Provide a new request.");
+                return;
+            }
+            else if (resp.Action is WaitUserAction.Accept or WaitUserAction.AcceptStep)
+            {
+                var expected = _state.PendingStepIndex;
+                var requested = resp.StepIndex ?? expected;
+                if (requested != expected)
+                {
+                    EmitWaitUser($"Next step is {expected + 1}. Reply with: accept step {expected + 1}");
+                    return;
+                }
+
+                await ExecuteCurrentStepAsync(ct).ConfigureAwait(true);
+                return;
+            }
+            else
+            {
+                EmitToolPlanWait();
+                return;
+            }
         }
 
         var repoScope = RepoScope.Resolve(_cfg);
@@ -193,8 +247,16 @@ public sealed class WorkflowFacade
         if (!string.IsNullOrWhiteSpace(rawJson))
             _trace.Emit("[jobspec] " + Trunc(rawJson, 800));
 
-        EmitAttachmentSuggestions();
-        _trace.Emit("[planner] not wired: no execution performed.");
+        if (_attachments == null || _attachments.Count == 0)
+        {
+            _trace.Emit("[attachments:none] Add at least one attachment to proceed to tool plan.");
+            EmitWaitUser("Attach at least one file, then reply with: accept (after plan appears).");
+            return;
+        }
+
+        var planOk = await BuildToolPlanAsync(text, rawJson, ct).ConfigureAwait(true);
+        if (planOk)
+            EmitToolPlanWait();
     }
 
     private async Task<JobSpec> RunJobSpecDigestAsync(string userText, CancellationToken ct)
@@ -297,37 +359,6 @@ public sealed class WorkflowFacade
         return sb.ToString();
     }
 
-    private void EmitAttachmentSuggestions()
-    {
-        if (_attachments == null || _attachments.Count == 0)
-        {
-            _trace.Emit("[attachments] none");
-            return;
-        }
-
-        var blueprint = LoadAttachmentBlueprint();
-        if (blueprint == null)
-        {
-            _trace.Emit("[attachments] blueprint attachment.ingest.v1 missing or unreadable.");
-            return;
-        }
-
-        _trace.Emit($"[attachments] {_attachments.Count} attachment(s) present. blueprint={blueprint.TemplatePath} visibility={blueprint.Visibility}");
-
-        foreach (var a in _attachments)
-        {
-            var tools = new List<string>();
-            var kind = (a.Kind ?? "").ToLowerInvariant();
-            if (kind == "image")
-                tools.AddRange(blueprint.ImageTools);
-            else if (kind == "document")
-                tools.AddRange(blueprint.DocumentTools);
-
-            var toolText = tools.Count == 0 ? "none" : string.Join(", ", tools.Distinct(StringComparer.OrdinalIgnoreCase));
-            _trace.Emit($"[attachments:suggest] {a.StoredName} ({kind}, {a.SizeBytes} bytes) -> {toolText}");
-        }
-    }
-
     private AttachmentBlueprintInfo? LoadAttachmentBlueprint()
     {
         var folder = (_cfg.General.BlueprintTemplatesPath ?? "").Trim();
@@ -414,5 +445,218 @@ public sealed class WorkflowFacade
         public string Visibility { get; init; } = "";
         public List<string> ImageTools { get; init; } = new();
         public List<string> DocumentTools { get; init; } = new();
+    }
+
+    private async Task<bool> BuildToolPlanAsync(string userText, string jobSpecJson, CancellationToken ct)
+    {
+        var prompt = (_cfg.General.ToolPlanPrompt ?? "").Trim();
+        if (prompt.Length == 0)
+        {
+            _trace.Emit("[toolplan:error] ToolPlanPrompt is empty (General.ToolPlanPrompt).");
+            EmitWaitUser("ToolPlan prompt is empty. Update Settings -> General -> Tool Plan Prompt.");
+            return false;
+        }
+
+        var blueprint = LoadAttachmentBlueprint();
+        var sb = new StringBuilder();
+        sb.AppendLine("USER REQUEST:");
+        sb.AppendLine(userText ?? "");
+        sb.AppendLine();
+        sb.AppendLine("JOB_SPEC_JSON:");
+        sb.AppendLine(jobSpecJson ?? "");
+        sb.AppendLine();
+        sb.AppendLine("ATTACHMENTS:");
+        foreach (var a in _attachments)
+        {
+            sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}");
+        }
+
+        if (blueprint != null)
+        {
+            sb.AppendLine();
+            sb.AppendLine("SUGGESTED_TOOLS:");
+            sb.AppendLine("imageTools: " + string.Join(", ", blueprint.ImageTools));
+            sb.AppendLine("documentTools: " + string.Join(", ", blueprint.DocumentTools));
+        }
+
+        string toolPlanText;
+        try
+        {
+            toolPlanText = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, sb.ToString(), ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _trace.Emit("[toolplan:error] invoke failed: " + ex.Message);
+            EmitWaitUser("ToolPlan invocation failed. Reply with: edit <rewrite your request>");
+            return false;
+        }
+
+        _trace.Emit("[toolplan:raw] " + Trunc(toolPlanText, 1200));
+
+        var plan = ToolPlanParser.TryParse(toolPlanText);
+        if (plan == null)
+        {
+            _forceEditBecauseInvalidJson = true;
+            EmitWaitUser("Model output was not valid JSON. Reply with: edit <rewrite your request>");
+            return false;
+        }
+
+        if (_cfg.General.TweakFirstMode && !plan.TweakFirst)
+        {
+            _trace.Emit("[toolplan:error] tweakFirst required.");
+            EmitWaitUser("Tool plan must set tweakFirst=true. Reply with: edit <rewrite your request>");
+            return false;
+        }
+
+        if (!ValidateToolPlan(plan))
+        {
+            EmitWaitUser("Tool plan invalid. Reply with: edit <rewrite your request>");
+            return false;
+        }
+
+        _state.PendingToolPlanJson = toolPlanText;
+        _state.PendingToolPlan = plan;
+        _state.PendingStepIndex = 0;
+        _state.ToolOutputs = new List<System.Text.Json.JsonElement>();
+        _state.LastJobSpecJson = jobSpecJson;
+        _state.OriginalUserText = userText;
+        return true;
+    }
+
+    private bool ValidateToolPlan(ToolPlan plan)
+    {
+        if (plan == null || plan.Steps == null || plan.Steps.Count == 0)
+            return false;
+
+        foreach (var step in plan.Steps)
+        {
+            if (!_toolManifest.Has(step.ToolId))
+            {
+                _trace.Emit($"[toolplan:error] step tool not in manifest: {step.ToolId}");
+                return false;
+            }
+            if (!_toolPrompts.Has(step.ToolId))
+            {
+                _trace.Emit($"[toolplan:error] step tool missing prompt: {step.ToolId}");
+                return false;
+            }
+
+            if (!step.Inputs.TryGetValue("storedName", out var stored) || string.IsNullOrWhiteSpace(stored))
+            {
+                _trace.Emit("[toolplan:error] step missing storedName input.");
+                return false;
+            }
+
+            var att = _attachments.FirstOrDefault(a => string.Equals(a.StoredName, stored, StringComparison.OrdinalIgnoreCase));
+            if (att == null)
+            {
+                _trace.Emit($"[toolplan:error] attachment not found for storedName: {stored}");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void EmitToolPlanWait()
+    {
+        if (_state.PendingToolPlan == null)
+        {
+            EmitWaitUser("No pending tool plan. Reply with: edit <rewrite your request>");
+            return;
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine("ToolPlan Steps:");
+        for (int i = 0; i < _state.PendingToolPlan.Steps.Count; i++)
+        {
+            var step = _state.PendingToolPlan.Steps[i];
+            var prefix = i == _state.PendingStepIndex ? "->" : "  ";
+            sb.AppendLine($"{prefix} Step {i + 1}: {step.ToolId} ({step.Id}) inputs: {string.Join(", ", step.Inputs.Select(kv => $"{kv.Key}={kv.Value}"))} why: {step.Why}");
+        }
+
+        var msg = WaitUserGate.GateMessage("Approve tool plan to continue.", sb.ToString().TrimEnd());
+        _state.PendingQuestion = msg;
+        _trace.Emit(msg);
+        UserFacingMessage?.Invoke(msg);
+    }
+
+    private async Task ExecuteCurrentStepAsync(CancellationToken ct)
+    {
+        if (_state.PendingToolPlan == null)
+        {
+            EmitWaitUser("No tool plan to execute.");
+            return;
+        }
+
+        if (_state.PendingStepIndex < 0 || _state.PendingStepIndex >= _state.PendingToolPlan.Steps.Count)
+        {
+            EmitWaitUser("Tool plan step index invalid.");
+            _state.ClearPlan();
+            return;
+        }
+
+        var step = _state.PendingToolPlan.Steps[_state.PendingStepIndex];
+        var result = await ToolStepRunner.RunAsync(step, _cfg, _trace, _attachments, _toolManifest, _toolPrompts, ct).ConfigureAwait(false);
+        if (!result.Ok)
+        {
+            EmitWaitUser(result.Message);
+            return;
+        }
+
+        if (result.Output.HasValue)
+            _state.ToolOutputs.Add(result.Output.Value);
+
+        _state.PendingStepIndex++;
+        if (_state.PendingStepIndex >= _state.PendingToolPlan.Steps.Count)
+        {
+            await ProduceFinalResponseAsync(ct).ConfigureAwait(false);
+            _state.ClearPlan();
+            return;
+        }
+
+        EmitToolPlanWait();
+    }
+
+    private async Task ProduceFinalResponseAsync(CancellationToken ct)
+    {
+        var prompt = (_cfg.General.FinalAnswerPrompt ?? "").Trim();
+        if (prompt.Length == 0)
+        {
+            _trace.Emit("[final:error] FinalAnswerPrompt is empty.");
+            EmitWaitUser("FinalAnswerPrompt is empty. Update settings.");
+            return;
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine("USER REQUEST:");
+        sb.AppendLine(_state.OriginalUserText ?? "");
+        sb.AppendLine();
+        sb.AppendLine("JOB_SPEC_JSON:");
+        sb.AppendLine(_state.LastJobSpecJson ?? "");
+        sb.AppendLine();
+        sb.AppendLine("ATTACHMENTS:");
+        foreach (var a in _attachments)
+        {
+            sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}");
+        }
+        sb.AppendLine();
+        sb.AppendLine("TOOL_OUTPUTS:");
+        sb.AppendLine(JsonSerializer.Serialize(_state.ToolOutputs));
+
+        string resp;
+        try
+        {
+            resp = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, sb.ToString(), ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _trace.Emit("[final:error] " + ex.Message);
+            EmitWaitUser("Final response failed. Reply with: edit <rewrite your request>");
+            return;
+        }
+
+        _trace.Emit("[final] " + Trunc(resp, 1200));
+        UserFacingMessage?.Invoke(resp);
     }
 }

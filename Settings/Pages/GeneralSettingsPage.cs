@@ -133,6 +133,7 @@ public sealed class GeneralSettingsPage : UserControl
         AddRow("Sandbox Host Path", () => _config.General.SandboxHostPath, v => _config.General.SandboxHostPath = v);
         AddRow("Sandbox Container Path", () => _config.General.SandboxContainerPath, v => _config.General.SandboxContainerPath = v);
 
+        AddBool("TweakFirst mode (avoid rebuilds)", () => _config.General.TweakFirstMode, v => _config.General.TweakFirstMode = v);
         AddRow("Tools Manifest Path (tools.json)", () => _config.General.ToolsPath, v => _config.General.ToolsPath = v);
         AddRow("Tool Prompts Folder (Tools/Prompt)", () => _config.General.ToolPromptsPath, v => _config.General.ToolPromptsPath = v);
         AddRow("BlueprintTemplates Folder", () => _config.General.BlueprintTemplatesPath, v => _config.General.BlueprintTemplatesPath = v);
@@ -206,6 +207,20 @@ public sealed class GeneralSettingsPage : UserControl
             () => _config.General.JobSpecDigestPrompt,
             v => _config.General.JobSpecDigestPrompt = v,
             height: 220
+        );
+
+        AddMultiline(
+            "Tool Plan Prompt (tool_plan.v1 only)",
+            () => _config.General.ToolPlanPrompt,
+            v => _config.General.ToolPlanPrompt = v,
+            height: 200
+        );
+
+        AddMultiline(
+            "Final Answer Prompt",
+            () => _config.General.FinalAnswerPrompt,
+            v => _config.General.FinalAnswerPrompt = v,
+            height: 160
         );
 
         Controls.Add(grid);
