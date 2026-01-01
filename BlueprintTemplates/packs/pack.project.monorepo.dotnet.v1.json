@@ -1,0 +1,19 @@
+﻿{
+  "id": "pack.project.monorepo.dotnet.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 155 },
+  "title": ".NET Monorepo (Solution + Multiple Projects)",
+  "description": "Sets up a solution-style monorepo with common project folders and validation flow.",
+  "tags": ["dotnet", "monorepo", "sln"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "ecosystem": "dotnet",
+    "uses": [
+      "task.create_project.dotnet.cli.v1",
+      "recipe.dotnet.sln.multi_project_layout.v1",
+      "task.build.dotnet.v1",
+      "task.test.dotnet.v1"
+    ]
+  }
+}

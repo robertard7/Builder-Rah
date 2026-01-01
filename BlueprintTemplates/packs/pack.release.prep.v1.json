@@ -1,0 +1,21 @@
+﻿{
+  "id": "pack.release.prep.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 170 },
+  "title": "Release Prep",
+  "description": "Prepares a project for release: ensure tests exist, run CI, bump version, update changelog, generate notes, gated publish.",
+  "tags": ["release", "prep", "publish"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.tests.scaffold_if_missing.v1",
+      "pack.ci.pipeline.matrix.v1",
+      "task.release.bump_version.v1",
+      "task.release.update_changelog.v1",
+      "task.release.generate_notes.v1",
+      "pack.package.publish.gated.v1"
+    ]
+  }
+}

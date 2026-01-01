@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.security.quick_hardening_docs_first.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Security quick hardening (docs-first)",
+  "description": "Fast path: define security policies/contracts and docs/checklists first. Great when code changes need review.",
+  "tags": ["security", "hardening", "docs", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.security.quick_hardening_docs_first.v1"] }
+}

@@ -1,0 +1,20 @@
+﻿{
+  "id": "pack.project.start.wizard.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Start Project Wizard",
+  "description": "Wizardized project start: choose ecosystem/profile, apply role preset, create, run, validate.",
+  "tags": ["project", "wizard", "start"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "preset.role.${rolePreset}.v1",
+      "task.create_project.${ecosystem}.${profile}.v1",
+      "task.format_lint.${ecosystem}.v1",
+      "task.build.${ecosystem}.v1",
+      "task.test.${ecosystem}.v1",
+      "task.run.${ecosystem}.v1"
+    ]
+  }
+}

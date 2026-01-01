@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.refactor.split_monolith.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 165 },
+  "title": "Refactor: Split monolith into modules/packages",
+  "description": "Plans and applies a safe modular split with minimal diffs.",
+  "tags": ["refactor", "modules", "monolith"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.refactor.split_monolith.v1"] }
+}

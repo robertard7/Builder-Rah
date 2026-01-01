@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.refactor.safe_rename_move.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 155 },
+  "title": "Refactor: Safe rename/move (validated)",
+  "description": "Safely renames/moves and validates by building/testing where applicable.",
+  "tags": ["refactor", "rename", "move"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.refactor.safe_rename_move.v1"] }
+}

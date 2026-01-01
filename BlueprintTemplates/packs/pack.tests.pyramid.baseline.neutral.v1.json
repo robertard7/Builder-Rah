@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.tests.pyramid.baseline.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 175 },
+  "title": "Testing pyramid baseline (neutral)",
+  "description": "Adds a sane test strategy and unit test scaffolding with CI gating guidance.",
+  "tags": ["tests", "pyramid", "unit", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.tests.pyramid.baseline.neutral.v1"] }
+}

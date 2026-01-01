@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.refactor.extract_abstraction.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Refactor: Extract abstraction (interface/trait/protocol)",
+  "description": "Extracts a clean abstraction for modularity and testing.",
+  "tags": ["refactor", "abstraction"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.refactor.extract_abstraction.v1"] }
+}

@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.release.hygiene.only.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 150 },
+  "title": "Release Hygiene Only",
+  "description": "Changelog + notes + license checks, no publishing.",
+  "tags": ["release", "hygiene"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.release.ensure_license.v1",
+      "task.release.update_changelog.v1",
+      "task.release.generate_notes.v1"
+    ]
+  }
+}

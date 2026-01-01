@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.tests.fuzz.safe.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 125 },
+  "title": "Fuzz testing harness (safe, neutral)",
+  "description": "Opt-in fuzz harness for parsers/decoders/routers with caps and crash reproduction docs.",
+  "tags": ["tests", "fuzz", "robustness", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.tests.fuzz.safe.neutral.v1"] }
+}

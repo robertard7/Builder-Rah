@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.tests.golden_files.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 150 },
+  "title": "Golden file tests (neutral)",
+  "description": "Adds snapshot/golden tests to stabilize important outputs with intentional updates.",
+  "tags": ["tests", "golden", "snapshot", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.tests.golden_files.neutral.v1"] }
+}

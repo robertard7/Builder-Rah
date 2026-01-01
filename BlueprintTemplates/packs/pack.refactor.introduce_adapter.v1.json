@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.refactor.introduce_adapter.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 150 },
+  "title": "Refactor: Introduce adapter/facade layer",
+  "description": "Isolates external dependencies behind a thin adapter layer for stability and tests.",
+  "tags": ["refactor", "adapter", "facade"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.refactor.introduce_adapter.v1"] }
+}

@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.repo.convert.folder_to_repo.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 185 },
+  "title": "Convert: Folder â†’ Repo (Hygiene + Structure)",
+  "description": "Turns a random folder into a shippable repo baseline (docs/templates/ignore/format conventions).",
+  "tags": ["repo", "convert", "hygiene"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.repo.detect_and_normalize_layout.v1",
+      "pack.repo.hygiene.baseline.v1"
+    ]
+  }
+}

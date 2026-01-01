@@ -1,0 +1,18 @@
+﻿{
+  "id": "pack.project.start.unstoppable.dotnet_first.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 205 },
+  "title": "Start Project: Unstoppable (.NET-first defaults)",
+  "description": "Same unstoppable wizard but defaults tuned for .NET projects first.",
+  "tags": ["start_project", "wizard", "dotnet"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [ "recipe.project.start.unstoppable.v1" ],
+    "defaults": {
+      "ecosystem": "dotnet",
+      "profile": "cli",
+      "rolePreset": "fast"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+﻿{
+  "id": "pack.project.start.declare_toolrefs.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 120 },
+  "title": "Project Start: Declare likely toolRefs (template)",
+  "description": "Demonstrates how a pack can declare toolRefs metadata so prompt gate can validate coverage before execution. This pack does not hardcode tools; it uses placeholder IDs to be replaced by your manifest-backed toolset.",
+  "tags": ["project", "start", "toolrefs", "schema"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "toolRefs": [
+      { "toolId": "workspace.create_project", "reason": "Create a new project skeleton for chosen ecosystem/profile", "optional": false },
+      { "toolId": "workspace.add_file", "reason": "Write initial files and configs", "optional": false },
+      { "toolId": "workspace.build", "reason": "Build the created project", "optional": true },
+      { "toolId": "workspace.test", "reason": "Run tests if present", "optional": true }
+    ],
+    "uses": [
+      "pack.tools.prompt_gate.explicit_first.v1",
+      "pack.project.start.unstoppable.v1"
+    ]
+  }
+}

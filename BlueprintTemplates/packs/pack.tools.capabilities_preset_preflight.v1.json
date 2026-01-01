@@ -1,0 +1,20 @@
+﻿{
+  "id": "pack.tools.capabilities_preset_preflight.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 241 },
+  "title": "Preflight: Detect ecosystem -> capability preset -> prompt gate",
+  "description": "Detects ecosystem, selects capability preset, injects capabilityRefs into planContext, then runs capabilities-aware tool prompt gate.",
+  "tags": ["tools", "capabilities", "preflight", "detect", "prompt_gate", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "inputs": ["planContext", "toolManifestSnapshot", "promptRegistrySnapshot", "runtimeEnv"],
+    "steps": [
+      { "use": "task.detect.ecosystem_and_entrypoints.v1", "as": "detectOut" },
+      { "use": "task.tools.select_capability_preset.v1", "with": { "detectedEcosystem": "${detectOut.detectedEcosystem}", "presetCatalog": "recipe.tools.capability_presets.ecosystems.v1" }, "as": "presetOut" },
+      { "use": "task.tools.inject_capabilityrefs_into_plancontext.v1", "with": { "planContext": "${planContext}", "selectedCapabilityRefs": "${presetOut.selectedCapabilityRefs}" }, "as": "plan2" },
+      { "use": "task.tools.prompt_gate.capabilities_aware.v1", "with": { "planContext": "${plan2.updatedPlanContext}", "toolManifestSnapshot": "${toolManifestSnapshot}", "promptRegistrySnapshot": "${promptRegistrySnapshot}", "runtimeEnv": "${runtimeEnv}" }, "as": "gate" }
+    ],
+    "outputs": ["gate", "planContextOut"]
+  }
+}

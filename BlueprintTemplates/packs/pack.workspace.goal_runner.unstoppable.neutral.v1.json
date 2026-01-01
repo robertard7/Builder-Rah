@@ -1,0 +1,14 @@
+﻿{
+  "id": "pack.workspace.goal_runner.unstoppable.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 220 },
+  "title": "Unstoppable Goal Runner (workspace-aware, neutral)",
+  "description": "Handles monorepos/workspaces: selects the correct target, then runs capability-aware goal execution with minimal WAIT_USER prompts.",
+  "tags": ["workspace", "goal", "capabilities", "unstoppable", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": ["recipe.workspace.goal_entry.neutral.v1"],
+    "inputs": ["goalVerb", "ecosystemHint?", "profileHint?", "settingsPresetName?"]
+  }
+}

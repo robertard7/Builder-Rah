@@ -1,0 +1,19 @@
+﻿{
+  "id": "pack.project.monorepo.node.workspaces.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 155 },
+  "title": "Node Monorepo (Workspaces)",
+  "description": "Sets up a Node monorepo with workspaces for packages/apps.",
+  "tags": ["node", "monorepo", "workspaces"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "ecosystem": "node",
+    "uses": [
+      "recipe.node.workspaces.base.v1",
+      "recipe.node.web.basic_routes.v1",
+      "task.test.node.v1",
+      "task.run.node.v1"
+    ]
+  }
+}

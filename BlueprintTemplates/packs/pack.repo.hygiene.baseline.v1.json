@@ -1,0 +1,21 @@
+﻿{
+  "id": "pack.repo.hygiene.baseline.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 175 },
+  "title": "Repo Hygiene: Baseline",
+  "description": "Adds sane repo hygiene: README/contributing/issue+PR templates, .gitignore, .editorconfig, and changelog conventions.",
+  "tags": ["repo", "hygiene", "contributing", "templates"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.repo.detect_and_normalize_layout.v1",
+      "task.detect.project_shape.v1",
+      "task.repo.add_gitignore_by_ecosystem.v1",
+      "task.repo.add_editorconfig_by_ecosystem.v1",
+      "task.repo.add_changelog_strategy.v1",
+      "task.repo.hygiene.scaffold.v1"
+    ],
+    "defaults": { "ecosystem": "generic" }
+  }
+}

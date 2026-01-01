@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.ui.frontend.react_spa.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 165 },
+  "title": "Create Frontend: React SPA baseline",
+  "description": "Creates a React SPA UI baseline with routes/layout and API client seam (abstract).",
+  "tags": ["ui", "frontend", "react", "spa"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.ui.react_spa.baseline.v1"] }
+}
