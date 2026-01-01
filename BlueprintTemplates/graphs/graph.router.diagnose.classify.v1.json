@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.diagnose.classify.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Diagnose Classifier Router",
+  "description": "Routes a failure log into restore/compile/test/run/publish diagnosis targets.",
+  "tags": ["router", "diagnose", "classify"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Log[Failure Log] --> Classify{classify_failure}\n  Classify -->|restore| R[task.diagnose.restore_fail.v1]\n  Classify -->|compile| C[task.diagnose.compile_fail.v1]\n  Classify -->|test| T[task.diagnose.test_fail.v1]\n  Classify -->|run| U[task.diagnose.run_fail.v1]\n  Classify -->|publish| P[task.diagnose.publish_fail.v1]\n  Classify -->|unknown| G[task.diagnose_build_fail_triage.generic.v1]"
+  }
+}

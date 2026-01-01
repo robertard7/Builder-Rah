@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.release_prep.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Release Prep",
+  "description": "Routes release intents to prep/hygiene/publish-gated packs.",
+  "tags": ["router", "release"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[release intent] --> Pick{which?}\n  Pick -->|prep| Prep[pack.release.prep.v1]\n  Pick -->|hygiene| Hyg[pack.release.hygiene.only.v1]\n  Pick -->|publish| Pub[pack.package.publish.gated.v1]\n  Pick -->|other| Fallback[graph.router.goal_by_maturity.v1]"
+  }
+}

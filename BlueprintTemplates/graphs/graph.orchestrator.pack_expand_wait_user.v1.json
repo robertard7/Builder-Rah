@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.orchestrator.pack_expand_wait_user.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Pack Expand With User Gate",
+  "description": "Expands a pack, waits for user approval, then executes.",
+  "tags": ["orchestrator", "approval"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Expand --> WAIT_USER\n  WAIT_USER -->|approved| Execute\n  WAIT_USER -->|edit| Expand"
+  }
+}

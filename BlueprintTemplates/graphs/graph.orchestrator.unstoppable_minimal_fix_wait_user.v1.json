@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.orchestrator.unstoppable_minimal_fix_wait_user.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Orchestrator: Diagnose (evidence -> fix -> validate -> WAIT_USER)",
+  "description": "Orchestrator flow: collect evidence, plan minimal fix, apply, validate, loop; if insufficient evidence, WAIT_USER.",
+  "tags": ["orchestrator", "diagnose", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Start[Start] --> Ev[task.diagnose.collect_evidence.v1]\n  Ev --> Cl[task.diagnose.classify_stage.v1]\n  Cl --> Plan[task.diagnose.propose_minimal_fix.v1]\n  Plan --> Apply[task.diagnose.apply_fix_and_validate.v1]\n  Apply --> Check{green?}\n  Check -->|yes| Done[Done]\n  Check -->|no and iter left| Ev\n  Check -->|no and insufficient evidence| Ask[task.diagnose.ask_user_for_missing_info.v1]\n  Ask --> WAIT[WAIT_USER]"
+  }
+}

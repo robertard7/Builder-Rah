@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.artifacts_and_publish_contracts.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Artifacts + publish contracts",
+  "description": "Routes packaging/publishing intents through artifact manifests and verification gates, then emits publish plan for approval.",
+  "tags": ["router", "artifacts", "publish", "contracts"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  U[User intent: package/publish] --> A[pack.artifacts.manifest.baseline.v1]\n  A --> G{Gates satisfied?}\n  G -->|yes| P[pack.package.publish.contract_first.neutral.v1]\n  G -->|WAIT_USER| W[WAIT_USER]\n  P --> Done[Done]\n  W --> P\n  P -->|fail| D[pack.diagnose.unstoppable.v1]\n  D --> Done"
+  }
+}

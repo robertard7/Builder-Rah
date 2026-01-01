@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.data_persistence.neutral.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Data + Persistence (neutral)",
+  "description": "Routes data/persistence intents to neutral packs.",
+  "tags": ["router", "data", "persistence", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[Data/persistence request] --> Kind{which?}\n  Kind -->|baseline| B[pack.data.baseline.neutral.v1]\n  Kind -->|choose storage| C[pack.data.choose_storage.neutral.v1]\n  Kind -->|cache strategy| K[pack.data.cache.strategy.neutral.v1]\n  B --> Done[Done]\n  C --> Done\n  K --> Done"
+  }
+}

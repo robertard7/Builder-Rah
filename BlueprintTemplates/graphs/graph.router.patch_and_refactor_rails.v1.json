@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.patch_and_refactor_rails.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Patch + Refactor safety rails",
+  "description": "Routes patch/refactor intents through safe rails (preflight, budget, receipts, validate) and diagnose on failure.",
+  "tags": ["router", "patch", "refactor", "safety"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  U[User intent: patch/refactor] --> C{Intent type}\n  C -->|apply patch or fix build| P[pack.patch.surgical_apply.v1]\n  C -->|rename/move| R1[pack.refactor.safe_rename_move.v2]\n  C -->|extract abstraction| R2[pack.refactor.extract_abstraction.v2]\n  P -->|success| Done[Done]\n  R1 -->|success| Done\n  R2 -->|success| Done\n  P -->|fail| Diag[pack.diagnose.unstoppable.v1]\n  R1 -->|fail| Diag\n  R2 -->|fail| Diag\n  Diag --> Done"
+  }
+}

@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.frontend_and_desktop_ux.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Frontend + Desktop UX",
+  "description": "Routes UI and desktop-wrapper requests to the appropriate packs.",
+  "tags": ["router", "ui", "desktop"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[UI/Desktop request] --> UI{frontend?}\n  UI -->|react spa| React[pack.ui.frontend.react_spa.v1]\n  UI -->|desktop wrapper| Wrap{which?}\n  Wrap -->|electron| E[pack.desktop.wrapper.electron.v1]\n  Wrap -->|tauri| T[pack.desktop.wrapper.tauri.v1]\n  Input -->|winforms ux| WF[pack.dotnet.winforms.ux.modernize.v1]\n  React --> Done[Done]\n  E --> Done\n  T --> Done\n  WF --> Done"
+  }
+}

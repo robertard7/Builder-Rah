@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.observability.deep.neutral.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Observability deep (neutral)",
+  "description": "Routes observability intents: baseline instrumentation and SLO/incident readiness.",
+  "tags": ["router", "observability", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[Observability request] --> Q{Goal?}\n  Q -->|baseline logs+traces+metrics| B[pack.obs.baseline.neutral.v1]\n  Q -->|SLOs + incident playbook| S[pack.obs.slos_and_incidents.neutral.v1]\n  B --> Done[Done]\n  S --> Done"
+  }
+}

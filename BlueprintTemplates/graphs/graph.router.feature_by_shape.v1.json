@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.feature_by_shape.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Feature Router by Project Shape",
+  "description": "Detects project shape and routes to a sensible starter recipe for feature addition.",
+  "tags": ["router", "feature", "shape"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[add feature] --> Detect[task.detect.project_shape.v1]\n  Detect -->|node| R1[recipe.node.web.basic_routes.v1]\n  Detect -->|python| R2[recipe.python.api.basic_endpoints.v1]\n  Detect -->|go| R3[recipe.go.cli.flags.v1]\n  Detect -->|rust| R4[recipe.rust.cli.args_logging.v1]\n  Detect -->|java| R5[recipe.java.cli.maven.hello.v1]\n  Detect -->|cpp| R6[recipe.cpp.cmake.hello_app.v1]\n  Detect -->|dotnet| R7[recipe.dotnet.tests.xunit_smoke.v1]\n  Detect -->|unknown| Fallback[pack.add.feature.v1]"
+  }
+}

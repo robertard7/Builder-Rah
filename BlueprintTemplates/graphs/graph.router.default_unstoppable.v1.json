@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.default_unstoppable.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router Default (Unstoppable)",
+  "description": "Routes common intents into packs and falls back to diagnosis/plan when uncertain.",
+  "tags": ["router", "default"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input --> DetectIntent{intent?}\n  DetectIntent -->|start project| StartPack[pack.project.start.v1]\n  DetectIntent -->|add feature| FeaturePack[pack.add.feature.v1]\n  DetectIntent -->|apply patch| PatchPack[pack.patch.apply.v1]\n  DetectIntent -->|format/lint| FormatPack[pack.format.lint.v1]\n  DetectIntent -->|publish| PublishPack[pack.package.publish.v1]\n  DetectIntent -->|build fail| DiagnosePack[pack.diagnose.buildfail.v1]\n  DetectIntent -->|unknown| Fallback[Brainstorm/Plan]"
+  }
+}

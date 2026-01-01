@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.docs.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Documentation",
+  "description": "Routes documentation requests to baseline/API/community/architecture packs.",
+  "tags": ["router", "docs"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[docs request] --> Pick{need?}\n  Pick -->|baseline docs| Base[pack.docs.baseline.v1]\n  Pick -->|api reference| Api[pack.docs.api_reference.v1]\n  Pick -->|community files| Comm[pack.docs.community.v1]\n  Pick -->|architecture + adrs| Arch[pack.docs.architecture.deepen.v1]\n  Pick -->|unsure| Base"
+  }
+}

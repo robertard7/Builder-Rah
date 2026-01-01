@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.orchestrator.project_start.unstoppable.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Orchestrator: Project Start Unstoppable",
+  "description": "Orchestrator flow: prompt select -> create -> hygiene/docs -> tests -> optional env -> validate -> diagnose -> WAIT_USER if needed.",
+  "tags": ["orchestrator", "start_project", "wizard"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Start[Start] --> Sel[task.project.start.prompt_select.v1]\n  Sel -->|WAIT_USER| Wait[WAIT_USER]\n  Sel --> Create[task.project.start.create_from_selection.v1]\n  Create --> Hyg[task.project.start.scaffold_docs_and_hygiene.v1]\n  Hyg --> Tests[task.project.start.scaffold_tests_if_missing.v1]\n  Tests --> Env[task.project.start.optional_containerize.v1]\n  Env --> Val[task.project.start.baseline_validate.v1]\n  Val --> Ok{green?}\n  Ok -->|yes| Done[Done]\n  Ok -->|no| Diag[pack.diagnose.unstoppable.v1]\n  Diag --> End{resolved?}\n  End -->|yes| Done\n  End -->|WAIT_USER| Wait"
+  }
+}

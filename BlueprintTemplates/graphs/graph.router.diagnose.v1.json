@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.diagnose.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Diagnose Router",
+  "description": "Routes build/test/run failures into triage and repair flows.",
+  "tags": ["router", "diagnose", "triage"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  R[router] --> IsFail{gate: cmd_run_tests}\n  IsFail -->|yes| T[route: RunTests]\n  IsFail -->|no| Next{gate: is_taskboard}\n  Next -->|yes| B[route: TaskBoardIngest]\n  Next -->|no| D[route: BrainstormPlanRequest]"
+  }
+}

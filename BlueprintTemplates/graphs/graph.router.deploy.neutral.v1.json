@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.deploy.neutral.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Deploy (vendor-neutral)",
+  "description": "Routes deploy intents to vendor-neutral packs (preview/prod/promotion).",
+  "tags": ["router", "deploy", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[Deploy request] --> Env{target?}\n  Env -->|preview| P[pack.deploy.neutral.preview.v1]\n  Env -->|prod| PR[pack.deploy.neutral.prod.v1]\n  Env -->|promote| X[pack.deploy.neutral.promote_preview_to_prod.v1]\n  P --> Done[Done]\n  PR --> Done\n  X --> Done"
+  }
+}

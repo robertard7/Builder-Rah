@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.orchestrator.diagnose.minimal_fix.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Diagnose Orchestrator: Minimal Fix",
+  "description": "Orchestrator flow: classify -> propose minimal patch -> WAIT_USER -> apply -> verify -> loop.",
+  "tags": ["orchestrator", "diagnose", "minimal"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  FailLog --> Classify\n  Classify --> ProposeFix\n  ProposeFix --> WAIT_USER\n  WAIT_USER -->|approved| Apply[task.apply_patch.generic.v1]\n  WAIT_USER -->|edit| ProposeFix\n  Apply --> VerifyBuild[task.build.${ecosystem}.v1]\n  VerifyBuild --> VerifyTest[task.test.${ecosystem}.v1]\n  VerifyTest -->|ok| Done\n  VerifyTest -->|fail| FailLog"
+  }
+}

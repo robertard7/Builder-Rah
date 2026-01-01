@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.tools.capability_presets_preflight.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: Tools preflight (ecosystem presets)",
+  "description": "Detect ecosystem -> inject capability presets -> capabilities-aware prompt gate -> continue / WAIT_USER.",
+  "tags": ["router", "tools", "capabilities", "presets", "preflight", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  A[Goal: execute plan] --> P[pack.tools.capabilities_preset_preflight.v1]\n  P -->|PASS| OK[Continue to orchestrator]\n  P -->|WAIT_USER missing capability or prompt| W[WAIT_USER]\n  W --> P\n  P -->|FAIL hard| D[pack.diagnose.unstoppable.v1]\n  D --> End[End]"
+  }
+}

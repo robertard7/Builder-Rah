@@ -1,0 +1,13 @@
+﻿{
+  "id": "graph.router.i18n_l10n_a11y.neutral.v1",
+  "kind": "graph",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "Router: i18n/l10n + accessibility (neutral)",
+  "description": "Routes localization and accessibility intents to neutral packs.",
+  "tags": ["router", "i18n", "l10n", "a11y", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "mermaid": "flowchart TD\n  Input[Localization/A11y request] --> Kind{need?}\n  Kind -->|i18n + l10n baseline| I[pack.i18n.l10n.baseline.neutral.v1]\n  Kind -->|accessibility baseline| A[pack.a11y.baseline.neutral.v1]\n  I --> Done[Done]\n  A --> Done"
+  }
+}

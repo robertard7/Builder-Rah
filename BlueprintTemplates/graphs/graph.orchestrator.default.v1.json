@@ -1,0 +1,13 @@
+{
+  "id": "graph.orchestrator.default.v1",
+  "kind": "graph",
+  "version": "v1",
+  "meta": { "visibility": "public", "priority": 100 },
+  "title": "Orchestrator graph (default)",
+  "description": "Default orchestrator graph placeholder for pack wiring. Replace mermaid later. Stored as data, not code.",
+  "tags": ["graph", "orchestrator", "default"],
+  "updatedUtc": "2025-12-28T00:00:00.0000000Z",
+  "content": {
+    "mermaid": "flowchart TD\n  A[\"Wizard Output\"] --> B[\"Apply Role Preset\"]\n  B --> C[\"Expand Pack\"]\n  C --> D[\"WAIT_USER\"]\n  D --> E[\"Execute\"]"
+  }
+}
