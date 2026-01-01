@@ -13,6 +13,9 @@ public sealed class WorkflowState
     public List<JsonElement> ToolOutputs { get; set; } = new();
     public string? LastJobSpecJson { get; set; }
     public string? OriginalUserText { get; set; }
+    public string PendingUserRequest { get; set; } = "";
+    public List<string> ClarificationAnswers { get; set; } = new();
+    public List<string> PendingQuestions { get; set; } = new();
 
     public void ClearPlan()
     {
@@ -22,5 +25,11 @@ public sealed class WorkflowState
         ToolOutputs = new List<JsonElement>();
         LastJobSpecJson = null;
         OriginalUserText = null;
+    }
+
+    public void ClearClarifications()
+    {
+        ClarificationAnswers = new List<string>();
+        PendingQuestions = new List<string>();
     }
 }

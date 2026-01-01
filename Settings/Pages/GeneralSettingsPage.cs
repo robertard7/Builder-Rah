@@ -134,6 +134,22 @@ public sealed class GeneralSettingsPage : UserControl
         AddRow("Sandbox Container Path", () => _config.General.SandboxContainerPath, v => _config.General.SandboxContainerPath = v);
 
         AddBool("TweakFirst mode (avoid rebuilds)", () => _config.General.TweakFirstMode, v => _config.General.TweakFirstMode = v);
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var convoLabel = new Label { Text = "Conversation Mode", AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 10, 0) };
+        var convoCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left };
+        convoCombo.Items.AddRange(Enum.GetNames(typeof(ConversationMode)));
+        convoCombo.SelectedItem = _config.General.ConversationMode.ToString();
+        convoCombo.SelectedIndexChanged += (_, _) =>
+        {
+            if (Enum.TryParse<ConversationMode>(convoCombo.SelectedItem?.ToString(), out var mode))
+            {
+                _config.General.ConversationMode = mode;
+                AutoSave.Touch();
+            }
+        };
+        grid.Controls.Add(convoLabel, 0, row);
+        grid.Controls.Add(convoCombo, 1, row);
+        row++;
         AddRow("Tools Manifest Path (tools.json)", () => _config.General.ToolsPath, v => _config.General.ToolsPath = v);
         AddRow("Tool Prompts Folder (Tools/Prompt)", () => _config.General.ToolPromptsPath, v => _config.General.ToolPromptsPath = v);
         AddRow("BlueprintTemplates Folder", () => _config.General.BlueprintTemplatesPath, v => _config.General.BlueprintTemplatesPath = v);
