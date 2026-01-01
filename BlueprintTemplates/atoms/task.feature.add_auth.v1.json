@@ -1,0 +1,44 @@
+﻿{
+  "id": "task.feature.add_auth.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Add Feature: Auth",
+  "description": "Add an authentication skeleton (JWT/session abstraction) without binding to providers.",
+  "tags": ["feature", "auth"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_feature_auth",
+    "inputs": ["projectRoot", "authMode"],
+    "authModes": ["jwt", "session", "generic"],
+    "routes": {
+      "jwt": {
+        "dotnet": ["recipe.dotnet.auth.jwt_skeleton.v1"],
+        "node": ["recipe.node.auth.jwt_skeleton.v1"],
+        "python": ["recipe.python.auth.jwt_skeleton.v1"],
+        "go": ["recipe.go.auth.jwt_skeleton.v1"],
+        "rust": ["recipe.rust.auth.jwt_skeleton.v1"],
+        "java": ["recipe.java.auth.jwt_skeleton.v1"],
+        "cpp": ["recipe.cpp.auth.jwt_skeleton.v1"]
+      },
+      "session": {
+        "dotnet": ["recipe.dotnet.auth.session_skeleton.v1"],
+        "node": ["recipe.node.auth.session_skeleton.v1"],
+        "python": ["recipe.python.auth.session_skeleton.v1"],
+        "go": ["recipe.go.auth.session_skeleton.v1"],
+        "rust": ["recipe.rust.auth.session_skeleton.v1"],
+        "java": ["recipe.java.auth.session_skeleton.v1"],
+        "cpp": ["recipe.cpp.auth.session_skeleton.v1"]
+      },
+      "generic": {
+        "dotnet": ["recipe.dotnet.auth.generic.v1"],
+        "node": ["recipe.node.auth.generic.v1"],
+        "python": ["recipe.python.auth.generic.v1"],
+        "go": ["recipe.go.auth.generic.v1"],
+        "rust": ["recipe.rust.auth.generic.v1"],
+        "java": ["recipe.java.auth.generic.v1"],
+        "cpp": ["recipe.cpp.auth.generic.v1"]
+      }
+    }
+  }
+}

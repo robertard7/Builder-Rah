@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.package_publish.cpp.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Package/Publish C++",
+  "description": "Package and publish a C++ build artifact using configured packaging settings.",
+  "tags": ["cpp", "package", "publish"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "package_publish",
+    "ecosystem": "cpp",
+    "inputs": ["projectRoot", "buildFolderName", "packageSpec", "releaseVersion"]
+  }
+}

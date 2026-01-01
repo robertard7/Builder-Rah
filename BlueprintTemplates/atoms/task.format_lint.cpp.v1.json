@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.format_lint.cpp.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Format/Lint C++",
+  "description": "Format and lint C++ using configured tooling (clang-format/clang-tidy or equivalents).",
+  "tags": ["cpp", "format", "lint"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "format_lint", "ecosystem": "cpp", "inputs": ["projectRoot"] }
+}

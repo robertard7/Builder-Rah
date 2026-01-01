@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.feature.add_health_endpoint_or_check.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 4 },
+  "title": "Feature: Add health checks (generic)",
+  "description": "Adds a health signal for services (endpoint or command) depending on ecosystem/profile. Abstract.",
+  "tags": ["feature", "health"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "feature_add_health",
+    "inputs": ["projectRoot", "ecosystem", "profile?", "options?"],
+    "outputs": ["healthArtifacts"]
+  }
+}

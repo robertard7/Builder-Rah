@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.format_lint.python.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Format/Lint Python",
+  "description": "Format and lint Python using configured tooling.",
+  "tags": ["python", "format", "lint"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "format_lint", "ecosystem": "python", "inputs": ["projectRoot"] }
+}

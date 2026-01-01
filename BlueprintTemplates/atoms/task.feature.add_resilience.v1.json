@@ -1,0 +1,35 @@
+﻿{
+  "id": "task.feature.add_resilience.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Add Feature: Resilience",
+  "description": "Adds retry/backoff/circuit-breaker guidance + lightweight wrappers where sensible. No dependency assumptions.",
+  "tags": ["feature", "resilience", "retry", "backoff", "circuitbreaker"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_feature_resilience",
+    "inputs": ["projectRoot", "strategy"],
+    "strategies": ["retry_backoff", "retry_backoff_circuit"],
+    "routes": {
+      "retry_backoff": {
+        "dotnet": ["recipe.dotnet.resilience.retry_backoff.v1"],
+        "node": ["recipe.node.resilience.retry_backoff.v1"],
+        "python": ["recipe.python.resilience.retry_backoff.v1"],
+        "go": ["recipe.go.resilience.retry_backoff.v1"],
+        "rust": ["recipe.rust.resilience.retry_backoff.v1"],
+        "java": ["recipe.java.resilience.retry_backoff.v1"],
+        "cpp": ["recipe.cpp.resilience.retry_backoff.v1"]
+      },
+      "retry_backoff_circuit": {
+        "dotnet": ["recipe.dotnet.resilience.retry_backoff_circuit.v1"],
+        "node": ["recipe.node.resilience.retry_backoff_circuit.v1"],
+        "python": ["recipe.python.resilience.retry_backoff_circuit.v1"],
+        "go": ["recipe.go.resilience.retry_backoff_circuit.v1"],
+        "rust": ["recipe.rust.resilience.retry_backoff_circuit.v1"],
+        "java": ["recipe.java.resilience.retry_backoff_circuit.v1"],
+        "cpp": ["recipe.cpp.resilience.retry_backoff_circuit.v1"]
+      }
+    }
+  }
+}

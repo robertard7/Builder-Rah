@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.perf.define_slos_and_budgets.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Perf: Define SLOs and budgets",
+  "description": "Defines service SLOs and performance budgets (latency percentiles, throughput, memory, startup) conceptually.",
+  "tags": ["perf", "slo", "budgets"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "perf_define_slos_and_budgets",
+    "inputs": ["projectRoot", "serviceType?", "userJourneys?"],
+    "outputs": ["slos", "perfBudgets"],
+    "rules": [
+      "use percentiles not averages",
+      "budgets must be measurable",
+      "include startup time budget for CLI/desktop apps"
+    ]
+  }
+}

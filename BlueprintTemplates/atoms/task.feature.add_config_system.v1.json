@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.feature.add_config_system.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Feature: Add configuration system (generic)",
+  "description": "Adds a baseline configuration system for an app/service: config file + env overrides + docs. Abstract.",
+  "tags": ["feature", "config"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "feature_add_config",
+    "inputs": ["projectRoot", "ecosystem", "profile?", "options?"],
+    "outputs": ["configArtifacts"],
+    "rules": [
+      "use variables for paths",
+      "do not assume specific libraries",
+      "document how to override via env"
+    ]
+  }
+}

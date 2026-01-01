@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.format_lint.go.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Format/Lint Go",
+  "description": "Format and lint Go using configured tooling.",
+  "tags": ["go", "format", "lint"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "format_lint", "ecosystem": "go", "inputs": ["projectRoot"] }
+}

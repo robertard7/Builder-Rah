@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.docs.scaffold_code_of_conduct.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 4 },
+  "title": "Docs: Scaffold Code of Conduct",
+  "description": "Adds a friendly Code of Conduct template.",
+  "tags": ["docs", "coc"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "docs_scaffold_coc", "inputs": ["projectRoot"], "route": "recipe.docs.coc.base.v1" }
+}

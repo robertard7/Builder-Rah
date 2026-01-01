@@ -1,0 +1,23 @@
+﻿{
+  "id": "task.feature.add_health_checks.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Add Feature: Health Checks",
+  "description": "Adds health endpoint and readiness/liveness notes.",
+  "tags": ["feature", "health", "readiness", "liveness"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_feature_health_checks",
+    "inputs": ["projectRoot"],
+    "routes": {
+      "dotnet": ["recipe.dotnet.health.basic.v1"],
+      "node": ["recipe.node.health.basic.v1"],
+      "python": ["recipe.python.health.basic.v1"],
+      "go": ["recipe.go.health.basic.v1"],
+      "rust": ["recipe.rust.health.basic.v1"],
+      "java": ["recipe.java.health.basic.v1"],
+      "cpp": ["recipe.cpp.health.basic.v1"]
+    }
+  }
+}

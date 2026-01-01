@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.i18n.extract_strings_to_catalog.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "i18n: Extract strings to catalog",
+  "description": "Moves user-visible strings into the message catalog contract and wires lookup calls conceptually (no library selection).",
+  "tags": ["i18n", "extract", "catalog"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "i18n_extract_strings",
+    "inputs": ["projectRoot", "stringInventory", "catalogContract"],
+    "outputs": ["catalogFiles", "codeTouchList"],
+    "rules": [
+      "preserve meaning and context notes for translators",
+      "avoid concatenating strings in ways that break grammar",
+      "ensure placeholders are consistent across locales"
+    ]
+  }
+}

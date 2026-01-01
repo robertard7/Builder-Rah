@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.docs.scaffold_architecture.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Docs: Scaffold Architecture",
+  "description": "Creates docs/architecture with a system overview, key modules, and boundaries. No commands.",
+  "tags": ["docs", "architecture"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "docs_scaffold_architecture", "inputs": ["projectRoot"], "route": "recipe.docs.architecture.base.v1" }
+}

@@ -1,0 +1,19 @@
+﻿{
+  "id": "task.patch.validate_post_apply.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Patch Validate: Post-apply validation",
+  "description": "Runs the appropriate validate steps (build/test/run/format) using existing atoms and routes failures to diagnose.",
+  "tags": ["patch", "validate", "diagnose"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "validate_post_apply",
+    "inputs": ["projectRoot", "goalVerb", "detectionReport?", "selection?"],
+    "outputs": ["validationResult", "evidenceBundle?"],
+    "rules": [
+      "use ecosystem-specific atoms when available, else generic",
+      "if validation fails, collect evidence and route to diagnose packs/graphs"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.package_publish.go.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Package/Publish Go",
+  "description": "Package and publish a Go module using configured registry settings.",
+  "tags": ["go", "package", "publish"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "package_publish", "ecosystem": "go", "inputs": ["projectRoot", "releaseVersion"] }
+}

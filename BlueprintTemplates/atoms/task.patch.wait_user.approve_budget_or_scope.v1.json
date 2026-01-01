@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.patch.wait_user.approve_budget_or_scope.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Patch Safety: Ask user to approve budget/scope (WAIT_USER)",
+  "description": "If patch plan exceeds budget or touches sensitive files, asks user to approve or narrow scope.",
+  "tags": ["patch", "wait_user", "budget"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "emit_wait_user_questions",
+    "inputs": ["preflightReport", "changeBudget", "patchPlan"],
+    "outputs": ["questions", "waitUser"],
+    "waitUser": true,
+    "questionRules": [
+      "offer options: narrow scope / increase budget / allow lockfile / allow rename-move",
+      "ask for confirmation when touching lockfiles, generated files, or wide refactors",
+      "keep questions minimal and specific"
+    ]
+  }
+}

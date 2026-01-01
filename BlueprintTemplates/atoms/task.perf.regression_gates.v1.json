@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.perf.regression_gates.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Perf: Regression gates",
+  "description": "Defines performance regression gates for CI (budgets, thresholds, comparisons) without tying to a specific CI system or tool.",
+  "tags": ["perf", "ci", "gates", "budgets"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "perf_define_regression_gates",
+    "inputs": ["projectRoot", "perfBudgets", "baselineReport?"],
+    "outputs": ["perfGates", "reportingNotes"],
+    "rules": [
+      "prefer relative comparison + absolute budget caps",
+      "allow noise bands, but require investigation when exceeded",
+      "gate must be bypassable only with explicit user approval"
+    ]
+  }
+}

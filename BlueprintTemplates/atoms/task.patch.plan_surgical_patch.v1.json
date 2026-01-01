@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.patch.plan_surgical_patch.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Patch Plan: Surgical patch plan",
+  "description": "Creates a minimal patch plan (add/replace/apply_patch) constrained by change budget and preflight risk flags.",
+  "tags": ["patch", "plan", "surgical"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "plan_surgical_patch",
+    "inputs": ["projectRoot", "goal", "evidenceBundle?", "preflightReport?", "changeBudget"],
+    "outputs": ["patchPlan"],
+    "rules": [
+      "prefer add_file over replace_file when possible",
+      "prefer patch hunks over whole-file replacement",
+      "avoid formatting-only changes unless goalVerb is format_lint",
+      "never invent tool ids; use existing generic file/patch atoms if needed"
+    ]
+  }
+}

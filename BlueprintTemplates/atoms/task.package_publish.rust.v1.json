@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.package_publish.rust.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Package/Publish Rust",
+  "description": "Package and publish a Rust crate using configured registry settings.",
+  "tags": ["rust", "package", "publish"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "package_publish", "ecosystem": "rust", "inputs": ["projectRoot", "releaseVersion"] }
+}

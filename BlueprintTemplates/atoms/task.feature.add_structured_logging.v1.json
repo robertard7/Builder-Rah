@@ -1,0 +1,19 @@
+﻿{
+  "id": "task.feature.add_structured_logging.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Feature: Add structured logging (generic)",
+  "description": "Adds structured logging conventions: levels, correlation ids, request logging. Abstract.",
+  "tags": ["feature", "logging", "observability"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "feature_add_structured_logging",
+    "inputs": ["projectRoot", "ecosystem", "profile?", "options?"],
+    "outputs": ["loggingArtifacts"],
+    "conventions": {
+      "levels": ["trace","debug","info","warn","error","fatal"],
+      "fields": ["timestamp","level","message","component","correlationId","error?"]
+    }
+  }
+}

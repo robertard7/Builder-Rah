@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.perf.propose_optimizations.safe.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Perf: Propose optimizations (safe)",
+  "description": "Proposes safe optimizations that preserve correctness. Requires validation plan and rollback notes.",
+  "tags": ["perf", "optimization", "safety"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "perf_propose_optimizations_safe",
+    "inputs": ["bottleneckList", "ecosystem", "riskProfile?"],
+    "outputs": ["optimizationPlan", "validationPlan", "rollbackPlan"],
+    "defaults": { "riskProfile": "low|medium|high" },
+    "rules": [
+      "do not change observable behavior without tests",
+      "include micro-benchmark plan if appropriate",
+      "include correctness regression checks"
+    ]
+  }
+}

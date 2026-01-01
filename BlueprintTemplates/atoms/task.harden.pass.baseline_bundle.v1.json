@@ -1,0 +1,22 @@
+﻿{
+  "id": "task.harden.pass.baseline_bundle.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Harden: Baseline pass (timeouts/retries/logging/health)",
+  "description": "Applies a baseline hardening pass for services: structured logs, timeouts, optional retries hooks, health checks, and config docs. Abstract.",
+  "tags": ["harden", "baseline", "service"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "harden_baseline_pass",
+    "inputs": ["projectRoot", "ecosystem", "profile?", "options?"],
+    "uses": [
+      "task.feature.add_structured_logging.v1",
+      "task.feature.add_http_client_pattern.v1",
+      "task.feature.add_health_endpoint_or_check.v1",
+      "task.feature.add_config_system.v1"
+    ],
+    "outputs": ["hardeningSummary"],
+    "defaults": { "retries": "optional", "circuitBreaker": "optional" }
+  }
+}

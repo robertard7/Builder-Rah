@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.feature.add_di_container.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Feature: Add dependency injection pattern (generic)",
+  "description": "Adds DI wiring pattern for services/components without assuming a specific framework/library.",
+  "tags": ["feature", "di"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "feature_add_di_pattern",
+    "inputs": ["projectRoot", "ecosystem", "profile?", "options?"],
+    "outputs": ["diArtifacts"],
+    "rules": [
+      "prefer constructor injection",
+      "centralize registrations",
+      "keep modules small"
+    ]
+  }
+}
