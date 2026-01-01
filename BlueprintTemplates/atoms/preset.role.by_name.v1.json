@@ -1,0 +1,19 @@
+{
+  "id": "preset.role.by_name.v1",
+  "kind": "orchestrator_preset",
+  "version": "v1",
+  "meta": { "visibility": "internal", "priority": 10 },
+  "title": "Apply role preset by name",
+  "description": "Engine-only atom. Applies a role preset by name from Settings. Does not set provider/model/toolchain. Forbidden keys: providerPolicy/models.",
+  "tags": ["preset", "role", "internal"],
+  "updatedUtc": "2025-12-28T00:00:00.0000000Z",
+  "content": {
+    "apply": {
+      "rolePreset": "${rolePreset}"
+    },
+    "tuning": {
+      "maxTokens": "${tuning.maxTokens?}",
+      "temperature": "${tuning.temperature?}"
+    }
+  }
+}
