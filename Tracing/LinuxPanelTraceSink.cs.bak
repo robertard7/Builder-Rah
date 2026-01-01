@@ -1,0 +1,17 @@
+#nullable enable
+using RahOllamaOnly.Ui;
+
+namespace RahOllamaOnly.Tracing
+{
+    public sealed class LinuxPanelTraceSink : ITraceSink
+    {
+        private readonly LinuxPanelWriter _w;
+        public LinuxPanelTraceSink(LinuxPanelWriter writer) => _w = writer;
+
+        public void Trace(string line)
+        {
+            // line already contains [TRACE T##] format from RunTrace
+            _w.Append(line + "\r\n");
+        }
+    }
+}
