@@ -1,0 +1,35 @@
+diff --git a/Settings/AppConfig.cs b/Settings/AppConfig.cs
+index 1779cc6..3b1377f 100644
+--- a/Settings/AppConfig.cs
++++ b/Settings/AppConfig.cs
+@@ -36,20 +36,21 @@ public sealed class GeneralSettings
+ 
+     // SAVE POINT: global digest prompt lives here (JSON-only, no tools)
+     public string JobSpecDigestPrompt { get; set; } =
+-        @"You are the JobSpec Digest. Reply with exactly one JSON object that matches this shape:
++        @"You are the JobSpec Digest. Respond with exactly one JSON object and nothing else.
++Output shape (no code fences, no prose):
+ {
+-  ""request"": ""<briefly restate the user's ask>"",
++  ""request"": ""<brief restatement of the user's ask>"",
+   ""state"": {
+-    ""ready"": true,
+-    ""missing"": []
++    ""ready"": <true|false>,
++    ""missing"": [""field1"", ""field2""]
+   }
+ }
+ Rules:
+-- Output must be valid JSON (no prose, markdown, code fences, or commentary).
+-- The top-level object MUST contain state.ready (boolean) and state.missing (array of strings).
+-- Do not invent fields. Only include keys explicitly provided by the user plus the required state object.
+-- If any required information is missing or ambiguous, set state.ready=false and list the missing field names in state.missing.
+-- If everything is present, set state.ready=true and state.missing=[].
++- Emit ONLY valid JSON. No markdown, comments, or additional text.
++- Top-level keys MUST be exactly: request (string) and state (object).
++- state.ready is a boolean. state.missing is an array of strings naming absent/ambiguous fields.
++- If any required information is missing, set state.ready=false and list each missing field in state.missing.
++- If the request is complete, set state.ready=true and state.missing=[].
+ - Any non-JSON output is a prompt failure.";
+ }
+ 
