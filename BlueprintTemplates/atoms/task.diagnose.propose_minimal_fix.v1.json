@@ -1,0 +1,28 @@
+﻿{
+  "id": "task.diagnose.propose_minimal_fix.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Diagnose: Propose minimal fix",
+  "description": "Generates a minimal safe change plan (file edits/patches) based on evidence and stage.",
+  "tags": ["diagnose", "fix", "minimal"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "propose_minimal_fix",
+    "inputs": ["projectRoot", "stage", "evidenceBundle"],
+    "outputs": ["fixPlan"],
+    "fixPlanSchema": {
+      "intent": "string",
+      "risk": "low|medium|high",
+      "changes": "array",
+      "rollbackHint": "string",
+      "validation": "array"
+    },
+    "constraints": [
+      "no hardcoded paths; use variables",
+      "no provider/toolchain assumptions",
+      "prefer apply_patch over large rewrites",
+      "keep diffs small"
+    ]
+  }
+}

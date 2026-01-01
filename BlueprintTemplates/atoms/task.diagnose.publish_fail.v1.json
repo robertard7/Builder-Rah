@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.diagnose.publish_fail.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Diagnose Publish Failure",
+  "description": "Classify and propose fixes for packaging/publishing failures.",
+  "tags": ["diagnose", "publish", "package"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "diagnose", "subtype": "publish_fail", "inputs": ["logText"] }
+}

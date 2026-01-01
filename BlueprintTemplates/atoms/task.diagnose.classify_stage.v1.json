@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.diagnose.classify_stage.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Diagnose: Classify failure stage",
+  "description": "Classifies evidence into restore/compile/test/run/publish/format buckets.",
+  "tags": ["diagnose", "classify"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "classify_failure_stage",
+    "inputs": ["evidenceBundle"],
+    "outputs": ["stage", "confidence", "reasons"]
+  }
+}

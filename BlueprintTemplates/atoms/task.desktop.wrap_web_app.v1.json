@@ -1,0 +1,16 @@
+﻿{
+  "id": "task.desktop.wrap_web_app.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 4 },
+  "title": "Desktop: Wrap web app into desktop shell (generic)",
+  "description": "Creates a desktop wrapper for an existing web UI with app window config, menus, and auto-update hooks as placeholders. Abstract.",
+  "tags": ["desktop", "wrapper"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "desktop_wrap_web_app",
+    "inputs": ["projectRoot", "wrapperType", "options?"],
+    "outputs": ["desktopArtifacts"],
+    "wrapperType": "electron|tauri|webview"
+  }
+}

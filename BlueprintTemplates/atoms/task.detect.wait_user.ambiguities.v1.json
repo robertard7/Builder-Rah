@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.detect.wait_user.ambiguities.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Detect: Ask user to resolve ambiguities (WAIT_USER)",
+  "description": "If detection yields multiple plausible targets (e.g., multiple apps), asks minimal questions to choose safely.",
+  "tags": ["detect", "wait_user", "ambiguity"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "emit_wait_user_questions",
+    "inputs": ["detectionReport", "layoutReport", "goalVerb?"],
+    "outputs": ["questions", "waitUser"],
+    "waitUser": true,
+    "questionRules": [
+      "ask only what is necessary to pick a target: which app, which package, which profile (cli/web/api/gui)",
+      "prefer offering discovered choices rather than open-ended questions",
+      "never ask provider/toolchain/model ids"
+    ]
+  }
+}

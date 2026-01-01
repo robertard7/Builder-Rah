@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.diagnose.restore_fail.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Diagnose Restore Failure",
+  "description": "Classify and propose fixes for dependency restore/resolve failures.",
+  "tags": ["diagnose", "restore", "dependencies"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "diagnose", "subtype": "restore_fail", "inputs": ["logText"] }
+}

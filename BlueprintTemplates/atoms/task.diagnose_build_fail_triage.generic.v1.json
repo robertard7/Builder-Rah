@@ -1,0 +1,14 @@
+{
+  "id": "task.diagnose_build_fail_triage.generic.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Diagnose Build Failure",
+  "description": "Analyze build output and propose fixes.",
+  "tags": ["diagnose"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "diagnose",
+    "inputs": ["buildLog"]
+  }
+}

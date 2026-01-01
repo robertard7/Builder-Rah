@@ -1,0 +1,16 @@
+﻿{
+  "id": "task.diagnose.dependency_upgrade_triage.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Diagnose: Dependency Upgrade Triage",
+  "description": "Analyze dependency upgrade issues (breaking changes, version conflicts) and propose minimal resolution.",
+  "tags": ["diagnose", "dependencies", "upgrade"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "diagnose",
+    "subtype": "dependency_upgrade_triage",
+    "inputs": ["projectRoot", "logText"],
+    "outputs": ["proposedPatch", "riskNotes"]
+  }
+}

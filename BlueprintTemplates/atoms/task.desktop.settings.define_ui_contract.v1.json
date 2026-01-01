@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.desktop.settings.define_ui_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Desktop: Define Settings UI contract",
+  "description": "Defines a neutral settings UI contract: sections, fields, validation, apply/cancel behavior, and persistence linkage.",
+  "tags": ["desktop", "settings", "ui", "contract"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "desktop_define_settings_ui_contract",
+    "inputs": ["projectRoot", "configStorageContract", "uiFrameworkHint?"],
+    "outputs": ["settingsUiContract"],
+    "rules": [
+      "settings must be grouped into sections with stable IDs",
+      "validation must be explicit and user-facing",
+      "support apply vs cancel vs restore defaults",
+      "no provider/model/toolchain IDs in defaults"
+    ]
+  }
+}

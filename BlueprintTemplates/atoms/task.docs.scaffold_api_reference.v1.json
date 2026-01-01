@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.docs.scaffold_api_reference.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Docs: Scaffold API reference placeholders",
+  "description": "Adds docs/api/ skeleton and notes on how to generate/reference API docs using Settings. No tool assumptions.",
+  "tags": ["docs", "api"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "docs_scaffold_api", "inputs": ["projectRoot", "ecosystem"], "routes": {
+    "generic": ["recipe.docs.api.generic.v1"],
+    "dotnet": ["recipe.docs.api.dotnet.v1"],
+    "node": ["recipe.docs.api.node.v1"],
+    "python": ["recipe.docs.api.python.v1"],
+    "go": ["recipe.docs.api.go.v1"],
+    "rust": ["recipe.docs.api.rust.v1"],
+    "java": ["recipe.docs.api.java.v1"],
+    "cpp": ["recipe.docs.api.cpp.v1"]
+  } }
+}

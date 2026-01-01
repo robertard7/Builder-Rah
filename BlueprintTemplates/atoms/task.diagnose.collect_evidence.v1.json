@@ -1,0 +1,23 @@
+﻿{
+  "id": "task.diagnose.collect_evidence.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Diagnose: Collect evidence bundle",
+  "description": "Collects structured evidence: errors, logs, layout, environment hints. No commands; orchestrator supplies data sources.",
+  "tags": ["diagnose", "evidence", "triage"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "collect_evidence",
+    "inputs": ["projectRoot", "lastErrorText?", "lastLogText?", "changedFiles?", "runtimeContext?"],
+    "outputs": ["evidenceBundle"],
+    "bundleSchema": {
+      "summary": "string",
+      "errorFingerprint": "string",
+      "suspectedStage": "restore|compile|test|run|publish|format|unknown",
+      "keyPaths": "array",
+      "snippets": "array",
+      "nextQuestions": "array"
+    }
+  }
+}

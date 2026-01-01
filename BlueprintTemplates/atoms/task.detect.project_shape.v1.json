@@ -1,0 +1,25 @@
+﻿{
+  "id": "task.detect.project_shape.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 4 },
+  "title": "Detect Project Shape",
+  "description": "Detect ecosystem/profile by inspecting file patterns (no shell execution).",
+  "tags": ["detect", "shape", "router"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "detect_project_shape",
+    "inputs": ["projectRoot"],
+    "signals": [
+      { "ifFileExists": "global.json", "hint": "dotnet" },
+      { "ifAnyGlob": "**/*.sln", "hint": "dotnet" },
+      { "ifFileExists": "package.json", "hint": "node" },
+      { "ifAnyGlob": "pyproject.toml,requirements.txt,setup.py", "hint": "python" },
+      { "ifFileExists": "go.mod", "hint": "go" },
+      { "ifFileExists": "Cargo.toml", "hint": "rust" },
+      { "ifFileExists": "pom.xml", "hint": "java" },
+      { "ifAnyGlob": "CMakeLists.txt", "hint": "cpp" }
+    ],
+    "outputs": ["ecosystem", "profileGuess"]
+  }
+}

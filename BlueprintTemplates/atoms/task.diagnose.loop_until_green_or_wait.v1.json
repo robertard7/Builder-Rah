@@ -1,0 +1,22 @@
+﻿{
+  "id": "task.diagnose.loop_until_green_or_wait.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Diagnose: Loop until green or WAIT_USER",
+  "description": "Repeats classify -> minimal fix -> validate until success or insufficient evidence triggers WAIT_USER.",
+  "tags": ["diagnose", "loop"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "diagnose_loop",
+    "inputs": ["projectRoot", "ecosystem?", "maxIters?"],
+    "defaultMaxIters": 3,
+    "uses": [
+      "task.diagnose.collect_evidence.v1",
+      "task.diagnose.classify_stage.v1",
+      "task.diagnose.propose_minimal_fix.v1",
+      "task.diagnose.apply_fix_and_validate.v1",
+      "task.diagnose.ask_user_for_missing_info.v1"
+    ]
+  }
+}

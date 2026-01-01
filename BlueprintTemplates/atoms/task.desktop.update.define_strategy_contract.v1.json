@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.desktop.update.define_strategy_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Desktop: Define update strategy contract",
+  "description": "Defines neutral update behavior: channeling, staged rollout, signature policy, rollback strategy, and user prompts.",
+  "tags": ["desktop", "updates", "release"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "desktop_define_update_strategy_contract",
+    "inputs": ["projectRoot", "distributionHint?", "riskTolerance?"],
+    "outputs": ["updateStrategyContract"],
+    "rules": [
+      "define update channels (stable/beta/dev) if applicable",
+      "define signature/verification policy conceptually",
+      "define rollback strategy and failure handling",
+      "avoid auto-updating without a user-visible policy"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.docs.scaffold.security_policy.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Docs: Scaffold SECURITY policy",
+  "description": "Adds SECURITY.md and disclosure guidelines. No vendor assumptions.",
+  "tags": ["docs", "security"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "docs_scaffold_security", "inputs": ["projectRoot"], "route": "recipe.docs.security.policy.v1" }
+}

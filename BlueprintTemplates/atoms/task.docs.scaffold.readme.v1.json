@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.docs.scaffold.readme.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Docs: Scaffold README",
+  "description": "Adds a high-quality README skeleton (goals, quickstart placeholders, structure). No commands.",
+  "tags": ["docs", "readme"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "docs_scaffold_readme", "inputs": ["projectRoot", "projectName"], "route": "recipe.docs.readme.base.v1" }
+}
