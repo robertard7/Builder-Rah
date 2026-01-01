@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.workspace.goal_entry.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 88 },
+  "title": "Goal entry: Workspace-aware (neutral)",
+  "description": "Detects workspace/monorepo, asks for target selection if needed, then runs the capability-aware goal runner.",
+  "tags": ["workspace", "goal", "neutral", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.workspace.goal_entry.v1" }
+  ] }
+}

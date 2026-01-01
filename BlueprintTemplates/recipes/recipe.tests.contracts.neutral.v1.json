@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.tests.contracts.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 86 },
+  "title": "Contract tests baseline (neutral)",
+  "description": "Defines and scaffolds contract tests for stable boundaries and compatibility.",
+  "tags": ["tests", "contract", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.tests.define_contracts.v1" },
+    { "use": "task.tests.scaffold_contract_tests.v1" }
+  ] }
+}

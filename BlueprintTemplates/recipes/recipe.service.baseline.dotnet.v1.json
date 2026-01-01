@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.service.baseline.dotnet.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 78 },
+  "title": "Service Baseline (.NET)",
+  "description": "Adds config/logging/DI/HTTP/health baseline patterns to a .NET service/app without assuming providers or toolchains.",
+  "tags": ["service", "baseline", "dotnet"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.feature.add_service_baseline_bundle.v1", "with": { "ecosystem": "dotnet" } }
+  ] }
+}

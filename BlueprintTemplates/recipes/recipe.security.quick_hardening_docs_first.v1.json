@@ -1,0 +1,19 @@
+﻿{
+  "id": "recipe.security.quick_hardening_docs_first.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 78 },
+  "title": "Security quick hardening (docs-first)",
+  "description": "Lightweight path: define policies/contracts and add docs/checklists first, with validation. Implementation can follow later.",
+  "tags": ["security", "hardening", "docs", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.sec.wait_user.risk_profile_and_data.v1" },
+    { "use": "task.sec.threat_model.baseline.v1" },
+    { "use": "task.sec.secrets_policy.v1" },
+    { "use": "task.sec.dependency_policy.v1" },
+    { "use": "task.sec.secure_defaults_checklist.v1" },
+    { "use": "task.sec.scaffold_security_docs.v1" },
+    { "use": "task.sec.validate_security_baseline.v1" }
+  ] }
+}

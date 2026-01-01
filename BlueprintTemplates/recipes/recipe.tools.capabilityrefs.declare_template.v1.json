@@ -1,0 +1,20 @@
+﻿{
+  "id": "recipe.tools.capabilityrefs.declare_template.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 85 },
+  "title": "Declare capabilityRefs for a plan (template)",
+  "description": "Template recipe showing capabilityRefs[] which are resolved to toolIds at runtime. Keeps templates tool-manifest-neutral.",
+  "tags": ["tools", "capabilities", "schema", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "capabilityRefs": [
+      { "capability": "workspace.build", "required": true, "reason": "Need to compile project" },
+      { "capability": "workspace.test", "required": false, "reason": "Run tests if present" }
+    ],
+    "notes": [
+      "capabilityRefs are resolved at runtime against your active tool manifest",
+      "use constraints to limit selection by os/hostKind/envScope if needed"
+    ]
+  }
+}

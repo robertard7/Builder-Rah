@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.repo.release.changelog_conventions.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 40 },
+  "title": "Repo: Changelog conventions",
+  "description": "Adds CHANGELOG.md and notes on how to maintain it.",
+  "tags": ["repo", "release", "changelog"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/CHANGELOG.md", "onConflict": "skip", "text": "# Changelog\n\nAll notable changes to this project will be documented here.\n\n## Unreleased\n- Added:\n- Changed:\n- Fixed:\n- Security:\n\n## 0.1.0\n- Initial release.\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/release_process.md", "onConflict": "skip", "text": "# Release Process\n\n1) Update version (project-specific)\n2) Update CHANGELOG.md\n3) Ensure LICENSE is present\n4) Run tests and build\n5) Publish/package via your environment/settings\n" } }
+  ] }
+}

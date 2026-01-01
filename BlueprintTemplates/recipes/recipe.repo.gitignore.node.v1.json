@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.repo.gitignore.node.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 35 },
+  "title": ".gitignore: Node add-ons",
+  "description": "Adds node-specific ignore lines (safe merge).",
+  "tags": ["node", "gitignore"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/.gitignore", "onConflict": "merge_if_possible_else_append", "text": "\n# Node\nnode_modules/\ndist/\n.nyc_output/\ncoverage/\n" } }
+  ] }
+}

@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.tests.fuzz.safe.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 72 },
+  "title": "Fuzz testing harness (safe, neutral)",
+  "description": "Defines safe fuzz targets and scaffolds an opt-in harness with strict caps and crash reproduction guidance.",
+  "tags": ["tests", "fuzz", "robustness", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.tests.define_fuzz_targets.v1" },
+    { "use": "task.tests.scaffold_fuzz_harness.v1" }
+  ] }
+}

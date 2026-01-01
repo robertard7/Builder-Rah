@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.tests.golden_files.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 82 },
+  "title": "Golden file tests baseline (neutral)",
+  "description": "Adds snapshot/golden file testing strategy and scaffolding for stable outputs.",
+  "tags": ["tests", "golden", "snapshot", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.tests.define_golden_files.v1" },
+    { "use": "task.tests.scaffold_golden_tests.v1" }
+  ] }
+}

@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.repo.hygiene.go.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": "Go Repo Hygiene",
+  "description": "Generic hygiene plus go notes.",
+  "tags": ["go", "repo", "hygiene"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.repo.hygiene.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/go_notes.md", "onConflict": "skip", "text": "# Go Notes\n\n- Keep modules tidy.\n- Prefer small packages.\n- Wire test/build via environment/settings.\n" } }
+  ] }
+}

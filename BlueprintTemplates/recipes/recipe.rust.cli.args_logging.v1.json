@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.rust.cli.args_logging.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": "Rust CLI: Args + Logging",
+  "description": "Adds minimal args handling and stdout logging.",
+  "tags": ["rust", "cli", "args"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.generic.v1", "with": { "path": "${projectRoot}/src/main.rs", "text": "use std::env;\n\nfn main() {\n    let args: Vec<String> = env::args().collect();\n    let name = args.get(1).map(|s| s.as_str()).unwrap_or(\"world\");\n    println!(\"Hello, {}\", name);\n}\n" } }
+    ]
+  }
+}

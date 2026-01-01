@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.refactor.extract_abstraction.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 72 },
+  "title": "Refactor: Extract abstraction",
+  "description": "Extracts an interface/trait/protocol around a component for modularity/testing.",
+  "tags": ["refactor", "abstraction"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.refactor.extract_interface_or_trait.v1" }
+  ] }
+}

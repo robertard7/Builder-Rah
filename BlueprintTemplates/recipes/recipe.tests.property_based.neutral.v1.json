@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.tests.property_based.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 78 },
+  "title": "Property-based tests baseline (neutral)",
+  "description": "Defines invariants and scaffolds a small set of property-based tests for deterministic logic.",
+  "tags": ["tests", "property", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.tests.define_property_based_scope.v1" },
+    { "use": "task.tests.scaffold_property_tests.v1" }
+  ] }
+}

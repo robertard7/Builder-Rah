@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.repo.hygiene.python.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": "Python Repo Hygiene",
+  "description": "Generic hygiene plus python notes.",
+  "tags": ["python", "repo", "hygiene"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.repo.hygiene.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/python_notes.md", "onConflict": "skip", "text": "# Python Notes\n\n- Use virtual environments.\n- Pin dependencies.\n- Wire lint/format/test via environment/settings.\n" } }
+  ] }
+}
