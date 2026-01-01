@@ -1,0 +1,22 @@
+﻿{
+  "id": "pack.diagnose.buildfail.declare_toolrefs.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 125 },
+  "title": "Diagnose Build Fail: Declare likely toolRefs (template)",
+  "description": "Demonstrates declaring toolRefs for diagnose flows. Replace tool IDs with your manifest tool IDs that gather logs, run build/test, and apply patches.",
+  "tags": ["diagnose", "build", "toolrefs", "schema"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "toolRefs": [
+      { "toolId": "workspace.collect_logs", "reason": "Collect build output, errors, and environment info", "optional": false },
+      { "toolId": "workspace.build", "reason": "Re-run build for confirmation", "optional": true },
+      { "toolId": "workspace.test", "reason": "Run tests after fix", "optional": true },
+      { "toolId": "workspace.apply_patch", "reason": "Apply minimal fix patches", "optional": true }
+    ],
+    "uses": [
+      "pack.tools.prompt_gate.explicit_first.v1",
+      "pack.diagnose.unstoppable.v1"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+﻿{
+  "id": "pack.docs.api_reference.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 155 },
+  "title": "Docs: API Reference Skeleton",
+  "description": "Adds docs/api placeholders and instructions to generate API docs via your Settings. No tool assumptions.",
+  "tags": ["docs", "api"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.docs.scaffold_api_reference.v1"
+    ],
+    "defaults": { "ecosystem": "generic" }
+  }
+}

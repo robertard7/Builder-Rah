@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.feature.resilience.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 158 },
+  "title": "Feature: Resilience",
+  "description": "Retry/backoff/circuit-breaker guidance and lightweight wrappers (no dependency assumptions).",
+  "tags": ["feature", "resilience", "retry", "backoff"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.feature.add_resilience.v1"
+    ],
+    "defaults": { "strategy": "retry_backoff" }
+  }
+}

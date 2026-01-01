@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.goal.package_publish.plan_only.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 165 },
+  "title": "Goal: Package/Publish (plan-only, capability-aware)",
+  "description": "Builds manifest + gates and produces a neutral publish plan for approval. Avoids hardcoded registry/tooling.",
+  "tags": ["goal", "publish", "capabilities", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["pack.package.publish.contract_first.neutral.v1"] }
+}

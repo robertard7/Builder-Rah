@@ -1,0 +1,20 @@
+﻿{
+  "id": "pack.goal_runner.unstoppable.capabilities_aware.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 240 },
+  "title": "Goal Runner (unstoppable, capabilities-aware)",
+  "description": "Runs detect+adapt goal runner with a capabilities-aware preflight tool prompt gate. Blocks with WAIT_USER when required coverage is missing.",
+  "tags": ["goal", "runner", "unstoppable", "capabilities", "preflight"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "pack.tools.prompt_gate.capabilities_aware.v1",
+      "pack.detect_and_adapt.goal_runner.v1"
+    ],
+    "capabilityRefs": [
+      { "capability": "workspace.detect_ecosystem", "required": false, "reason": "Improve plan selection" },
+      { "capability": "workspace.collect_logs", "required": false, "reason": "If diagnose path triggers, logs are needed" }
+    ]
+  }
+}

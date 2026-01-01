@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.feature.database.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Feature: Database",
+  "description": "Adds a database integration skeleton (sqlite/postgres/generic) without hardcoding providers.",
+  "tags": ["feature", "database"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.feature.add_database.v1"
+    ],
+    "defaults": { "dbKind": "sqlite" }
+  }
+}

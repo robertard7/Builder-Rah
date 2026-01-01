@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.perf.capacity_plan.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Capacity plan (neutral)",
+  "description": "Creates a neutral capacity plan template based on SLOs and load assumptions.",
+  "tags": ["perf", "capacity", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.perf.capacity_plan.neutral.v1"] }
+}

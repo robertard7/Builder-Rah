@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.feature.di_pattern.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 135 },
+  "title": "Add DI Pattern (baseline)",
+  "description": "Adds dependency injection wiring patterns abstractly.",
+  "tags": ["feature", "di"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["task.feature.add_di_container.v1"] }
+}

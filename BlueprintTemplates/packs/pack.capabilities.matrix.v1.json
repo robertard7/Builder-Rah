@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.capabilities.matrix.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 150 },
+  "title": "Capabilities Matrix (What RAH can do by ecosystem)",
+  "description": "Public matrix describing verb coverage so routing and UI can avoid guessing.",
+  "tags": ["capabilities", "matrix", "routing"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.capabilities.matrix.v1"] }
+}

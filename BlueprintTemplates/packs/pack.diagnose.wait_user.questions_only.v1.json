@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.diagnose.wait_user.questions_only.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 140 },
+  "title": "Diagnose: Ask only whatâ€™s missing (WAIT_USER)",
+  "description": "When the system canâ€™t decide safely, it asks a minimal set of targeted questions and waits.",
+  "tags": ["diagnose", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": [ "task.diagnose.collect_evidence.v1", "task.diagnose.ask_user_for_missing_info.v1" ] }
+}

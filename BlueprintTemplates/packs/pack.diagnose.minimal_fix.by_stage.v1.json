@@ -1,0 +1,24 @@
+﻿{
+  "id": "pack.diagnose.minimal_fix.by_stage.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 165 },
+  "title": "Diagnose: Minimal Fix (by stage)",
+  "description": "Routes to a stage-specific minimal-fix playbook for restore/compile/test/run/publish/format failures.",
+  "tags": ["diagnose", "minimal", "route"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "routes": {
+      "restore": "recipe.diagnose.minimal_fix.restore.v1",
+      "compile": "recipe.diagnose.minimal_fix.compile.v1",
+      "test": "recipe.diagnose.minimal_fix.test.v1",
+      "run": "recipe.diagnose.minimal_fix.run.v1",
+      "publish": "recipe.diagnose.minimal_fix.publish.v1",
+      "format": "recipe.diagnose.minimal_fix.format.v1"
+    },
+    "uses": [
+      "task.diagnose.collect_evidence.v1",
+      "task.diagnose.classify_stage.v1"
+    ]
+  }
+}

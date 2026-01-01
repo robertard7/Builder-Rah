@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.goal.test_or_scaffold.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 170 },
+  "title": "Goal: Test (capability-aware)",
+  "description": "Runs tests when present; if missing, offers to scaffold tests or asks user to approve skipping.",
+  "tags": ["goal", "test", "capabilities"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["pack.goal_runner.unstoppable.neutral.v1"], "goalVerb": "test" }
+}

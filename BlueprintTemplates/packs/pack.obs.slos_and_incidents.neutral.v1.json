@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.obs.slos_and_incidents.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 170 },
+  "title": "SLOs + incident playbook (neutral)",
+  "description": "Adds SLOs/alerts policy and an incident playbook/runbook plus postmortem template.",
+  "tags": ["observability", "slo", "alerts", "incident", "runbook", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.obs.slos_and_incidents.neutral.v1"] }
+}

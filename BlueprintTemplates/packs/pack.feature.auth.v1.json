@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.feature.auth.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Feature: Auth",
+  "description": "Adds an authentication skeleton (jwt/session) without binding to vendors.",
+  "tags": ["feature", "auth"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.feature.add_auth.v1"
+    ],
+    "defaults": { "authMode": "jwt" }
+  }
+}

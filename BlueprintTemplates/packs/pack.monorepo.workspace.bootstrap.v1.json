@@ -1,0 +1,19 @@
+﻿{
+  "id": "pack.monorepo.workspace.bootstrap.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 170 },
+  "title": "Monorepo: Workspace Bootstrap",
+  "description": "Scaffolds a monorepo workspace root (apps/libs/docs), detects current layout, and adds root docs.",
+  "tags": ["monorepo", "workspace", "bootstrap"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.monorepo.detect_workspace.v1",
+      "task.monorepo.scaffold.workspace_root.v1",
+      "task.monorepo.add_root_build_docs.v1",
+      "pack.repo.hygiene.baseline.v1"
+    ],
+    "defaults": { "workspaceType": "generic", "ecosystem": "generic" }
+  }
+}

@@ -1,0 +1,16 @@
+﻿{
+  "id": "pack.diagnose.unstoppable.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 190 },
+  "title": "Diagnose: Unstoppable (classify -> minimal fix -> validate -> WAIT_USER)",
+  "description": "Collects evidence, classifies failure stage, proposes minimal fix, validates, repeats up to 3 iterations, otherwise asks targeted questions (WAIT_USER).",
+  "tags": ["diagnose", "unstoppable", "triage", "fix"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.diagnose.loop_until_green_or_wait.v1"
+    ],
+    "defaults": { "maxIters": 3 }
+  }
+}

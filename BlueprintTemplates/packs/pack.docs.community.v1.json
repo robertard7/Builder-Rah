@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.docs.community.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 145 },
+  "title": "Docs: Community Files",
+  "description": "Adds Code of Conduct and improves repo friendliness.",
+  "tags": ["docs", "community"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.docs.scaffold_code_of_conduct.v1",
+      "task.docs.scaffold.contributing.v1",
+      "task.docs.scaffold.security_policy.v1"
+    ]
+  }
+}

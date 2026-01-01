@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.harden.baseline_pass.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 170 },
+  "title": "Harden: Baseline pass (logging/timeouts/health/config)",
+  "description": "Applies baseline hardening pass to services/apps without hardcoding tools or providers.",
+  "tags": ["harden", "baseline", "service"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.harden.baseline_pass.v1"] }
+}

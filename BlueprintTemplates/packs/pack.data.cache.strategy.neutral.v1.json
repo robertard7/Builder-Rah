@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.data.cache.strategy.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Cache strategy (neutral)",
+  "description": "Defines cache strategy hooks and invalidation rules, optional and product-agnostic.",
+  "tags": ["data", "cache", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.data.cache.strategy.neutral.v1"] }
+}

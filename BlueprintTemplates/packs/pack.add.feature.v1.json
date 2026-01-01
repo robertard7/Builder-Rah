@@ -1,0 +1,19 @@
+﻿{
+  "id": "pack.add.feature.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 140 },
+  "title": "Add Feature",
+  "description": "Guided feature addition: plan, modify files, patch, validate.",
+  "tags": ["feature", "add", "guided"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.add_file.generic.v1",
+      "task.replace_file.generic.v1",
+      "task.apply_patch.generic.v1",
+      "task.build.${ecosystem}.v1",
+      "task.test.${ecosystem}.v1"
+    ]
+  }
+}

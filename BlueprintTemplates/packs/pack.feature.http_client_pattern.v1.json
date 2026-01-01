@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.feature.http_client_pattern.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 135 },
+  "title": "Add HTTP Client Pattern (baseline)",
+  "description": "Adds outbound HTTP client abstraction with timeouts and optional resilience hooks.",
+  "tags": ["feature", "http", "client"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["task.feature.add_http_client_pattern.v1"] }
+}

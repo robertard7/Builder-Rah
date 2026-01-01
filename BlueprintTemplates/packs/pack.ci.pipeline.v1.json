@@ -1,0 +1,15 @@
+﻿{
+  "id": "pack.ci.pipeline.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 165 },
+  "title": "CI Pipeline",
+  "description": "Detect project shape then run lint/build/test pipeline.",
+  "tags": ["ci", "pipeline", "build", "test"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.ci.pipeline.generic.v1"
+    ]
+  }
+}

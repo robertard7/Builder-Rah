@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.artifacts.manifest.baseline.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Artifacts: Generate manifest + verification gates",
+  "description": "Generates a deterministic artifact manifest and defines verification gates. Asks user only if a required gate cannot run.",
+  "tags": ["artifacts", "manifest", "verify", "gates"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.artifacts.manifest_and_gates.baseline.v1"] }
+}

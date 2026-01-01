@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.data.choose_storage.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 155 },
+  "title": "Choose storage option (neutral)",
+  "description": "Helps select a storage option based on constraints; asks only whatâ€™s missing.",
+  "tags": ["data", "storage", "neutral", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.data.choose_storage.neutral.v1"] }
+}

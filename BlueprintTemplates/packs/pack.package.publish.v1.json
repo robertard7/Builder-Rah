@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.package.publish.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 120 },
+  "title": "Package and Publish",
+  "description": "Package and publish flow (requires credentials configured elsewhere).",
+  "tags": ["package", "publish", "release"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.build.${ecosystem}.v1",
+      "task.test.${ecosystem}.v1",
+      "task.package_publish.${ecosystem}.v1"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.perf.baseline_and_gates.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 185 },
+  "title": "Performance baseline + regression gates (neutral)",
+  "description": "Defines SLOs and budgets, collects baseline metrics, defines load profile, and adds regression gates.",
+  "tags": ["perf", "baseline", "gates", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.perf.baseline_and_gates.neutral.v1"] }
+}

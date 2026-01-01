@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.feature.observability.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 165 },
+  "title": "Feature: Observability",
+  "description": "Structured logging + correlation id scaffolding. No provider/toolchain assumptions.",
+  "tags": ["feature", "observability", "logging"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.feature.add_observability.v1"
+    ],
+    "defaults": { "mode": "basic" }
+  }
+}

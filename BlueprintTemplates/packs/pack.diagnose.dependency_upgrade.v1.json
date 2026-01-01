@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.diagnose.dependency_upgrade.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Diagnose: Dependency Upgrade",
+  "description": "Triage dependency upgrade failures, propose minimal patch, WAIT_USER, then verify.",
+  "tags": ["diagnose", "dependencies", "upgrade"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.diagnose.dependency_upgrade_triage.v1",
+      "task.apply_patch.verified.v1"
+    ]
+  }
+}
