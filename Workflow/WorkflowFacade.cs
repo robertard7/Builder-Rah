@@ -125,18 +125,6 @@ public sealed class WorkflowFacade
         // Run digest.
         var spec = await RunJobSpecDigestAsync(text, ct).ConfigureAwait(true);
 
-        // If digest failed JSON, we do ONE thing:
-        // force edit next (prevents infinite loop)
-        if (spec == null)
-        {
-            _trace.Emit("[digest:error] Digest returned null JobSpec (unexpected).");
-            _forceEditBecauseInvalidJson = true;
-
-            EmitWaitUser("Model output was not valid JSON. Reply with: edit <rewrite your request>");
-
-            return;
-        }
-
         if (!spec.IsComplete)
         {
             var missing = spec.GetMissingFields();
@@ -166,7 +154,7 @@ public sealed class WorkflowFacade
         _trace.Emit("[route:graph_ok] Mermaid workflow graph validated. (Planner dispatch not wired yet.)");
     }
 
-    private async Task<JobSpec?> RunJobSpecDigestAsync(string userText, CancellationToken ct)
+    private async Task<JobSpec> RunJobSpecDigestAsync(string userText, CancellationToken ct)
     {
         var prompt = (_cfg.General.JobSpecDigestPrompt ?? "").Trim();
         if (prompt.Length == 0)

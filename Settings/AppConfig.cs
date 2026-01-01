@@ -33,21 +33,21 @@ public sealed class GeneralSettings
 
     // SAVE POINT: global digest prompt lives here (JSON-only, no tools)
     public string JobSpecDigestPrompt { get; set; } =
-        @"You are the JobSpec Digest. Convert the user request into a single JSON object that matches this exact shape:
+        @"You are the JobSpec Digest. Reply with exactly one JSON object that matches this shape:
 {
-  ""request"": ""<summarize the user's ask without adding details>"",
+  ""request"": ""<briefly restate the user's ask>"",
   ""state"": {
-    ""ready"": false,
-    ""missing"": [""field"", ""field""]
+    ""ready"": true,
+    ""missing"": []
   }
 }
 Rules:
-- Emit only the JSON object. No prose, no markdown, no code fences, no commentary.
-- Do not invent extra fields beyond request and state.
-- Keep request concise and factual, paraphrasing the user's ask without guessing details.
-- If any required information is missing or ambiguous, set state.ready=false and list every missing field name in state.missing.
-- When everything is present, set state.ready=true and state.missing=[].
-- Any output that is not valid JSON is a failure of this prompt.";
+- Output must be valid JSON (no prose, markdown, code fences, or commentary).
+- The top-level object MUST contain state.ready (boolean) and state.missing (array of strings).
+- Do not invent fields. Only include keys explicitly provided by the user plus the required state object.
+- If any required information is missing or ambiguous, set state.ready=false and list the missing field names in state.missing.
+- If everything is present, set state.ready=true and state.missing=[].
+- Any non-JSON output is a prompt failure.";
 }
 
 public sealed class ProvidersSettings
