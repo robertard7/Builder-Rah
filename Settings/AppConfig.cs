@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.IO;
 
 namespace RahBuilder.Settings;
 
@@ -24,10 +25,14 @@ public sealed class GeneralSettings
     public string RepoRoot { get; set; } = "";
     public string SandboxHostPath { get; set; } = "";
     public string SandboxContainerPath { get; set; } = "";
+    public string InboxHostPath { get; set; } = DefaultInboxPath();
 
     public string ToolsPath { get; set; } = "";                 // tools.json
     public string ToolPromptsPath { get; set; } = "";           // folder: Tools/Prompt (files named by toolId)
     public string BlueprintTemplatesPath { get; set; } = "";    // folder: BlueprintTemplates (prompt library)
+    public string AcceptedAttachmentExtensions { get; set; } = ".txt,.md,.json,.png,.jpg,.jpeg,.pdf,.zip";
+    public long MaxAttachmentBytes { get; set; } = 50 * 1024 * 1024;
+    public long MaxTotalInboxBytes { get; set; } = 500 * 1024 * 1024;
 
     public bool GraphDriven { get; set; } = true;
     public bool ContainerOnly { get; set; } = true;
@@ -52,6 +57,33 @@ Rules:
 - If any required information is missing, set state.ready=false and list each missing field in state.missing.
 - If the request is complete, set state.ready=true and state.missing=[].
 - Any non-JSON output is a prompt failure.";
+
+    public void Normalize()
+    {
+        if (string.IsNullOrWhiteSpace(InboxHostPath))
+            InboxHostPath = DefaultInboxPath();
+
+        if (string.IsNullOrWhiteSpace(AcceptedAttachmentExtensions))
+            AcceptedAttachmentExtensions = ".txt,.md,.json,.png,.jpg,.jpeg,.pdf,.zip";
+
+        if (MaxAttachmentBytes <= 0)
+            MaxAttachmentBytes = 50 * 1024 * 1024;
+
+        if (MaxTotalInboxBytes <= 0)
+            MaxTotalInboxBytes = 500 * 1024 * 1024;
+
+        if (string.IsNullOrWhiteSpace(ExecutionTarget))
+            ExecutionTarget = OperatingSystem.IsWindows() ? "WindowsHost" : "LinuxContainer";
+    }
+
+    private static string DefaultInboxPath()
+    {
+        var basePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(basePath))
+            basePath = AppContext.BaseDirectory;
+
+        return Path.Combine(basePath, "RahBuilder", "inbox");
+    }
 }
 
 public sealed class ProvidersSettings

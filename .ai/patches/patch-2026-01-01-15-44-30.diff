@@ -1,0 +1,789 @@
+diff --git a/MainForm.cs b/MainForm.cs
+index 31090bc..1ded80c 100644
+--- a/MainForm.cs
++++ b/MainForm.cs
+@@ -5,26 +5,27 @@ using System.Threading;
+ using System.Threading.Tasks;
+ using System.Windows.Forms;
+ using RahBuilder.Settings;
+-using RahBuilder.Workflow;
+-using RahBuilder.Ui;
+-using RahOllamaOnly.Tracing;
+-using RahOllamaOnly.Ui;
+-
+-namespace RahBuilder;
+-
+-public sealed class MainForm : Form
+-{
+-    private readonly AppConfig _config;
+-
+-    private readonly RichTextBox _chatView;
++using RahBuilder.Workflow;
++using RahBuilder.Ui;
++using RahOllamaOnly.Tracing;
++using RahOllamaOnly.Ui;
++
++namespace RahBuilder;
++
++public sealed class MainForm : Form
++{
++    private readonly AppConfig _config;
++    private AttachmentInbox _inbox;
++
++    private readonly RichTextBox _chatView;
+ 
+     private readonly TextBox _traceBox;
+     private readonly TracePanelWriter _traceWriter;
+-    private readonly RunTrace _trace;
+-
+-    private readonly WorkflowFacade _workflow;
+-
+-    private readonly ChatComposerControl _composer;
++    private readonly RunTrace _trace;
++
++    private readonly WorkflowFacade _workflow;
++
++    private readonly ChatComposerControl _composer;
+ 
+     public MainForm()
+     {
+@@ -32,14 +33,15 @@ public sealed class MainForm : Form
+         Width = 1200;
+         Height = 800;
+ 
+-        _config = ConfigStore.Load();
+-
+-        _traceWriter = new TracePanelWriter();
+-        _trace = new RunTrace(new RahOllamaOnly.Tracing.TracePanelTraceSink(_traceWriter));
+-
+-        _workflow = new WorkflowFacade(_trace);
+-        _workflow.UserFacingMessage += s => AppendChat(s + "\n");
+-
++        _traceWriter = new TracePanelWriter();
++        _trace = new RunTrace(new RahOllamaOnly.Tracing.TracePanelTraceSink(_traceWriter));
++
++        _config = ConfigStore.Load();
++        _inbox = new AttachmentInbox(_config.General, _trace);
++
++        _workflow = new WorkflowFacade(_trace);
++        _workflow.UserFacingMessage += s => AppendChat(s + "\n");
++
+         var tabs = new TabControl { Dock = DockStyle.Fill };
+ 
+         // Chat tab layout
+@@ -66,11 +68,13 @@ public sealed class MainForm : Form
+             BackColor = SystemColors.Window
+         };
+ 
+-        _composer = new ChatComposerControl();
+-        _composer.SendRequested += text => _ = SendNowAsync(text);
+-
+-        leftPanel.Controls.Add(_chatView);
+-        leftPanel.Controls.Add(_composer);
++        _composer = new ChatComposerControl(_inbox);
++        _composer.SendRequested += text => _ = SendNowAsync(text);
++        _composer.AttachmentsChanged += att => _workflow.SetAttachments(att);
++        _workflow.SetAttachments(_inbox.List());
++
++        leftPanel.Controls.Add(_chatView);
++        leftPanel.Controls.Add(_composer);
+ 
+         // Right side: trace
+         _traceBox = new TextBox
+@@ -137,13 +141,17 @@ public sealed class MainForm : Form
+         _workflow.RefreshTooling(_config);
+     }
+ 
+-    private void AfterSettingsSaved()
+-    {
+-        PublishConfigToRuntime();
+-
+-        if (_config.General.EnableGlobalClipboardShortcuts)
+-            ClipboardPolicy.Apply(this);
+-    }
++    private void AfterSettingsSaved()
++    {
++        PublishConfigToRuntime();
++        _inbox = new AttachmentInbox(_config.General, _trace);
++        _composer.SetInbox(_inbox);
++        _composer.ReloadAttachments(_inbox.List());
++        _workflow.SetAttachments(_inbox.List());
++
++        if (_config.General.EnableGlobalClipboardShortcuts)
++            ClipboardPolicy.Apply(this);
++    }
+ 
+     private async Task SendNowAsync(string text)
+     {
+diff --git a/Settings/AppConfig.cs b/Settings/AppConfig.cs
+index 3b1377f..679e0a4 100644
+--- a/Settings/AppConfig.cs
++++ b/Settings/AppConfig.cs
+@@ -1,5 +1,6 @@
+ #nullable enable
+ using System;
++using System.IO;
+ 
+ namespace RahBuilder.Settings;
+ 
+@@ -24,10 +25,14 @@ public sealed class GeneralSettings
+     public string RepoRoot { get; set; } = "";
+     public string SandboxHostPath { get; set; } = "";
+     public string SandboxContainerPath { get; set; } = "";
+-
+-    public string ToolsPath { get; set; } = "";                 // tools.json
++    public string InboxHostPath { get; set; } = DefaultInboxPath();
++
++    public string ToolsPath { get; set; } = "";                 // tools.json
+     public string ToolPromptsPath { get; set; } = "";           // folder: Tools/Prompt (files named by toolId)
+     public string BlueprintTemplatesPath { get; set; } = "";    // folder: BlueprintTemplates (prompt library)
++    public string AcceptedAttachmentExtensions { get; set; } = ".txt,.md,.json,.png,.jpg,.jpeg,.pdf,.zip";
++    public long MaxAttachmentBytes { get; set; } = 50 * 1024 * 1024;
++    public long MaxTotalInboxBytes { get; set; } = 500 * 1024 * 1024;
+ 
+     public bool GraphDriven { get; set; } = true;
+     public bool ContainerOnly { get; set; } = true;
+@@ -52,6 +57,33 @@ Rules:
+ - If any required information is missing, set state.ready=false and list each missing field in state.missing.
+ - If the request is complete, set state.ready=true and state.missing=[].
+ - Any non-JSON output is a prompt failure.";
++
++    public void Normalize()
++    {
++        if (string.IsNullOrWhiteSpace(InboxHostPath))
++            InboxHostPath = DefaultInboxPath();
++
++        if (string.IsNullOrWhiteSpace(AcceptedAttachmentExtensions))
++            AcceptedAttachmentExtensions = ".txt,.md,.json,.png,.jpg,.jpeg,.pdf,.zip";
++
++        if (MaxAttachmentBytes <= 0)
++            MaxAttachmentBytes = 50 * 1024 * 1024;
++
++        if (MaxTotalInboxBytes <= 0)
++            MaxTotalInboxBytes = 500 * 1024 * 1024;
++
++        if (string.IsNullOrWhiteSpace(ExecutionTarget))
++            ExecutionTarget = OperatingSystem.IsWindows() ? "WindowsHost" : "LinuxContainer";
++    }
++
++    private static string DefaultInboxPath()
++    {
++        var basePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
++        if (string.IsNullOrWhiteSpace(basePath))
++            basePath = AppContext.BaseDirectory;
++
++        return Path.Combine(basePath, "RahBuilder", "inbox");
++    }
+ }
+ 
+ public sealed class ProvidersSettings
+diff --git a/Settings/ConfigStore.cs b/Settings/ConfigStore.cs
+index 95658a6..c180b93 100644
+--- a/Settings/ConfigStore.cs
++++ b/Settings/ConfigStore.cs
+@@ -52,15 +52,16 @@ public static class ConfigStore
+         cfg.General ??= new GeneralSettings();
+         cfg.Providers ??= new ProvidersSettings();
+         cfg.WorkflowGraph ??= new WorkflowGraphSettings();
+-        cfg.Toolchain ??= new ToolchainSettings();
+-        cfg.Orchestrator ??= new OrchestratorSettings();
+-
+-        // Ensure orchestrator has stable required roles
+-        cfg.Orchestrator.EnsureDefaults();
+-
+-        // If you have other migration/normalization hooks, call them here.
+-        // DO NOT reintroduce legacy scalar RolePrompt_* properties.
+-    }
++        cfg.Toolchain ??= new ToolchainSettings();
++        cfg.Orchestrator ??= new OrchestratorSettings();
++
++        // Ensure orchestrator has stable required roles
++        cfg.Orchestrator.EnsureDefaults();
++        cfg.General.Normalize();
++
++        // If you have other migration/normalization hooks, call them here.
++        // DO NOT reintroduce legacy scalar RolePrompt_* properties.
++    }
+ 
+     private static string GetConfigPath()
+     {
+diff --git a/Settings/Pages/GeneralSettingsPage.cs b/Settings/Pages/GeneralSettingsPage.cs
+index 7d0205a..c6f6843 100644
+--- a/Settings/Pages/GeneralSettingsPage.cs
++++ b/Settings/Pages/GeneralSettingsPage.cs
+@@ -1,7 +1,9 @@
+ #nullable enable
+-using System;
+-using System.Drawing;
+-using System.Windows.Forms;
++using System;
++using System.Diagnostics;
++using System.Drawing;
++using System.IO;
++using System.Windows.Forms;
+ 
+ namespace RahBuilder.Settings.Pages;
+ 
+@@ -76,10 +78,51 @@ public sealed class GeneralSettingsPage : UserControl
+         AddRow("Sandbox Host Path", () => _config.General.SandboxHostPath, v => _config.General.SandboxHostPath = v);
+         AddRow("Sandbox Container Path", () => _config.General.SandboxContainerPath, v => _config.General.SandboxContainerPath = v);
+ 
+-        AddRow("Tools Manifest Path (tools.json)", () => _config.General.ToolsPath, v => _config.General.ToolsPath = v);
++        AddRow("Tools Manifest Path (tools.json)", () => _config.General.ToolsPath, v => _config.General.ToolsPath = v);
+         AddRow("Tool Prompts Folder (Tools/Prompt)", () => _config.General.ToolPromptsPath, v => _config.General.ToolPromptsPath = v);
+         AddRow("BlueprintTemplates Folder", () => _config.General.BlueprintTemplatesPath, v => _config.General.BlueprintTemplatesPath = v);
+ 
++        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
++        var inboxLabel = new Label { Text = "Attachments Inbox (host path)", AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 10, 0) };
++        var inboxPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
++        var inboxBox = new TextBox { Width = 420, Text = _config.General.InboxHostPath ?? "" };
++        inboxBox.TextChanged += (_, _) => { _config.General.InboxHostPath = inboxBox.Text; AutoSave.Touch(); };
++        var inboxBtn = new Button { Text = "Open Folder", AutoSize = true, Margin = new Padding(6, 0, 0, 0) };
++        inboxBtn.Click += (_, _) =>
++        {
++            try
++            {
++                var path = _config.General.InboxHostPath ?? "";
++                if (string.IsNullOrWhiteSpace(path)) path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RahBuilder", "inbox");
++                Directory.CreateDirectory(path);
++                Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
++            }
++            catch { }
++        };
++        inboxPanel.Controls.Add(inboxBox);
++        inboxPanel.Controls.Add(inboxBtn);
++        grid.Controls.Add(inboxLabel, 0, row);
++        grid.Controls.Add(inboxPanel, 1, row);
++        row++;
++
++        AddRow("Accepted attachment extensions (comma-separated)", () => _config.General.AcceptedAttachmentExtensions, v => _config.General.AcceptedAttachmentExtensions = v);
++        AddRow("Max attachment bytes", () => _config.General.MaxAttachmentBytes.ToString(), v =>
++        {
++            if (long.TryParse(v, out var parsed) && parsed > 0)
++            {
++                _config.General.MaxAttachmentBytes = parsed;
++                AutoSave.Touch();
++            }
++        });
++        AddRow("Max total inbox bytes", () => _config.General.MaxTotalInboxBytes.ToString(), v =>
++        {
++            if (long.TryParse(v, out var parsed) && parsed > 0)
++            {
++                _config.General.MaxTotalInboxBytes = parsed;
++                AutoSave.Touch();
++            }
++        });
++
+         AddBool("GraphDriven routing enabled", () => _config.General.GraphDriven, v => _config.General.GraphDriven = v);
+         AddBool("Container-only execution (no host tools)", () => _config.General.ContainerOnly, v => _config.General.ContainerOnly = v);
+         AddBool("Global clipboard shortcuts + context menus", () => _config.General.EnableGlobalClipboardShortcuts, v => _config.General.EnableGlobalClipboardShortcuts = v);
+diff --git a/Ui/ChatComposerControl.cs b/Ui/ChatComposerControl.cs
+index 656c8ee..bab7ab1 100644
+--- a/Ui/ChatComposerControl.cs
++++ b/Ui/ChatComposerControl.cs
+@@ -1,38 +1,86 @@
+ #nullable enable
+-using System;
+-using System.Drawing;
+-using System.Windows.Forms;
+-
+-namespace RahBuilder.Ui;
+-
+-public sealed class ChatComposerControl : UserControl
+-{
+-    private readonly RichTextBox _input;
+-    private readonly Button _send;
+-
+-    private readonly int _minHeight = 34;
+-    private readonly int _maxHeight = 180;
+-
+-    public event Action<string>? SendRequested;
+-
+-    public ChatComposerControl()
+-    {
+-        Dock = DockStyle.Bottom;
+-        Padding = new Padding(6);
+-
+-        var root = new TableLayoutPanel
+-        {
+-            Dock = DockStyle.Fill,
+-            ColumnCount = 2,
+-            RowCount = 1
+-        };
+-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+-        root.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+-
+-        _input = new RichTextBox
+-        {
+-            Dock = DockStyle.Fill,
+-            Multiline = true,
++using System;
++using System.Collections.Generic;
++using System.Drawing;
++using System.IO;
++using System.Linq;
++using System.Windows.Forms;
++using RahBuilder.Workflow;
++
++namespace RahBuilder.Ui;
++
++public sealed class ChatComposerControl : UserControl
++{
++    private readonly RichTextBox _input;
++    private readonly Button _attach;
++    private readonly Button _send;
++    private readonly FlowLayoutPanel _chips;
++    private readonly Label _status;
++
++    private AttachmentInbox _inbox;
++    private readonly List<AttachmentInbox.AttachmentEntry> _attachments = new();
++
++    private readonly int _minHeight = 34;
++    private readonly int _maxHeight = 180;
++
++    public event Action<string>? SendRequested;
++    public event Action<IReadOnlyList<AttachmentInbox.AttachmentEntry>>? AttachmentsChanged;
++
++    public ChatComposerControl(AttachmentInbox inbox)
++    {
++        Dock = DockStyle.Bottom;
++        Padding = new Padding(6);
++
++        _inbox = inbox ?? throw new ArgumentNullException(nameof(inbox));
++
++        AllowDrop = true;
++        DragEnter += OnDragEnter;
++        DragDrop += OnDragDrop;
++
++        var root = new TableLayoutPanel
++        {
++            Dock = DockStyle.Fill,
++            ColumnCount = 1,
++            RowCount = 3
++        };
++        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
++        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
++        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
++
++        _chips = new FlowLayoutPanel
++        {
++            Dock = DockStyle.Top,
++            AutoSize = true,
++            FlowDirection = FlowDirection.LeftToRight,
++            WrapContents = true
++        };
++
++        var statusPanel = new FlowLayoutPanel
++        {
++            Dock = DockStyle.Top,
++            AutoSize = true,
++            FlowDirection = FlowDirection.LeftToRight,
++            WrapContents = true,
++            Margin = new Padding(0, 2, 0, 4)
++        };
++
++        _status = new Label { AutoSize = true, ForeColor = Color.DimGray };
++        statusPanel.Controls.Add(_status);
++
++        var composerRow = new TableLayoutPanel
++        {
++            Dock = DockStyle.Fill,
++            ColumnCount = 3,
++            RowCount = 1
++        };
++        composerRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
++        composerRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
++        composerRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
++
++        _input = new RichTextBox
++        {
++            Dock = DockStyle.Fill,
++            Multiline = true,
+             WordWrap = true,
+             ScrollBars = RichTextBoxScrollBars.Vertical,
+             DetectUrls = false,
+@@ -41,19 +89,28 @@ public sealed class ChatComposerControl : UserControl
+             Height = _minHeight
+         };
+ 
+-        _send = new Button
+-        {
+-            Text = "Send",
+-            AutoSize = true,
+-            Padding = new Padding(14, 8, 14, 8),
+-            Margin = new Padding(6, 0, 0, 0)
+-        };
+-
+-        _send.Click += (_, _) => FireSend();
+-
+-        _input.TextChanged += (_, _) => ReflowHeight();
+-
+-        _input.KeyDown += (_, e) =>
++        _attach = new Button
++        {
++            Text = "Attach…",
++            AutoSize = true,
++            Padding = new Padding(12, 8, 12, 8),
++            Margin = new Padding(6, 0, 0, 0)
++        };
++
++        _send = new Button
++        {
++            Text = "Send",
++            AutoSize = true,
++            Padding = new Padding(14, 8, 14, 8),
++            Margin = new Padding(6, 0, 0, 0)
++        };
++
++        _attach.Click += (_, _) => ChooseFiles();
++        _send.Click += (_, _) => FireSend();
++
++        _input.TextChanged += (_, _) => ReflowHeight();
++
++        _input.KeyDown += (_, e) =>
+         {
+             if (e.KeyCode == Keys.Enter)
+             {
+@@ -66,49 +123,182 @@ public sealed class ChatComposerControl : UserControl
+             }
+         };
+ 
+-        root.Controls.Add(_input, 0, 0);
+-        root.Controls.Add(_send, 1, 0);
+-
+-        Controls.Add(root);
+-
+-        Height = _minHeight + Padding.Vertical;
+-    }
+-
+-    public void FocusInput() => _input.Focus();
+-
+-    public void SetEnabled(bool enabled)
+-    {
+-        _input.Enabled = enabled;
+-        _send.Enabled = enabled;
+-    }
+-
+-    public void Clear()
+-    {
+-        _input.Text = "";
+-        ReflowHeight();
+-    }
++        composerRow.Controls.Add(_input, 0, 0);
++        composerRow.Controls.Add(_attach, 1, 0);
++        composerRow.Controls.Add(_send, 2, 0);
++
++        root.Controls.Add(_chips, 0, 0);
++        root.Controls.Add(statusPanel, 0, 1);
++        root.Controls.Add(composerRow, 0, 2);
++
++        Controls.Add(root);
++
++        Height = _minHeight + Padding.Vertical + _chips.Height + statusPanel.Height;
++        RefreshAttachments(_inbox.List());
++    }
++
++    public void FocusInput() => _input.Focus();
++
++    public void SetEnabled(bool enabled)
++    {
++        _input.Enabled = enabled;
++        _attach.Enabled = enabled;
++        _send.Enabled = enabled;
++    }
++
++    public void SetInbox(AttachmentInbox inbox)
++    {
++        _inbox = inbox ?? throw new ArgumentNullException(nameof(inbox));
++        RefreshAttachments(_inbox.List());
++    }
++
++    public void ReloadAttachments(IReadOnlyList<AttachmentInbox.AttachmentEntry> entries) => RefreshAttachments(entries);
++
++    public void Clear()
++    {
++        _input.Text = "";
++        ReflowHeight();
++    }
+ 
+     private void FireSend()
+     {
+         var text = (_input.Text ?? "").Trim();
+         if (text.Length == 0) return;
+ 
+-        Clear();
+-        SendRequested?.Invoke(text);
+-    }
+-
+-    private void ReflowHeight()
+-    {
+-        var lines = Math.Max(1, _input.Lines.Length);
+-        var lineH = TextRenderer.MeasureText("X", _input.Font).Height;
++        Clear();
++        SendRequested?.Invoke(text);
++    }
++
++    private void ChooseFiles()
++    {
++        using var dlg = new OpenFileDialog
++        {
++            Multiselect = true,
++            Title = "Attach files",
++            Filter = "All files (*.*)|*.*"
++        };
++
++        if (dlg.ShowDialog() == DialogResult.OK)
++            AddFiles(dlg.FileNames);
++    }
++
++    private void AddFiles(IEnumerable<string> files)
++    {
++        var result = _inbox.AddFiles(files);
++        if (!result.Ok)
++        {
++            ShowStatus(result.Message, true);
++            return;
++        }
++
++        RefreshAttachments(_inbox.List());
++        ShowStatus($"Added {result.Added.Count} attachment(s).", false);
++    }
++
++    private void RemoveAttachment(string storedName)
++    {
++        var result = _inbox.Remove(storedName);
++        if (!result.Ok)
++        {
++            ShowStatus(result.Message, true);
++            return;
++        }
++
++        RefreshAttachments(_inbox.List());
++        ShowStatus("Attachment removed.", false);
++    }
++
++    private void RefreshAttachments(IReadOnlyList<AttachmentInbox.AttachmentEntry> entries)
++    {
++        _attachments.Clear();
++        if (entries != null)
++            _attachments.AddRange(entries);
++
++        _chips.Controls.Clear();
++
++        foreach (var a in _attachments)
++        {
++            var chip = BuildChip(a);
++            _chips.Controls.Add(chip);
++        }
++
++        AttachmentsChanged?.Invoke(_attachments.ToList());
++    }
++
++    private Control BuildChip(AttachmentInbox.AttachmentEntry entry)
++    {
++        var panel = new FlowLayoutPanel
++        {
++            AutoSize = true,
++            BackColor = Color.FromArgb(230, 230, 230),
++            Margin = new Padding(0, 0, 6, 6),
++            Padding = new Padding(6, 4, 6, 4),
++            FlowDirection = FlowDirection.LeftToRight,
++            WrapContents = false
++        };
++
++        var name = new Label
++        {
++            AutoSize = true,
++            Text = $"{entry.OriginalName} ({FormatBytes(entry.SizeBytes)})",
++            Padding = new Padding(0, 2, 6, 0)
++        };
++
++        var remove = new Button
++        {
++            Text = "x",
++            AutoSize = true,
++            Margin = new Padding(0),
++            Padding = new Padding(4, 0, 4, 0)
++        };
++        remove.Click += (_, _) => RemoveAttachment(entry.StoredName);
++
++        panel.Controls.Add(name);
++        panel.Controls.Add(remove);
++        return panel;
++    }
++
++    private void OnDragEnter(object? _, DragEventArgs e)
++    {
++        if (e.Data != null && e.Data.GetDataPresent(DataFormats.FileDrop))
++            e.Effect = DragDropEffects.Copy;
++    }
++
++    private void OnDragDrop(object? _, DragEventArgs e)
++    {
++        if (e.Data == null || !e.Data.GetDataPresent(DataFormats.FileDrop)) return;
++
++        if (e.Data.GetData(DataFormats.FileDrop) is string[] paths && paths.Length > 0)
++            AddFiles(paths.Where(File.Exists));
++    }
++
++    private void ShowStatus(string message, bool isError)
++    {
++        _status.Text = message ?? "";
++        _status.ForeColor = isError ? Color.Firebrick : Color.DimGray;
++    }
++
++    private static string FormatBytes(long bytes)
++    {
++        const long KB = 1024;
++        const long MB = KB * 1024;
++        const long GB = MB * 1024;
++
++        if (bytes >= GB) return $"{bytes / (double)GB:0.##} GB";
++        if (bytes >= MB) return $"{bytes / (double)MB:0.##} MB";
++        if (bytes >= KB) return $"{bytes / (double)KB:0.##} KB";
++        return bytes + " B";
++    }
++
++    private void ReflowHeight()
++    {
++        var lines = Math.Max(1, _input.Lines.Length);
++        var lineH = TextRenderer.MeasureText("X", _input.Font).Height;
+ 
+         var desired = (lines * lineH) + 14;
+         var clamped = Math.Max(_minHeight, Math.Min(_maxHeight, desired));
+ 
+-        if (_input.Height != clamped)
+-        {
+-            _input.Height = clamped;
+-            Height = clamped + Padding.Vertical;
+-        }
+-    }
+-}
++        if (_input.Height != clamped)
++            _input.Height = clamped;
++    }
++}
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index d56566c..3cd576a 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -1,11 +1,12 @@
+ #nullable enable
+-using System;
+-using System.IO;
+-using System.Threading;
+-using System.Threading.Tasks;
+-using RahBuilder.Settings;
+-using RahOllamaOnly.Tools;
+-using RahOllamaOnly.Tracing;
++using System;
++using System.IO;
++using System.Text;
++using System.Threading;
++using System.Threading.Tasks;
++using RahBuilder.Settings;
++using RahOllamaOnly.Tools;
++using RahOllamaOnly.Tracing;
+ 
+ namespace RahBuilder.Workflow;
+ 
+@@ -13,9 +14,10 @@ public sealed class WorkflowFacade
+ {
+     private readonly RunTrace _trace;
+     private readonly WorkflowRouter _router = new();
+-    private AppConfig _cfg;
+-
+-    private string _lastGraphHash = "";
++    private AppConfig _cfg;
++    private IReadOnlyList<AttachmentInbox.AttachmentEntry> _attachments = Array.Empty<AttachmentInbox.AttachmentEntry>();
++
++    private string _lastGraphHash = "";
+ 
+     // If true, the ONLY allowed reply is: "edit <rewrite>"
+     private bool _forceEditBecauseInvalidJson = false;
+@@ -36,17 +38,22 @@ public sealed class WorkflowFacade
+         SyncGraphToHub(_cfg);
+     }
+ 
+-    public void RefreshTooling(AppConfig cfg)
+-    {
+-        if (cfg != null) _cfg = cfg;
+-        SyncGraphToHub(_cfg);
+-        RefreshTooling();
+-    }
+-
+-    public void RefreshTooling()
+-    {
+-        var toolsPath = (_cfg.General.ToolsPath ?? "").Trim();
+-        var promptDir = (_cfg.General.ToolPromptsPath ?? "").Trim();
++    public void RefreshTooling(AppConfig cfg)
++    {
++        if (cfg != null) _cfg = cfg;
++        SyncGraphToHub(_cfg);
++        RefreshTooling();
++    }
++
++    public void SetAttachments(IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments)
++    {
++        _attachments = attachments ?? Array.Empty<AttachmentInbox.AttachmentEntry>();
++    }
++
++    public void RefreshTooling()
++    {
++        var toolsPath = (_cfg.General.ToolsPath ?? "").Trim();
++        var promptDir = (_cfg.General.ToolPromptsPath ?? "").Trim();
+ 
+         ToolManifest manifest;
+         try
+@@ -133,7 +140,8 @@ public sealed class WorkflowFacade
+         }
+ 
+         // Run digest.
+-        var spec = await RunJobSpecDigestAsync(text, ct).ConfigureAwait(true);
++        var userTextWithAttachments = AppendAttachmentMetadata(text);
++        var spec = await RunJobSpecDigestAsync(userTextWithAttachments, ct).ConfigureAwait(true);
+ 
+         if (!spec.IsComplete)
+         {
+@@ -230,12 +238,12 @@ public sealed class WorkflowFacade
+             _trace.Emit($"[graph] published hash={MermaidGraphHub.CurrentHash}");
+     }
+ 
+-    private static string ComputeHash(string s)
+-    {
+-        using var sha = System.Security.Cryptography.SHA256.Create();
+-        var bytes = System.Text.Encoding.UTF8.GetBytes(s ?? "");
+-        return Convert.ToHexString(sha.ComputeHash(bytes));
+-    }
++    private static string ComputeHash(string s)
++    {
++        using var sha = System.Security.Cryptography.SHA256.Create();
++        var bytes = System.Text.Encoding.UTF8.GetBytes(s ?? "");
++        return Convert.ToHexString(sha.ComputeHash(bytes));
++    }
+ 
+     private static string Trunc(string s, int max)
+     {
+@@ -245,4 +253,22 @@ public sealed class WorkflowFacade
+     }
+ 
+     private static bool IsWindowsDesktopProject() => true; // RahBuilder.csproj uses Microsoft.NET.Sdk.WindowsDesktop
++
++    private string AppendAttachmentMetadata(string userText)
++    {
++        if (_attachments == null || _attachments.Count == 0)
++            return userText ?? "";
++
++        var sb = new StringBuilder();
++        sb.AppendLine("ATTACHMENTS:");
++        foreach (var a in _attachments)
++        {
++            sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}");
++        }
++        sb.AppendLine();
++        sb.Append(userText ?? "");
++
++        _trace.Emit($"[digest:attachments] {_attachments.Count} attached");
++        return sb.ToString();
++    }
+ }
