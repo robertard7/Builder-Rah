@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.service.baseline.go.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 74 },
+  "title": "Service Baseline (Go)",
+  "description": "Adds config/logging/HTTP/health baseline patterns to a Go service abstractly.",
+  "tags": ["service", "baseline", "go"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.feature.add_service_baseline_bundle.v1", "with": { "ecosystem": "go" } }
+  ] }
+}

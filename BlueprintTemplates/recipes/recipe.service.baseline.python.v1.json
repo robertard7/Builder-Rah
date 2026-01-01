@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.service.baseline.python.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 76 },
+  "title": "Service Baseline (Python)",
+  "description": "Adds config/logging/HTTP/health baseline patterns to a Python service abstractly.",
+  "tags": ["service", "baseline", "python"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.feature.add_service_baseline_bundle.v1", "with": { "ecosystem": "python" } }
+  ] }
+}

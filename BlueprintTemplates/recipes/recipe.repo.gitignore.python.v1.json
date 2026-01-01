@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.repo.gitignore.python.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 35 },
+  "title": ".gitignore: Python add-ons",
+  "description": "Adds python-specific ignore lines (safe merge).",
+  "tags": ["python", "gitignore"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/.gitignore", "onConflict": "merge_if_possible_else_append", "text": "\n# Python\n__pycache__/\n*.pyc\n.venv/\n.env/\n" } }
+  ] }
+}

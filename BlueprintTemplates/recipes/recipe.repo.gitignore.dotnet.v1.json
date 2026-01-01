@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.repo.gitignore.dotnet.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 35 },
+  "title": ".gitignore: .NET add-ons",
+  "description": "Adds dotnet-specific ignore lines (safe merge).",
+  "tags": ["dotnet", "gitignore"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/.gitignore", "onConflict": "merge_if_possible_else_append", "text": "\n# .NET\nbin/\nobj/\n*.user\n*.suo\n*.cache\n" } }
+  ] }
+}

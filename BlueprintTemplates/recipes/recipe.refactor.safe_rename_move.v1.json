@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.refactor.safe_rename_move.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 70 },
+  "title": "Refactor: Safe rename/move",
+  "description": "Safely renames/moves with reference updates and validation.",
+  "tags": ["refactor", "rename", "move"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.refactor.safe_rename_move.v1" }
+  ] }
+}

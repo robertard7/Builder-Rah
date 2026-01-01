@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.repo.hygiene.node.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": "Node Repo Hygiene",
+  "description": "Generic hygiene plus node notes (no tool assumptions).",
+  "tags": ["node", "repo", "hygiene"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.repo.hygiene.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/node_notes.md", "onConflict": "skip", "text": "# Node Notes\n\n- Keep dependencies minimal.\n- Prefer lockfiles.\n- Wire lint/format/test via environment/settings.\n" } }
+  ] }
+}

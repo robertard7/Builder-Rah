@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.security.gitignore.sane_defaults.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 40 },
+  "title": "Security: .gitignore Sane Defaults",
+  "description": "Adds a conservative .gitignore for common build outputs and secrets.",
+  "tags": ["security", "gitignore"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/.gitignore", "onConflict": "skip", "text": "# build outputs\nbin/\nobj/\ndist/\nbuild/\n\n# logs\n*.log\n\n# env/secrets\n.env\n*.key\n*.pem\n\n# node\nnode_modules/\n\n# python\n__pycache__/\n.venv/\n\n# rust\n/target/\n\n# java\n/target/\n" } }
+    ]
+  }
+}

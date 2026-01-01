@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.repo.hygiene.dotnet.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": ".NET Repo Hygiene",
+  "description": "Generic hygiene plus dotnet-specific notes (no commands).",
+  "tags": ["dotnet", "repo", "hygiene"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.repo.hygiene.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/dotnet_notes.md", "onConflict": "skip", "text": "# .NET Notes\n\n- Keep solutions/projects minimal.\n- Prefer deterministic builds when possible.\n- Wire formatting/linting via environment/settings.\n" } }
+  ] }
+}

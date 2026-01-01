@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.rust.auth.jwt_skeleton.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 5 },
+  "title": "Rust Auth: JWT Notes",
+  "description": "Adds auth notes stub.",
+  "tags": ["rust", "auth", "jwt"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/auth_jwt.md", "onConflict": "skip", "text": "# Auth (JWT)\n\nImplement via crate selection.\n" } }
+  ] }
+}

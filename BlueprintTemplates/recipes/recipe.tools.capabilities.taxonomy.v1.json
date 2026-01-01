@@ -1,0 +1,64 @@
+﻿{
+  "id": "recipe.tools.capabilities.taxonomy.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 90 },
+  "title": "Tools: Capabilities taxonomy (neutral)",
+  "description": "Defines a neutral capability vocabulary for tool selection without hardcoding tool IDs. Resolved at runtime against the active tool manifest.",
+  "tags": ["tools", "capabilities", "taxonomy", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "capabilityGroups": [
+      {
+        "name": "workspace.core",
+        "capabilities": [
+          "workspace.create_project",
+          "workspace.add_file",
+          "workspace.replace_file",
+          "workspace.apply_patch",
+          "workspace.build",
+          "workspace.test",
+          "workspace.run",
+          "workspace.format_lint",
+          "workspace.package_publish",
+          "workspace.diagnose_build_fail_triage"
+        ]
+      },
+      {
+        "name": "workspace.intake",
+        "capabilities": [
+          "workspace.detect_ecosystem",
+          "workspace.detect_entrypoints",
+          "workspace.detect_layout",
+          "workspace.detect_maturity",
+          "workspace.collect_logs"
+        ]
+      },
+      {
+        "name": "workspace.repo_ops",
+        "capabilities": [
+          "repo.init",
+          "repo.status",
+          "repo.commit",
+          "repo.branch",
+          "repo.diff",
+          "repo.apply_patch"
+        ]
+      },
+      {
+        "name": "workspace.packaging",
+        "capabilities": [
+          "artifact.manifest.generate",
+          "artifact.gates.validate",
+          "publish.plan.emit",
+          "publish.execute"
+        ]
+      }
+    ],
+    "resolutionRules": [
+      "capabilities are resolved to toolIds by matching against the active manifest's declared capabilities/tags",
+      "if multiple toolIds satisfy a capability, prefer the one matching envScope/os/hostKind and with highest internal ranking",
+      "if no toolId matches a required capability, WAIT_USER with a minimal request: 'add prompt+tool mapping for capability X'"
+    ]
+  }
+}

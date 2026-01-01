@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.repo.gitignore.cpp.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 35 },
+  "title": ".gitignore: C++ add-ons",
+  "description": "Adds C++ build ignore lines (safe merge).",
+  "tags": ["cpp", "gitignore"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/.gitignore", "onConflict": "merge_if_possible_else_append", "text": "\n# C++\n/build/\n/out/\n*.o\n*.obj\n" } }
+  ] }
+}

@@ -1,0 +1,136 @@
+﻿{
+  "id": "recipe.tools.capability_presets.ecosystems.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 88 },
+  "title": "Tools: Ecosystem capability presets (neutral)",
+  "description": "Defines capabilityRef presets for common ecosystems. These are resolved to toolIds at runtime (no tool IDs in templates).",
+  "tags": ["tools", "capabilities", "presets", "ecosystem", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "presets": [
+      {
+        "name": "generic.base",
+        "when": { "ecosystem": "generic" },
+        "capabilityRefs": [
+          { "capability": "workspace.add_file", "required": true, "reason": "Project creation needs file write capability" },
+          { "capability": "workspace.replace_file", "required": true, "reason": "Edits must be possible" },
+          { "capability": "workspace.apply_patch", "required": false, "reason": "Prefer patches for surgical changes when available" },
+          { "capability": "workspace.format_lint", "required": false, "reason": "Optional formatting/lint" },
+          { "capability": "workspace.build", "required": false, "reason": "If build step exists" },
+          { "capability": "workspace.test", "required": false, "reason": "If tests exist" },
+          { "capability": "workspace.run", "required": false, "reason": "If runnable target exists" }
+        ]
+      },
+
+      {
+        "name": "dotnet.service_or_app",
+        "when": { "ecosystem": "dotnet" },
+        "capabilityRefs": [
+          { "capability": "workspace.create_project", "required": false, "reason": "Can scaffold via CLI if project missing" },
+          { "capability": "workspace.add_file", "required": true, "reason": "Write csproj and sources" },
+          { "capability": "workspace.replace_file", "required": true, "reason": "Edits are normal" },
+          { "capability": "workspace.apply_patch", "required": false, "reason": "Surgical changes preferred" },
+          { "capability": "workspace.format_lint", "required": false, "reason": "dotnet format / analyzers optional" },
+          { "capability": "workspace.build", "required": true, "reason": "dotnet build as primary compile gate" },
+          { "capability": "workspace.test", "required": false, "reason": "dotnet test if tests present" },
+          { "capability": "workspace.run", "required": false, "reason": "dotnet run if app target exists" },
+          { "capability": "artifact.manifest.generate", "required": false, "reason": "Optional publish outputs manifest" }
+        ]
+      },
+
+      {
+        "name": "node.app_or_service",
+        "when": { "ecosystem": "node" },
+        "capabilityRefs": [
+          { "capability": "workspace.create_project", "required": false, "reason": "Can scaffold package.json if missing" },
+          { "capability": "workspace.add_file", "required": true, "reason": "Write sources/config" },
+          { "capability": "workspace.replace_file", "required": true, "reason": "Edits are normal" },
+          { "capability": "workspace.apply_patch", "required": false, "reason": "Surgical changes preferred" },
+          { "capability": "workspace.format_lint", "required": false, "reason": "eslint/prettier optional" },
+          { "capability": "workspace.build", "required": false, "reason": "Some apps have build step" },
+          { "capability": "workspace.test", "required": false, "reason": "jest/vitest if present" },
+          { "capability": "workspace.run", "required": true, "reason": "node apps should run or start script" }
+        ]
+      },
+
+      {
+        "name": "python.cli_or_api",
+        "when": { "ecosystem": "python" },
+        "capabilityRefs": [
+          { "capability": "workspace.create_project", "required": false, "reason": "Scaffold package layout if missing" },
+          { "capability": "workspace.add_file", "required": true, "reason": "Write sources/config" },
+          { "capability": "workspace.replace_file", "required": true, "reason": "Edits are normal" },
+          { "capability": "workspace.apply_patch", "required": false, "reason": "Surgical changes preferred" },
+          { "capability": "workspace.format_lint", "required": false, "reason": "ruff/black optional" },
+          { "capability": "workspace.test", "required": false, "reason": "pytest if present" },
+          { "capability": "workspace.run", "required": true, "reason": "python entrypoint should be runnable" }
+        ]
+      },
+
+      {
+        "name": "go.cli_or_service",
+        "when": { "ecosystem": "go" },
+        "capabilityRefs": [
+          { "capability": "workspace.create_project", "required": false, "reason": "go mod init if missing" },
+          { "capability": "workspace.add_file", "required": true, "reason": "Write sources" },
+          { "capability": "workspace.replace_file", "required": true, "reason": "Edits are normal" },
+          { "capability": "workspace.apply_patch", "required": false, "reason": "Surgical changes preferred" },
+          { "capability": "workspace.format_lint", "required": true, "reason": "gofmt is baseline" },
+          { "capability": "workspace.build", "required": true, "reason": "go build as compile gate" },
+          { "capability": "workspace.test", "required": false, "reason": "go test if tests exist" },
+          { "capability": "workspace.run", "required": false, "reason": "go run for simple apps" }
+        ]
+      },
+
+      {
+        "name": "rust.cli_or_service",
+        "when": { "ecosystem": "rust" },
+        "capabilityRefs": [
+          { "capability": "workspace.create_project", "required": false, "reason": "cargo new if missing" },
+          { "capability": "workspace.add_file", "required": true, "reason": "Write sources" },
+          { "capability": "workspace.replace_file", "required": true, "reason": "Edits are normal" },
+          { "capability": "workspace.apply_patch", "required": false, "reason": "Surgical changes preferred" },
+          { "capability": "workspace.format_lint", "required": false, "reason": "rustfmt/clippy optional but common" },
+          { "capability": "workspace.build", "required": true, "reason": "cargo build as compile gate" },
+          { "capability": "workspace.test", "required": false, "reason": "cargo test if tests exist" },
+          { "capability": "workspace.run", "required": false, "reason": "cargo run for apps" }
+        ]
+      },
+
+      {
+        "name": "java.cli_or_service",
+        "when": { "ecosystem": "java" },
+        "capabilityRefs": [
+          { "capability": "workspace.create_project", "required": false, "reason": "maven/gradle scaffold if missing" },
+          { "capability": "workspace.add_file", "required": true, "reason": "Write sources/pom/build files" },
+          { "capability": "workspace.replace_file", "required": true, "reason": "Edits are normal" },
+          { "capability": "workspace.apply_patch", "required": false, "reason": "Surgical changes preferred" },
+          { "capability": "workspace.format_lint", "required": false, "reason": "Optional formatting checks" },
+          { "capability": "workspace.build", "required": true, "reason": "mvn/gradle build as gate" },
+          { "capability": "workspace.test", "required": false, "reason": "unit tests if present" },
+          { "capability": "workspace.run", "required": false, "reason": "run if app target exists" }
+        ]
+      },
+
+      {
+        "name": "cpp.cmake_or_buildsystem",
+        "when": { "ecosystem": "cpp" },
+        "capabilityRefs": [
+          { "capability": "workspace.create_project", "required": false, "reason": "cmake scaffold if missing" },
+          { "capability": "workspace.add_file", "required": true, "reason": "Write sources/build files" },
+          { "capability": "workspace.replace_file", "required": true, "reason": "Edits are normal" },
+          { "capability": "workspace.apply_patch", "required": false, "reason": "Surgical changes preferred" },
+          { "capability": "workspace.format_lint", "required": false, "reason": "clang-format optional" },
+          { "capability": "workspace.build", "required": true, "reason": "build as compile gate" },
+          { "capability": "workspace.test", "required": false, "reason": "ctest if present" },
+          { "capability": "workspace.run", "required": false, "reason": "run if binary known" }
+        ]
+      }
+    ],
+    "notes": [
+      "These presets are capability-only. Your runtime maps them to toolIds using the active manifest.",
+      "Add more ecosystems by appending presets. No other template changes required."
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+﻿{
+  "id": "recipe.tools.toolrefs.declare_template.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 80 },
+  "title": "Declare toolRefs for a plan (template)",
+  "description": "Template recipe: declare toolRefs[] in your pack/recipe/graph content so tool prompt gate becomes deterministic. This recipe does not execute anything; it documents the schema via content.toolRefs.",
+  "tags": ["tools", "toolrefs", "schema", "prompts"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "toolRefs": [
+      {
+        "toolId": "example.tool.id",
+        "reason": "Why this plan may call the tool",
+        "optional": true
+      }
+    ],
+    "steps": [
+      {
+        "use": "task.add_file.generic.v1",
+        "with": {
+          "path": "${projectRoot}/.rah/toolrefs.json",
+          "note": "Optional: write a machine-readable toolRefs summary for the workspace if your system supports it."
+        }
+      }
+    ]
+  }
+}

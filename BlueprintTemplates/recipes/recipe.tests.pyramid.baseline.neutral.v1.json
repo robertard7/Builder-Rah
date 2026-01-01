@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.tests.pyramid.baseline.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 88 },
+  "title": "Testing pyramid baseline (neutral)",
+  "description": "Defines a testing strategy and scaffolds unit tests with sensible defaults.",
+  "tags": ["tests", "pyramid", "unit", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.tests.define_pyramid_strategy.v1" },
+    { "use": "task.tests.scaffold_unit_tests_if_missing.v1" },
+    { "use": "task.tests.define_ci_gates_for_tests.v1" }
+  ] }
+}

@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.service.baseline.cpp.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 72 },
+  "title": "Service Baseline (C++/CMake)",
+  "description": "Adds config/logging/HTTP/health baseline patterns to a CMake-based C++ project abstractly.",
+  "tags": ["service", "baseline", "cpp", "cmake"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.feature.add_service_baseline_bundle.v1", "with": { "ecosystem": "cpp" } }
+  ] }
+}

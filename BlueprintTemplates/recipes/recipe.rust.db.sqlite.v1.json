@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.rust.db.sqlite.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 10 },
+  "title": "Rust DB: SQLite Notes",
+  "description": "Adds db notes stub.",
+  "tags": ["rust", "db", "sqlite"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/db_sqlite.md", "onConflict": "skip", "text": "# DB (SQLite)\n\nIntegrate via crate selection in your environment/settings.\n" } }
+  ] }
+}

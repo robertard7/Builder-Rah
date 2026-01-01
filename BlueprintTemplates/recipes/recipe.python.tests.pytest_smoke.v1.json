@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.python.tests.pytest_smoke.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": "Python Tests: Pytest Smoke",
+  "description": "Adds a minimal pytest test file.",
+  "tags": ["python", "test", "pytest"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/tests/test_smoke.py", "onConflict": "skip", "text": "def test_smoke():\n    assert 1 + 1 == 2\n" } }
+    ]
+  }
+}

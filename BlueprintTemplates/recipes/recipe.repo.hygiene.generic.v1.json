@@ -1,0 +1,22 @@
+﻿{
+  "id": "recipe.repo.hygiene.generic.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": "Repo Hygiene: Generic",
+  "description": "Adds basic README, contributing, code of conduct note, and issue/PR templates.",
+  "tags": ["repo", "hygiene", "templates"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/README.md", "onConflict": "skip", "text": "# ${projectName}\n\n## Overview\nDescribe what this project does.\n\n## Quickstart\n- Build/test/run steps depend on your ecosystem and environment settings.\n\n## Contributing\nSee CONTRIBUTING.md.\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/CONTRIBUTING.md", "onConflict": "skip", "text": "# Contributing\n\n## How to contribute\n- Create a branch\n- Make focused changes\n- Add/adjust tests if applicable\n- Keep changes minimal and well-described\n\n## Commit hygiene\n- clear messages\n- small diffs\n\n## Security\nIf you discover a security issue, follow the SECURITY.md policy.\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/SECURITY.md", "onConflict": "skip", "text": "# Security Policy\n\n## Reporting\nPlease report security issues privately.\n\n## Supported versions\nDefine supported versions here.\n" } },
+
+    { "use": "task.ensure_dir.v1", "with": { "path": "${projectRoot}/.github/ISSUE_TEMPLATE" } },
+    { "use": "task.ensure_dir.v1", "with": { "path": "${projectRoot}/.github" } },
+
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/.github/pull_request_template.md", "onConflict": "skip", "text": "## Summary\n\n## Testing\n- [ ] tests run\n- [ ] build succeeds\n\n## Notes\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/.github/ISSUE_TEMPLATE/bug_report.md", "onConflict": "skip", "text": "---\nname: Bug report\ndescription: Report a bug\n---\n\n## What happened?\n\n## Expected behavior\n\n## Steps to reproduce\n\n## Logs / screenshots\n\n## Environment\n- OS:\n- Version:\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/.github/ISSUE_TEMPLATE/feature_request.md", "onConflict": "skip", "text": "---\nname: Feature request\ndescription: Propose an improvement\n---\n\n## Problem\n\n## Proposal\n\n## Alternatives\n\n## Risks\n" } }
+  ] }
+}

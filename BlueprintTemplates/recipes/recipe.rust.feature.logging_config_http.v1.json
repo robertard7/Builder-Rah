@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.rust.feature.logging_config_http.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "Rust Feature: Logging + Config + HTTP",
+  "description": "Adds config.json and a minimal HTTP example placeholder (no deps assumed).",
+  "tags": ["rust", "logging", "config", "http"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/config.json", "onConflict": "skip", "text": "{\n  \"baseUrl\": \"https://example.com\"\n}\n" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/http_sample.rs", "onConflict": "skip", "text": "use std::fs;\n\npub fn run() {\n    let cfg = fs::read_to_string(\"config.json\").unwrap_or_else(|_| \"{\\\"baseUrl\\\":\\\"https://example.com\\\"}\".to_string());\n    println!(\"config: {}\", cfg);\n    println!(\"HTTP sample: add an HTTP client crate per your settings if desired\");\n}\n" } }
+    ]
+  }
+}

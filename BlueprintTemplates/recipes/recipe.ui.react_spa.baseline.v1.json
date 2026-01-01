@@ -1,0 +1,17 @@
+﻿{
+  "id": "recipe.ui.react_spa.baseline.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 78 },
+  "title": "UI Baseline: React SPA",
+  "description": "Scaffolds a React SPA baseline: routing, layout, state + API client seam, and basic lint/test hooks (abstract).",
+  "tags": ["ui", "react", "spa"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.ui.scaffold.react_spa.v1" },
+      { "use": "task.ui.add_routes_and_layout.v1" },
+      { "use": "task.ui.add_state_and_api_client.v1" }
+    ]
+  }
+}

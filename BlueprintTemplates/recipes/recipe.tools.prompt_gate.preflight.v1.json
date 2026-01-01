@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.tools.prompt_gate.preflight.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 90 },
+  "title": "Preflight: Tool prompt gate (no tool without prompt)",
+  "description": "Ensures that every tool referenced by the selected plan has a prompt definition. Blocks with WAIT_USER if missing.",
+  "tags": ["tools", "prompts", "preflight", "gate"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.tools.enforce_no_tool_without_prompt_gate.v1" }
+  ] }
+}

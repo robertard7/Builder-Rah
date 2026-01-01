@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.repo.hygiene.java.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": "Java Repo Hygiene",
+  "description": "Generic hygiene plus java notes.",
+  "tags": ["java", "repo", "hygiene"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.repo.hygiene.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/java_notes.md", "onConflict": "skip", "text": "# Java Notes\n\n- Keep modules minimal.\n- Prefer clear package structure.\n- Wire test/build via environment/settings.\n" } }
+  ] }
+}
