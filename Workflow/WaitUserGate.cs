@@ -45,13 +45,22 @@ public static class WaitUserGate
         return new WaitUserResponse(WaitUserAction.None);
     }
 
-    public static string GateMessage(string pendingQuestion, string? toolPlanPreview = null)
+    public static string GateMessage(string pendingQuestion, string? toolPlanPreview = null, ConversationMode mode = ConversationMode.Conversational)
     {
         var preview = string.IsNullOrWhiteSpace(toolPlanPreview) ? "" : $"{toolPlanPreview}\n";
+        if (mode == ConversationMode.Strict)
+        {
+            return
+                "WAIT_USER\n" +
+                preview +
+                $"Pending: {pendingQuestion}\n" +
+                "Allowed replies: accept | reject | edit <rewrite> | accept step <n>";
+        }
+
         return
             "WAIT_USER\n" +
             preview +
-            $"Pending: {pendingQuestion}\n" +
-            "Allowed replies: accept | reject | edit <rewrite> | accept step <n>";
+            $"{pendingQuestion}\n" +
+            "(You can say things like 'go ahead', 'run all', 'stop', or 'change it to <...>')";
     }
 }

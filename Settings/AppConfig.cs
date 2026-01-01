@@ -24,6 +24,7 @@ public sealed class GeneralSettings
 {
     public string RepoRoot { get; set; } = "";
     public bool TweakFirstMode { get; set; } = true;
+    public ConversationMode ConversationMode { get; set; } = ConversationMode.Conversational;
     public string SandboxHostPath { get; set; } = "";
     public string SandboxContainerPath { get; set; } = "";
     public string InboxHostPath { get; set; } = DefaultInboxPath();
@@ -83,6 +84,9 @@ Rules:
 
         if (string.IsNullOrWhiteSpace(FinalAnswerPrompt))
             FinalAnswerPrompt = DefaultFinalAnswerPrompt();
+
+        if (!Enum.IsDefined(typeof(ConversationMode), ConversationMode))
+            ConversationMode = ConversationMode.Conversational;
     }
 
     private static string DefaultInboxPath()
@@ -102,6 +106,12 @@ Rules:
   ""steps"": [
     { ""id"": ""step1"", ""toolId"": ""file.read.text"" or ""vision.describe.image"", ""inputs"": { ""storedName"": ""<storedName>"" }, ""why"": ""<reason>"" }
   ]
+}
+
+public enum ConversationMode
+{
+    Conversational,
+    Strict
 }
 Rules:
 - Allowed tools ONLY: file.read.text, vision.describe.image.
