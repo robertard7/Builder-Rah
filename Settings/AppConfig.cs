@@ -32,7 +32,22 @@ public sealed class GeneralSettings
     public bool EnableGlobalClipboardShortcuts { get; set; } = true;
 
     // SAVE POINT: global digest prompt lives here (JSON-only, no tools)
-    public string JobSpecDigestPrompt { get; set; } = "";
+    public string JobSpecDigestPrompt { get; set; } =
+        @"You are the JobSpec Digest. Convert the user request into a single JSON object that matches this exact shape:
+{
+  ""request"": ""<summarize the user's ask without adding details>"",
+  ""state"": {
+    ""ready"": false,
+    ""missing"": [""field"", ""field""]
+  }
+}
+Rules:
+- Emit only the JSON object. No prose, no markdown, no code fences, no commentary.
+- Do not invent extra fields beyond request and state.
+- Keep request concise and factual, paraphrasing the user's ask without guessing details.
+- If any required information is missing or ambiguous, set state.ready=false and list every missing field name in state.missing.
+- When everything is present, set state.ready=true and state.missing=[].
+- Any output that is not valid JSON is a failure of this prompt.";
 }
 
 public sealed class ProvidersSettings
