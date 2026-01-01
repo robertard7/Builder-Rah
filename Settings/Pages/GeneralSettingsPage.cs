@@ -1,6 +1,8 @@
 #nullable enable
 using System;
+using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 
 namespace RahBuilder.Settings.Pages;
@@ -79,6 +81,47 @@ public sealed class GeneralSettingsPage : UserControl
         AddRow("Tools Manifest Path (tools.json)", () => _config.General.ToolsPath, v => _config.General.ToolsPath = v);
         AddRow("Tool Prompts Folder (Tools/Prompt)", () => _config.General.ToolPromptsPath, v => _config.General.ToolPromptsPath = v);
         AddRow("BlueprintTemplates Folder", () => _config.General.BlueprintTemplatesPath, v => _config.General.BlueprintTemplatesPath = v);
+
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var inboxLabel = new Label { Text = "Attachments Inbox (host path)", AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 10, 0) };
+        var inboxPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
+        var inboxBox = new TextBox { Width = 420, Text = _config.General.InboxHostPath ?? "" };
+        inboxBox.TextChanged += (_, _) => { _config.General.InboxHostPath = inboxBox.Text; AutoSave.Touch(); };
+        var inboxBtn = new Button { Text = "Open Folder", AutoSize = true, Margin = new Padding(6, 0, 0, 0) };
+        inboxBtn.Click += (_, _) =>
+        {
+            try
+            {
+                var path = _config.General.InboxHostPath ?? "";
+                if (string.IsNullOrWhiteSpace(path)) path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RahBuilder", "inbox");
+                Directory.CreateDirectory(path);
+                Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+            }
+            catch { }
+        };
+        inboxPanel.Controls.Add(inboxBox);
+        inboxPanel.Controls.Add(inboxBtn);
+        grid.Controls.Add(inboxLabel, 0, row);
+        grid.Controls.Add(inboxPanel, 1, row);
+        row++;
+
+        AddRow("Accepted attachment extensions (comma-separated)", () => _config.General.AcceptedAttachmentExtensions, v => _config.General.AcceptedAttachmentExtensions = v);
+        AddRow("Max attachment bytes", () => _config.General.MaxAttachmentBytes.ToString(), v =>
+        {
+            if (long.TryParse(v, out var parsed) && parsed > 0)
+            {
+                _config.General.MaxAttachmentBytes = parsed;
+                AutoSave.Touch();
+            }
+        });
+        AddRow("Max total inbox bytes", () => _config.General.MaxTotalInboxBytes.ToString(), v =>
+        {
+            if (long.TryParse(v, out var parsed) && parsed > 0)
+            {
+                _config.General.MaxTotalInboxBytes = parsed;
+                AutoSave.Touch();
+            }
+        });
 
         AddBool("GraphDriven routing enabled", () => _config.General.GraphDriven, v => _config.General.GraphDriven = v);
         AddBool("Container-only execution (no host tools)", () => _config.General.ContainerOnly, v => _config.General.ContainerOnly = v);

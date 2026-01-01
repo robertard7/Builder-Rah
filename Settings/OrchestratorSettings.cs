@@ -26,15 +26,16 @@ public sealed class OrchestratorSettings
         EnsureRole("Executor");
         EnsureRole("Repair");
         EnsureRole("Embed");
+        EnsureRole("Vision", provider: "", model: "");
 
-        var order = new[] { "Orchestrator", "Planner", "Executor", "Repair", "Embed" };
+        var order = new[] { "Orchestrator", "Planner", "Executor", "Repair", "Embed", "Vision" };
         Roles = Roles
             .OrderBy(r => Array.IndexOf(order, r.Role ?? ""))
             .ThenBy(r => r.Role, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
-    private void EnsureRole(string role)
+    private void EnsureRole(string role, string provider = "Ollama", string model = "")
     {
         if (Roles.Any(r => string.Equals(r.Role, role, StringComparison.OrdinalIgnoreCase)))
             return;
@@ -42,8 +43,8 @@ public sealed class OrchestratorSettings
         Roles.Add(new OrchestratorRoleConfig
         {
             Role = role,
-            Provider = "Ollama",
-            Model = "",
+            Provider = provider,
+            Model = model,
             PromptId = "default"
         });
     }
