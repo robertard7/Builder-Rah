@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.detect.ecosystem.intent_contract.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 70 },
+  "title": "Detect: ecosystem + entrypoints intent contract",
+  "description": "Schema for detection outputs used to select tool capability presets.",
+  "tags": ["detect", "ecosystem", "intent", "contract"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "detectedEcosystem": "dotnet|node|python|go|rust|java|cpp|generic",
+    "signals": ["fileMarkers", "lockfiles", "buildFiles", "entrypoints"],
+    "confidence": "0..1",
+    "notes": ["string"]
+  }
+}

@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.cpp.cmake.hello_app.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": "C++ (CMake): Hello App",
+  "description": "Adds minimal main.cpp and CMakeLists.txt for an executable.",
+  "tags": ["cpp", "cmake", "hello"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.generic.v1", "with": { "path": "${projectRoot}/src/main.cpp", "text": "#include <iostream>\n\nint main(int argc, char** argv) {\n  const char* name = (argc > 1) ? argv[1] : \"world\";\n  std::cout << \"Hello, \" << name << std::endl;\n  return 0;\n}\n" } },
+      { "use": "task.add_file.generic.v1", "with": { "path": "${projectRoot}/CMakeLists.txt", "text": "cmake_minimum_required(VERSION 3.20)\nproject(${projectName} LANGUAGES CXX)\n\nset(CMAKE_CXX_STANDARD 20)\nset(CMAKE_CXX_STANDARD_REQUIRED ON)\n\nadd_executable(${projectName}\n  src/main.cpp\n)\n" } }
+    ]
+  }
+}

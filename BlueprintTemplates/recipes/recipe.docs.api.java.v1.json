@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.docs.api.java.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 46 },
+  "title": "API Docs: Java placeholder",
+  "description": "Adds docs/api with Java notes.",
+  "tags": ["docs", "api", "java"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.docs.api.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/api/java.md", "onConflict": "skip", "text": "# API (Java)\n\n- Decide doc generation via Settings.\n- Keep module docs consistent.\n" } }
+  ] }
+}

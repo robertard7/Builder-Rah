@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.data.choose_storage.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 70 },
+  "title": "Choose storage option (neutral, may WAIT_USER)",
+  "description": "Selects a storage option based on constraints; asks minimal questions if constraints are missing.",
+  "tags": ["data", "storage", "neutral", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.data.choose_storage_option.v1" }
+  ] }
+}

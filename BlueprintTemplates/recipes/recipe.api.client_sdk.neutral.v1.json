@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.api.client_sdk.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 74 },
+  "title": "Client SDK plan (neutral)",
+  "description": "Defines a neutral plan for producing typed clients/SDKs and keeping them aligned with server contract/versioning.",
+  "tags": ["api", "client", "sdk", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.api.client_sdk_plan.v1" }
+  ] }
+}

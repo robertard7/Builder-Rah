@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.dotnet.db.postgres.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": ".NET DB: Postgres Skeleton",
+  "description": "Adds a minimal data access interface and a placeholder Postgres implementation.",
+  "tags": ["dotnet", "db", "postgres"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Data/PostgresDb.cs", "onConflict": "skip", "text": "using System.Threading.Tasks;\n\nnamespace Data;\n\n// Placeholder: wire a Postgres provider via your toolchain/settings.\npublic sealed class PostgresDb : IDb\n{\n  public Task<string> PingAsync() => Task.FromResult(\"postgres:ok\");\n}\n" } }
+    ]
+  }
+}

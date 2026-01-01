@@ -1,0 +1,11 @@
+﻿{
+  "id": "recipe.go.resilience.retry_backoff.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 15 },
+  "title": "Go Resilience: Notes",
+  "description": "Adds resilience docs stub.",
+  "tags": ["go", "resilience"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [ { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/resilience.md", "onConflict": "skip", "text": "# Resilience\n\nRetry/backoff/timeouts. Implement via chosen libs.\n" } } ] }
+}

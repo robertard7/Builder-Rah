@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.docs.api.go.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 46 },
+  "title": "API Docs: Go placeholder",
+  "description": "Adds docs/api with Go notes.",
+  "tags": ["docs", "api", "go"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.docs.api.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/api/go.md", "onConflict": "skip", "text": "# API (Go)\n\n- Decide doc generation via Settings.\n- Keep module/workspace details documented.\n" } }
+  ] }
+}

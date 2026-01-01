@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.go.tests.basic_smoke.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": "Go Tests: Basic Smoke",
+  "description": "Adds a minimal go test file.",
+  "tags": ["go", "test", "smoke"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/smoke_test.go", "onConflict": "skip", "text": "package main\n\nimport \"testing\"\n\nfunc TestSmoke(t *testing.T) {\n  if 1+1 != 2 { t.Fatal(\"math broke\") }\n}\n" } }
+    ]
+  }
+}

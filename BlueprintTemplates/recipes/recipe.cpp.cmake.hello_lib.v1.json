@@ -1,0 +1,17 @@
+{
+  "id": "recipe.cpp.cmake.hello_lib.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public" },
+  "title": "C++ CMake Hello Library",
+  "description": "Adds a minimal library target layout and build wiring for CMake projects.",
+  "tags": ["cpp", "cmake", "library"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "use": [
+      "task.add_file.generic.v1",
+      "task.replace_file.generic.v1",
+      "task.build.cpp.v1"
+    ]
+  }
+}

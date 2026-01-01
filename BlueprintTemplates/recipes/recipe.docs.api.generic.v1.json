@@ -1,0 +1,18 @@
+﻿{
+  "id": "recipe.docs.api.generic.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 46 },
+  "title": "API Docs: Generic placeholder",
+  "description": "Adds docs/api placeholder with guidance.",
+  "tags": ["docs", "api"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.ensure_dir.v1", "with": { "path": "${projectRoot}/docs/api" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": {
+      "path": "${projectRoot}/docs/api/README.md",
+      "onConflict": "skip",
+      "text": "# API Reference\n\nGenerate or curate API docs using your environment Settings.\n\n- Do not hardcode tool commands here.\n- Keep docs versioned with releases.\n"
+    } }
+  ] }
+}

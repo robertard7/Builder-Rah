@@ -1,0 +1,19 @@
+﻿{
+  "id": "recipe.desktop.toolkit.baseline.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 86 },
+  "title": "Desktop toolkit baseline (neutral)",
+  "description": "Establishes core desktop app contracts: config storage, settings UI, offline mode, updates, crash reporting, packaging artifacts, and startup health.",
+  "tags": ["desktop", "toolkit", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.desktop.config.define_storage_contract.v1" },
+    { "use": "task.desktop.settings.define_ui_contract.v1" },
+    { "use": "task.desktop.offline.define_behavior_contract.v1" },
+    { "use": "task.desktop.update.define_strategy_contract.v1" },
+    { "use": "task.desktop.crash.define_reporting_contract.v1" },
+    { "use": "task.desktop.packaging.define_artifact_contract.v1" },
+    { "use": "task.desktop.health.define_startup_shutdown_contract.v1" }
+  ] }
+}

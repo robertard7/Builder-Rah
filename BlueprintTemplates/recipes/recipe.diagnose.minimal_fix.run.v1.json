@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.diagnose.minimal_fix.run.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "Diagnose: Run minimal fix playbook",
+  "description": "Evidence-driven runtime failure triage and minimal remediation plan (no commands).",
+  "tags": ["diagnose", "run"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.diagnose.collect_evidence.v1" },
+    { "use": "task.diagnose.classify_stage.v1" },
+    { "use": "task.diagnose.propose_minimal_fix.v1", "with": { "stage": "run" } }
+  ] }
+}

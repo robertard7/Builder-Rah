@@ -1,0 +1,21 @@
+{
+  "id": "recipe.dotnet.winforms.editor_base.v1",
+  "kind": "recipe",
+  "version": "v1",
+  "meta": { "visibility": "public", "priority": 90 },
+  "title": "WinForms editor base (RichTextBox + file menu)",
+  "description": "Mid-level recipe: applies editor base features on top of a WinForms project. Uses task atoms; does not hardcode toolchain/provider/model.",
+  "tags": ["dotnet", "winforms", "editor", "recipe"],
+  "updatedUtc": "2025-12-28T00:00:00.0000000Z",
+  "content": {
+    "requires": {
+      "ecosystem": "dotnet",
+      "profile": "gui"
+    },
+    "steps": [
+      { "use": "task.replace_file.dotnet.winforms.mainform_editor_base.v1" },
+      { "use": "task.build.dotnet.v1" },
+      { "use": "task.run.dotnet.v1" }
+    ]
+  }
+}

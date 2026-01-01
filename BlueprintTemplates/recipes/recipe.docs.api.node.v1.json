@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.docs.api.node.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 46 },
+  "title": "API Docs: Node placeholder",
+  "description": "Adds docs/api with Node notes.",
+  "tags": ["docs", "api", "node"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.docs.api.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/api/node.md", "onConflict": "skip", "text": "# API (Node)\n\n- Decide doc generation via Settings.\n- Keep runtime configuration external.\n" } }
+  ] }
+}

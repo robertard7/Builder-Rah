@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.deploy.neutral.promote_preview_to_prod.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 74 },
+  "title": "Deploy (neutral): Promote preview to prod (gated)",
+  "description": "Defines a gated promotion plan from preview to production with explicit user confirmation and required evidence.",
+  "tags": ["deploy", "promotion", "neutral", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.deploy.promote_preview_to_prod.v1" }
+    ]
+  }
+}

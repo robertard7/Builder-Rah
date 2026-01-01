@@ -1,0 +1,17 @@
+﻿{
+  "id": "recipe.docs.coc.base.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 48 },
+  "title": "Code of Conduct: Base",
+  "description": "Adds a basic Code of Conduct.",
+  "tags": ["docs", "coc"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": {
+      "path": "${projectRoot}/CODE_OF_CONDUCT.md",
+      "onConflict": "skip",
+      "text": "# Code of Conduct\n\nBe respectful.\n\n## Our standards\n- Be kind\n- Assume good intent\n- Keep feedback constructive\n\n## Enforcement\nProject maintainers may moderate content.\n"
+    } }
+  ] }
+}

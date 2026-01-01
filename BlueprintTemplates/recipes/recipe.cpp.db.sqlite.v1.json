@@ -1,0 +1,11 @@
+﻿{
+  "id": "recipe.cpp.db.sqlite.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 5 },
+  "title": "C++ DB: SQLite Notes",
+  "description": "Adds db notes stub.",
+  "tags": ["cpp", "db", "sqlite"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [ { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/db_sqlite.md", "onConflict": "skip", "text": "# DB (SQLite)\n\nIntegrate via library choice.\n" } } ] }
+}

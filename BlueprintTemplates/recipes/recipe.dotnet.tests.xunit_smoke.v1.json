@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.dotnet.tests.xunit_smoke.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": ".NET Tests: xUnit Smoke",
+  "description": "Adds a minimal xUnit test file (assumes test project exists or will be created).",
+  "tags": ["dotnet", "test", "xunit"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/tests/SmokeTests/SmokeTests.cs", "onConflict": "skip", "text": "using Xunit;\n\npublic sealed class SmokeTests\n{\n  [Fact]\n  public void It_works()\n  {\n    Assert.True(true);\n  }\n}\n" } }
+    ]
+  }
+}

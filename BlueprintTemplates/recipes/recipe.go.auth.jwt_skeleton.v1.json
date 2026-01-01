@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.go.auth.jwt_skeleton.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 20 },
+  "title": "Go Auth: JWT Notes",
+  "description": "Adds auth notes stub; implementation via chosen libs.",
+  "tags": ["go", "auth", "jwt"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/auth_jwt.md", "onConflict": "skip", "text": "# Auth (JWT)\n\nImplement token issue/verify using a library chosen in your environment/settings.\n" } }
+  ] }
+}

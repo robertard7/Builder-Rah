@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.data.cache.strategy.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 72 },
+  "title": "Cache strategy (neutral)",
+  "description": "Defines cache strategy hooks and invalidation rules without selecting a cache product.",
+  "tags": ["data", "cache", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.data.cache_strategy_contract.v1" }
+  ] }
+}

@@ -1,0 +1,20 @@
+﻿{
+  "id": "recipe.data.baseline.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 80 },
+  "title": "Data baseline (neutral): domain + contract + migrations + tests",
+  "description": "Creates a storage-agnostic data layer baseline: domain model, storage contract, logical schema, migrations contract, repository scaffold, in-memory tests.",
+  "tags": ["data", "persistence", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.data.define_domain_model.v1" },
+      { "use": "task.data.define_storage_contract.v1" },
+      { "use": "task.data.schema_contract.v1" },
+      { "use": "task.data.migrations_contract.v1" },
+      { "use": "task.data.repository_pattern_scaffold.v1" },
+      { "use": "task.data.add_inmemory_store_for_tests.v1" }
+    ]
+  }
+}

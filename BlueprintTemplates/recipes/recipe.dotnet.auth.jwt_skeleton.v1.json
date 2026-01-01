@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.dotnet.auth.jwt_skeleton.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": ".NET Auth: JWT Skeleton",
+  "description": "Adds token interface and placeholder signer/validator.",
+  "tags": ["dotnet", "auth", "jwt"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Auth/ITokenService.cs", "onConflict": "skip", "text": "namespace Auth;\n\npublic interface ITokenService\n{\n  string Issue(string subject);\n  bool TryValidate(string token, out string subject);\n}\n" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Auth/TokenService.cs", "onConflict": "skip", "text": "namespace Auth;\n\n// Placeholder: implement signing/validation via your chosen library.\npublic sealed class TokenService : ITokenService\n{\n  public string Issue(string subject) => \"token:\" + subject;\n\n  public bool TryValidate(string token, out string subject)\n  {\n    subject = \"\";\n    if (!token.StartsWith(\"token:\")) return false;\n    subject = token.Substring(\"token:\".Length);\n    return true;\n  }\n}\n" } }
+    ]
+  }
+}

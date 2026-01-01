@@ -1,0 +1,11 @@
+﻿{
+  "id": "recipe.cpp.cache.external_hook.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 5 },
+  "title": "C++ Cache: External Hook Notes",
+  "description": "Adds cache notes stub.",
+  "tags": ["cpp", "cache", "external"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [ { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/cache_external.md", "onConflict": "skip", "text": "# External Cache\n\nIntegrate via settings.\n" } } ] }
+}

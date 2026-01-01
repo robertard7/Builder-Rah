@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.dotnet.winforms.ux.modernize.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 72 },
+  "title": "Modernize UX: WinForms baseline patterns",
+  "description": "Applies UX modernization patterns to WinForms apps: async UI rules, centralized theme, consistent layout patterns (abstract).",
+  "tags": ["dotnet", "winforms", "ux", "modernize"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.dotnet.ux.modernize.winforms_patterns.v1" }
+    ]
+  }
+}

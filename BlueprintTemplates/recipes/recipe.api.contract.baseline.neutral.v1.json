@@ -1,0 +1,22 @@
+﻿{
+  "id": "recipe.api.contract.baseline.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 82 },
+  "title": "API contract baseline (neutral)",
+  "description": "Defines API contract, error model, versioning, docs scaffolding, contract tests, deprecation policy, and compatibility gates.",
+  "tags": ["api", "contract", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.api.define_contract.v1" },
+      { "use": "task.api.error_model_contract.v1" },
+      { "use": "task.api.versioning_strategy.v1" },
+      { "use": "task.api.auth_contract.neutral.v1" },
+      { "use": "task.api.deprecation_policy.v1" },
+      { "use": "task.api.compatibility_gates.v1" },
+      { "use": "task.api.scaffold_contract_docs.v1" },
+      { "use": "task.api.contract_tests_baseline.v1" }
+    ]
+  }
+}
