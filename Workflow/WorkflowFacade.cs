@@ -113,6 +113,16 @@ public sealed class WorkflowFacade
             _forceEditBecauseInvalidJson = false;
         }
 
+        var repoScope = RepoScope.Resolve(_cfg);
+        _trace.Emit(repoScope.Message);
+        if (!repoScope.Ok)
+        {
+            EmitWaitUser("Set RepoRoot in Settings -> General.RepoRoot, then retry.");
+            return;
+        }
+
+        RepoScope.CheckGit(repoScope, _trace);
+
         SyncGraphToHub(_cfg);
 
         // No silent fallbacks.

@@ -109,7 +109,7 @@ public sealed class MainForm : Form
         {
             Controls =
             {
-                new SettingsHostControl(_config, AfterSettingsSaved) { Dock = DockStyle.Fill }
+                new SettingsHostControl(_config, AfterSettingsSaved, _trace) { Dock = DockStyle.Fill }
             }
         });
 
