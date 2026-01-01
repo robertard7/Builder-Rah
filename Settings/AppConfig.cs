@@ -1,4 +1,6 @@
 #nullable enable
+using System;
+
 namespace RahBuilder.Settings;
 
 public sealed class AppConfig
@@ -30,6 +32,7 @@ public sealed class GeneralSettings
     public bool GraphDriven { get; set; } = true;
     public bool ContainerOnly { get; set; } = true;
     public bool EnableGlobalClipboardShortcuts { get; set; } = true;
+    public string ExecutionTarget { get; set; } = OperatingSystem.IsWindows() ? "WindowsHost" : "LinuxContainer";
 
     // SAVE POINT: global digest prompt lives here (JSON-only, no tools)
     public string JobSpecDigestPrompt { get; set; } =

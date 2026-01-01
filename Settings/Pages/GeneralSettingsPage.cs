@@ -84,6 +84,25 @@ public sealed class GeneralSettingsPage : UserControl
         AddBool("Container-only execution (no host tools)", () => _config.General.ContainerOnly, v => _config.General.ContainerOnly = v);
         AddBool("Global clipboard shortcuts + context menus", () => _config.General.EnableGlobalClipboardShortcuts, v => _config.General.EnableGlobalClipboardShortcuts = v);
 
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var execLabel = new Label { Text = "Execution Target (WinForms requires WindowsHost)", AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 10, 0) };
+        var execCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left };
+        execCombo.Items.AddRange(new object[] { "WindowsHost", "LinuxContainer" });
+        var currentTarget = (_config.General.ExecutionTarget ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(currentTarget))
+            currentTarget = OperatingSystem.IsWindows() ? "WindowsHost" : "LinuxContainer";
+        execCombo.SelectedItem = currentTarget;
+        execCombo.SelectedIndexChanged += (_, _) =>
+        {
+            var value = execCombo.SelectedItem?.ToString() ?? "";
+            if (string.IsNullOrWhiteSpace(value)) return;
+            _config.General.ExecutionTarget = value;
+            AutoSave.Touch();
+        };
+        grid.Controls.Add(execLabel, 0, row);
+        grid.Controls.Add(execCombo, 1, row);
+        row++;
+
         AddMultiline(
             "Global Job Spec Digest Prompt (JSON-only, no tools)",
             () => _config.General.JobSpecDigestPrompt,
