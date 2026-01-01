@@ -1,0 +1,19 @@
+﻿{
+  "id": "task.data.define_storage_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Data: Define storage contract (ports/adapters)",
+  "description": "Defines a storage contract (interfaces/traits) for persistence operations without committing to a DB or ORM.",
+  "tags": ["data", "storage", "contract", "ports"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "data_define_storage_contract",
+    "inputs": ["projectRoot", "domainModel", "ecosystem"],
+    "outputs": ["storageContract"],
+    "rules": [
+      "CRUD is not a goal; define operations by use-case",
+      "contract must support testing via in-memory implementation"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+﻿{
+  "id": "task.create_project.cpp.cmake.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 10 },
+  "title": "Create C++ Project (CMake)",
+  "description": "Create a C++ scaffold using CMake (src/, include/, CMakeLists.txt).",
+  "tags": ["cpp", "cmake", "create_project"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "create_project",
+    "ecosystem": "cpp",
+    "profile": "cmake",
+    "inputs": ["projectRoot", "projectName", "folderName"],
+    "outputs": ["projectRoot", "cmakeFile", "mainFile"]
+  }
+}

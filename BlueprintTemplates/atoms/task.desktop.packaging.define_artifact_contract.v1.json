@@ -1,0 +1,26 @@
+﻿{
+  "id": "task.desktop.packaging.define_artifact_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Desktop: Define packaging + artifact contract",
+  "description": "Defines what artifacts exist (installer/portable), naming, version stamping, signing concept, and where artifacts land (variables only).",
+  "tags": ["desktop", "packaging", "release", "artifacts"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "desktop_define_packaging_artifact_contract",
+    "inputs": ["projectRoot", "appName?", "targets?"],
+    "outputs": ["artifactContract"],
+    "rules": [
+      "no hardcoded output directories; use ${projectRoot} and variables",
+      "define version stamping across binaries and metadata",
+      "define signing conceptually (if applicable)",
+      "define portable vs installer differences"
+    ],
+    "variables": {
+      "projectRoot": "${projectRoot}",
+      "appName": "${projectName}",
+      "artifactRoot": "${artifactRoot?}"
+    }
+  }
+}

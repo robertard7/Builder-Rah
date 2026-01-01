@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.build.rust.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Build Rust",
+  "description": "Build a Rust project using configured build settings.",
+  "tags": ["rust", "build"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "build", "ecosystem": "rust", "inputs": ["projectRoot"] }
+}

@@ -1,0 +1,17 @@
+﻿{
+  "id": "task.create_project.python.api.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 10 },
+  "title": "Create Python API Project",
+  "description": "Create a Python API scaffold (app module, routing skeleton).",
+  "tags": ["python", "api", "create_project"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "create_project",
+    "ecosystem": "python",
+    "profile": "api",
+    "inputs": ["projectRoot", "projectName", "folderName"],
+    "outputs": ["projectRoot", "appEntryFile"]
+  }
+}

@@ -1,0 +1,17 @@
+﻿{
+  "id": "task.create_project.node.web.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 10 },
+  "title": "Create Node Web Project",
+  "description": "Create a basic Node.js web app scaffold.",
+  "tags": ["node", "web", "create_project"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "create_project",
+    "ecosystem": "node",
+    "profile": "web",
+    "inputs": ["projectRoot", "projectName", "folderName"],
+    "outputs": ["projectRoot", "serverEntryFile"]
+  }
+}

@@ -1,0 +1,25 @@
+﻿{
+  "id": "task.add_feature.bundle.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Add Feature Bundle",
+  "description": "Apply a known feature bundle by selecting recipes based on ecosystem.",
+  "tags": ["feature", "bundle"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_feature_bundle",
+    "inputs": ["projectRoot", "bundleName"],
+    "bundles": {
+      "logging_config_http": {
+        "dotnet": ["recipe.dotnet.feature.logging_config_http.v1"],
+        "node": ["recipe.node.feature.logging_config_http.v1"],
+        "python": ["recipe.python.feature.logging_config_http.v1"],
+        "go": ["recipe.go.feature.logging_config_http.v1"],
+        "rust": ["recipe.rust.feature.logging_config_http.v1"],
+        "java": ["recipe.java.feature.logging_config_http.v1"],
+        "cpp": ["recipe.cpp.feature.logging_config_http.v1"]
+      }
+    }
+  }
+}

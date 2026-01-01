@@ -1,0 +1,14 @@
+{
+  "id": "preset.role.quality.v1",
+  "kind": "preset",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 15 },
+  "title": "Role Preset: quality",
+  "description": "Apply Settings rolePreset by name: quality.",
+  "tags": ["preset", "role", "quality"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "apply_role_preset",
+    "rolePreset": "quality"
+  }
+}

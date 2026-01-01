@@ -1,0 +1,19 @@
+﻿{
+  "id": "task.capabilities.execute_atom_plan.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Capabilities: Execute atom plan (delegated)",
+  "description": "Executes an atomExecutionPlan as a sequence. Engine decides how to run each atom; template contains no commands.",
+  "tags": ["capabilities", "execute", "plan"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "execute_atom_plan",
+    "inputs": ["atomExecutionPlan", "projectRoot", "settingsPresetName?"],
+    "outputs": ["executionReceipts", "finalStatus"],
+    "rules": [
+      "stop on hard failure and route to diagnose pack",
+      "if an atom returns WAIT_USER, surface it immediately"
+    ]
+  }
+}

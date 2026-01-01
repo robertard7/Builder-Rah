@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.api.contract_tests_baseline.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "API: Contract tests baseline",
+  "description": "Adds baseline contract tests and golden examples to catch breaking changes and regressions.",
+  "tags": ["api", "tests", "contract", "compat"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "api_add_contract_tests_baseline",
+    "inputs": ["projectRoot", "apiContract", "versioningStrategy"],
+    "outputs": ["testsArtifacts", "goldenExamples"],
+    "rules": [
+      "tests must be deterministic",
+      "include negative tests for error model stability",
+      "include backwards-compat checks per gate policy"
+    ]
+  }
+}

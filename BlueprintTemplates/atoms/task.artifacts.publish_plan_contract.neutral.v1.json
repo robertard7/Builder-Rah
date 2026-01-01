@@ -1,0 +1,31 @@
+﻿{
+  "id": "task.artifacts.publish_plan_contract.neutral.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Publish: Define publish plan contract (neutral)",
+  "description": "Defines a neutral publish plan describing what will be published, where, and required inputs, without hardcoding registries or tools.",
+  "tags": ["publish", "contract", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "define_publish_plan_contract",
+    "inputs": ["ecosystem?", "artifactManifest", "versioningStrategy?"],
+    "outputs": ["publishPlanContract"],
+    "schema": {
+      "fields": [
+        "targetType: registry|store|internal",
+        "packageId",
+        "version",
+        "artifactsRef",
+        "requiredInputs[]",
+        "verificationGatesRef",
+        "notes"
+      ]
+    },
+    "rules": [
+      "do not assume a specific registry (nuget/npm/pypi/etc.)",
+      "do not include credentials",
+      "allow user or settings to map targetType -> concrete destination"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+﻿{
+  "id": "task.create_project.node.cli.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 10 },
+  "title": "Create Node CLI Project",
+  "description": "Create a Node.js CLI project scaffold.",
+  "tags": ["node", "cli", "create_project"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "create_project",
+    "ecosystem": "node",
+    "profile": "cli",
+    "inputs": ["projectRoot", "projectName", "folderName"],
+    "outputs": ["projectRoot", "entryFile"]
+  }
+}

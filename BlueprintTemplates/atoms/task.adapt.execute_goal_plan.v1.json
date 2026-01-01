@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.adapt.execute_goal_plan.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Adapt: Execute goal plan (abstract)",
+  "description": "Executes the mapped goal plan using existing atoms (build/test/run/format/publish/diagnose) without embedding commands here.",
+  "tags": ["adapt", "execute", "plan"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "execute_task_plan",
+    "inputs": ["taskPlan", "projectRoot", "selection?"],
+    "outputs": ["result"],
+    "rules": [
+      "respect WAIT_USER nodes if required",
+      "prefer minimal steps; stop on error and route to diagnose pack",
+      "do not alter provider/toolchain settings"
+    ]
+  }
+}

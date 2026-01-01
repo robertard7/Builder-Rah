@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.api.compatibility_gates.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "API: Backward compatibility gates",
+  "description": "Defines compatibility checks and gates to prevent breaking changes from shipping silently.",
+  "tags": ["api", "compat", "gates", "ci"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "api_define_compatibility_gates",
+    "inputs": ["projectRoot", "apiContract", "versioningStrategy"],
+    "outputs": ["compatGates", "checklist"],
+    "rules": [
+      "breaking changes must fail gate unless new major version",
+      "additive changes must be documented",
+      "deprecations must include migration guidance"
+    ]
+  }
+}

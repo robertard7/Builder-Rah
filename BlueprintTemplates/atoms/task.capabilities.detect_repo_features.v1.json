@@ -1,0 +1,35 @@
+﻿{
+  "id": "task.capabilities.detect_repo_features.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Capabilities: Detect repo features",
+  "description": "Detects what a repo can plausibly do without guessing: build/test/run/package formats and key files.",
+  "tags": ["capabilities", "detect", "repo", "intake"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "detect_repo_capabilities",
+    "inputs": ["projectRoot"],
+    "outputs": ["capabilitiesReport"],
+    "reportShape": {
+      "fields": [
+        "ecosystemCandidates[]",
+        "hasSolutionOrWorkspace",
+        "hasTests",
+        "hasLintOrFormatConfig",
+        "hasPackagingConfig",
+        "entrypoints[]",
+        "knownBuildFiles[]",
+        "knownTestFiles[]",
+        "knownRunTargets[]",
+        "knownPackageTargets[]",
+        "notes[]"
+      ]
+    },
+    "rules": [
+      "detection must be evidence-based (file presence or prior receipts)",
+      "do not infer tests exist unless a test target is discoverable",
+      "record ambiguities rather than guessing"
+    ]
+  }
+}

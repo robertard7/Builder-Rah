@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.build.java.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Build Java (Maven)",
+  "description": "Build a Java project using Maven configuration.",
+  "tags": ["java", "maven", "build"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "build", "ecosystem": "java", "inputs": ["projectRoot"] }
+}

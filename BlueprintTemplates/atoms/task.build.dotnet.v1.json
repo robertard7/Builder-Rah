@@ -1,0 +1,15 @@
+{
+  "id": "task.build.dotnet.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 12 },
+  "title": "Build .NET",
+  "description": "Build a .NET solution/project using configured settings.",
+  "tags": ["dotnet", "build"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "build",
+    "ecosystem": "dotnet",
+    "inputs": ["projectRoot", "solutionPath"]
+  }
+}

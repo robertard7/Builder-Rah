@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.build.cpp.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Build C++ (CMake)",
+  "description": "Build a C++ project using configured CMake settings.",
+  "tags": ["cpp", "cmake", "build"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "build", "ecosystem": "cpp", "inputs": ["projectRoot", "buildFolderName"] }
+}

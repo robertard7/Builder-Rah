@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.create_project.dotnet.winforms.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Create project (.NET WinForms GUI)",
+  "description": "Creates a WinForms app project. Orchestrator resolves actual scaffolding.",
+  "tags": ["create_project", "dotnet", "gui", "winforms"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "create_project", "inputs": ["projectRoot", "projectName"], "outputs": ["solutionPath?", "projectPath?"] }
+}

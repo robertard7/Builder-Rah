@@ -1,0 +1,14 @@
+{
+  "id": "preset.role.fast.v1",
+  "kind": "preset",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 15 },
+  "title": "Role Preset: fast",
+  "description": "Apply Settings rolePreset by name: fast.",
+  "tags": ["preset", "role", "fast"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "apply_role_preset",
+    "rolePreset": "fast"
+  }
+}

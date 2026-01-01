@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.adapt.map_goal_to_tasks.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Adapt: Map goal verb to ecosystem-specific tasks",
+  "description": "Translates a user goal (build/test/run/format/publish/etc.) into the correct ecosystem-specific atom ids.",
+  "tags": ["adapt", "routing", "verbs"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "map_goal_to_tasks",
+    "inputs": ["goalVerb", "detectionReport", "preferredEcosystem?", "preferredProfile?"],
+    "outputs": ["taskPlan"],
+    "mappingRules": [
+      "if ecosystem is clear, pick task.<verb>.<ecosystem>.*.v1 when available",
+      "fall back to task.<verb>.generic.v1 when ecosystem-specific is missing",
+      "for multi-ecosystem, prefer the ecosystem aligned to the user's goal/profile",
+      "never invent ids; only reference ids that exist in manifest"
+    ]
+  }
+}

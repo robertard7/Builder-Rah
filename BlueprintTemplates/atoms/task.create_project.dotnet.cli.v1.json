@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.create_project.dotnet.cli.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Create project (.NET CLI)",
+  "description": "Creates a .NET console project. Orchestrator resolves actual scaffolding.",
+  "tags": ["create_project", "dotnet", "cli"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "create_project", "inputs": ["projectRoot", "projectName"], "outputs": ["solutionPath?", "projectPath?"] }
+}

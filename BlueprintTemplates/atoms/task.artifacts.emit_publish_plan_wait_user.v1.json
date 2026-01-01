@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.artifacts.emit_publish_plan_wait_user.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Publish: Emit publish plan for approval (WAIT_USER)",
+  "description": "Produces a publish plan summary for user approval when destination details are unknown or risk is high.",
+  "tags": ["publish", "wait_user", "plan"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "emit_wait_user_questions",
+    "inputs": ["publishPlanContract", "verificationGates", "artifactManifest"],
+    "outputs": ["questions", "waitUser"],
+    "waitUser": true,
+    "questionRules": [
+      "ask which destination targetType should map to (by settings name, not ids)",
+      "ask if this is a dry-run plan only or execute publish",
+      "confirm version and packageId if ambiguous"
+    ]
+  }
+}

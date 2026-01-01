@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.capabilities.wait_user.resolve_ambiguities.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Capabilities: WAIT_USER resolve ambiguities",
+  "description": "Asks minimal questions to resolve ambiguities discovered during detection or planning.",
+  "tags": ["capabilities", "wait_user", "ambiguity"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "emit_wait_user_questions",
+    "inputs": ["capabilitiesReport", "goalVerb", "normalizedGoalPlan?"],
+    "outputs": ["questions", "waitUser"],
+    "waitUser": true,
+    "questionRules": [
+      "ask only what is required to execute next safe step",
+      "prefer: which entrypoint to run, which project within workspace, desired test framework, desired package target type",
+      "do not ask for provider/model/toolchain ids"
+    ]
+  }
+}

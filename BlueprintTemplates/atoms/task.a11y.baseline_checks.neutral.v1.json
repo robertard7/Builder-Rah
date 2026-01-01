@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.a11y.baseline_checks.neutral.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Accessibility: Baseline checks (neutral)",
+  "description": "Defines baseline accessibility checks: keyboard navigation, focus order, contrast, labels, ARIA where relevant, and screen-reader semantics.",
+  "tags": ["a11y", "accessibility", "ui"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "a11y_define_baseline_checks",
+    "inputs": ["projectRoot", "uiType?"],
+    "outputs": ["a11yChecklist", "highRiskAreas"],
+    "rules": [
+      "keyboard-only use must be possible for core flows",
+      "focus visible and logical",
+      "errors must be announced and associated with fields",
+      "avoid color-only meaning"
+    ]
+  }
+}

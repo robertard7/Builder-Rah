@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.api.scaffold_contract_docs.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "API: Scaffold contract documentation",
+  "description": "Creates human-readable API docs based on the contract (endpoints, examples, errors, auth, versioning).",
+  "tags": ["api", "docs", "contract"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "api_scaffold_contract_docs",
+    "inputs": ["projectRoot", "apiContract", "errorModel", "authContract?"],
+    "outputs": ["docsArtifacts"],
+    "rules": [
+      "examples must avoid real secrets",
+      "include curl-like examples only as pseudocode, not commands",
+      "document pagination/filtering where applicable"
+    ]
+  }
+}

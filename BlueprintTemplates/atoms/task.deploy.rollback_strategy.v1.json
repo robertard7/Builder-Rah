@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.deploy.rollback_strategy.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Deploy: Rollback strategy",
+  "description": "Defines a vendor-neutral rollback strategy for deploy failures (code rollback, config rollback, migration notes). Abstract.",
+  "tags": ["deploy", "rollback", "safety"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "deploy_rollback_strategy",
+    "inputs": ["projectRoot", "ecosystem", "hasDb?"],
+    "outputs": ["rollbackStrategy"],
+    "rules": [
+      "prefer reversible steps",
+      "make rollback steps explicit",
+      "never delete data by default"
+    ]
+  }
+}

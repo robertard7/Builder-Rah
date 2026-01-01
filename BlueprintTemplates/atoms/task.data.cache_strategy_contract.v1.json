@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.data.cache_strategy_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Data: Cache strategy contract",
+  "description": "Defines caching strategy hooks (TTL, invalidation, stampede protection notes) without choosing a cache product.",
+  "tags": ["data", "cache", "contract"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "data_define_cache_strategy",
+    "inputs": ["projectRoot", "useCases?", "riskProfile?"],
+    "outputs": ["cacheContract", "invalidationNotes"],
+    "defaults": { "riskProfile": "low|medium|high" },
+    "rules": [
+      "cache is optional; app must work without it",
+      "never cache secrets",
+      "document invalidation rules clearly"
+    ]
+  }
+}

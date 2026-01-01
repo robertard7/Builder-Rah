@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.ci.pipeline.generic.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "CI Pipeline (Generic)",
+  "description": "Run a generic CI pipeline sequence (detect -> lint -> build -> test) using configured tasks.",
+  "tags": ["ci", "pipeline", "generic"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "pipeline",
+    "inputs": ["projectRoot"],
+    "steps": [
+      "task.detect.project_shape.v1",
+      "task.format_lint.${ecosystem}.v1",
+      "task.build.${ecosystem}.v1",
+      "task.test.${ecosystem}.v1"
+    ]
+  }
+}

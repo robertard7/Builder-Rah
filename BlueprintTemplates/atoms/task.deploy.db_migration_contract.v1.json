@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.deploy.db_migration_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Deploy: DB migration contract (optional)",
+  "description": "Defines how migrations are run, verified, and rolled back conceptually. Abstract.",
+  "tags": ["deploy", "db", "migrations"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "deploy_db_migration_contract",
+    "inputs": ["projectRoot", "ecosystem", "dbType?"],
+    "outputs": ["migrationContract", "safetyNotes"],
+    "rules": [
+      "must be safe by default",
+      "no destructive changes without explicit approval",
+      "include backup/rollback guidance"
+    ]
+  }
+}
