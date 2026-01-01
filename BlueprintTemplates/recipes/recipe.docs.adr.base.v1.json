@@ -1,0 +1,23 @@
+﻿{
+  "id": "recipe.docs.adr.base.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 54 },
+  "title": "ADR: Base",
+  "description": "Creates ADR folder, index, and ADR template.",
+  "tags": ["docs", "adr"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.ensure_dir.v1", "with": { "path": "${projectRoot}/docs/adr" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": {
+      "path": "${projectRoot}/docs/adr/README.md",
+      "onConflict": "skip",
+      "text": "# Architecture Decision Records\n\n- Keep decisions small and specific.\n- Link to PRs/issues if available.\n"
+    } },
+    { "use": "task.add_file.conflict_policy.v1", "with": {
+      "path": "${projectRoot}/docs/adr/template.md",
+      "onConflict": "skip",
+      "text": "# ADR: <title>\n\n## Status\nProposed | Accepted | Deprecated\n\n## Context\nWhat problem are we solving?\n\n## Decision\nWhat did we decide?\n\n## Consequences\nWhat do we gain/lose?\n"
+    } }
+  ] }
+}

@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.dotnet.auth.session_skeleton.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": ".NET Auth: Session Skeleton",
+  "description": "Adds a simple session store abstraction.",
+  "tags": ["dotnet", "auth", "session"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Auth/ISessionStore.cs", "onConflict": "skip", "text": "namespace Auth;\n\npublic interface ISessionStore\n{\n  string Create(string subject);\n  bool TryGet(string sessionId, out string subject);\n}\n" } }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.go.feature.logging_config_http.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "Go Feature: Logging + Config + HTTP",
+  "description": "Adds config.json and a minimal net/http client sample with logging.",
+  "tags": ["go", "logging", "config", "http"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/config.json", "onConflict": "skip", "text": "{\n  \"baseUrl\": \"https://example.com\"\n}\n" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/http_sample.go", "onConflict": "skip", "text": "package main\n\nimport (\n  \"encoding/json\"\n  \"io\"\n  \"log\"\n  \"net/http\"\n  \"os\"\n)\n\ntype Config struct { BaseUrl string `json:\"baseUrl\"` }\n\nfunc main() {\n  f, err := os.Open(\"config.json\")\n  if err != nil { log.Fatal(err) }\n  defer f.Close()\n\n  var cfg Config\n  if err := json.NewDecoder(f).Decode(&cfg); err != nil { log.Fatal(err) }\n  if cfg.BaseUrl == \"\" { cfg.BaseUrl = \"https://example.com\" }\n\n  log.Printf(\"GET %s/\", cfg.BaseUrl)\n  resp, err := http.Get(cfg.BaseUrl + \"/\")\n  if err != nil { log.Fatal(err) }\n  defer resp.Body.Close()\n  io.Copy(io.Discard, resp.Body)\n  log.Printf(\"Status: %d\", resp.StatusCode)\n}\n" } }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+﻿{
+  "id": "recipe.dotnet.sln.multi_project_layout.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": ".NET Solution Multi-Project Layout",
+  "description": "Creates common folders and a README for a solution-style repo.",
+  "tags": ["dotnet", "sln", "layout"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/README.md", "onConflict": "skip", "text": "# ${projectName}\n\nSolution-based repository.\n\nFolders:\n- src/\n- tests/\n" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/.keep", "onConflict": "skip", "text": "" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/tests/.keep", "onConflict": "skip", "text": "" } }
+    ]
+  }
+}

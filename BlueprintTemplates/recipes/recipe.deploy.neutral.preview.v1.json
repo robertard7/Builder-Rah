@@ -1,0 +1,20 @@
+﻿{
+  "id": "recipe.deploy.neutral.preview.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 78 },
+  "title": "Deploy (neutral): Preview environment",
+  "description": "Creates a vendor-neutral preview deployment plan: env contract, secrets policy, artifact manifest, smoke tests, rollback.",
+  "tags": ["deploy", "preview", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.deploy.define_env_contract.v1" },
+      { "use": "task.deploy.secrets_policy.v1" },
+      { "use": "task.deploy.generate_artifact_manifest.v1" },
+      { "use": "task.deploy.smoke_test_contract.v1" },
+      { "use": "task.deploy.rollback_strategy.v1" },
+      { "use": "task.deploy.preview_plan.v1" }
+    ]
+  }
+}

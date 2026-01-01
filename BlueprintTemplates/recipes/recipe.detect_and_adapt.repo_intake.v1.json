@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.detect_and_adapt.repo_intake.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 78 },
+  "title": "Detect & Adapt: Repo intake (no execution)",
+  "description": "Detects ecosystem/layout/maturity and produces a concise plan of recommended packs to apply next.",
+  "tags": ["detect", "intake", "plan_only"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.detect.ecosystem_and_entrypoints.v1" },
+    { "use": "task.detect.repo_layout_and_conventions.v1" },
+    { "use": "task.detect.project_maturity_and_risk.v1" }
+  ] }
+}

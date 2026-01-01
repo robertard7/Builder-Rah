@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.go.auth.session_skeleton.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 15 },
+  "title": "Go Auth: Session Notes",
+  "description": "Adds session auth notes stub.",
+  "tags": ["go", "auth", "session"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/auth_session.md", "onConflict": "skip", "text": "# Auth (Session)\n\nDocument session strategy here.\n" } }
+  ] }
+}

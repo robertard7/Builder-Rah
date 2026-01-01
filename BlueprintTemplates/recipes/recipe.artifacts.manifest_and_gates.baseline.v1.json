@@ -1,0 +1,19 @@
+﻿{
+  "id": "recipe.artifacts.manifest_and_gates.baseline.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 85 },
+  "title": "Artifacts: Manifest + verification gates (baseline)",
+  "description": "Defines artifact manifest contract, collects evidence, generates/writes manifest, and defines/validates verification gates.",
+  "tags": ["artifacts", "manifest", "verify", "gates"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.detect.ecosystem_and_entrypoints.v1" },
+    { "use": "task.artifacts.define_manifest_contract.v1" },
+    { "use": "task.artifacts.collect_outputs_and_receipts.v1" },
+    { "use": "task.artifacts.generate_manifest.v1" },
+    { "use": "task.artifacts.write_manifest_file.v1" },
+    { "use": "task.artifacts.define_verification_gates.v1" },
+    { "use": "task.artifacts.validate_gates_or_wait_user.v1" }
+  ] }
+}

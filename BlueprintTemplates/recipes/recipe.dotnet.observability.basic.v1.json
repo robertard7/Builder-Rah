@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.dotnet.observability.basic.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": ".NET Observability: Basic",
+  "description": "Adds minimal logger abstraction + correlation context.",
+  "tags": ["dotnet", "observability", "logging"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Obs/ILog.cs", "onConflict": "skip", "text": "namespace Obs;\n\npublic interface ILog\n{\n  void Info(string message);\n  void Warn(string message);\n  void Error(string message);\n}\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Obs/Correlation.cs", "onConflict": "skip", "text": "using System;\nusing System.Threading;\n\nnamespace Obs;\n\npublic static class Correlation\n{\n  private static readonly AsyncLocal<string?> _id = new();\n  public static string Id => _id.Value ?? \"\";\n  public static IDisposable Push(string id)\n  {\n    var prev = _id.Value;\n    _id.Value = id;\n    return new Restore(prev);\n  }\n  private sealed class Restore : IDisposable\n  {\n    private readonly string? _prev;\n    public Restore(string? prev) { _prev = prev; }\n    public void Dispose() { _id.Value = _prev; }\n  }\n}\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/observability.md", "onConflict": "skip", "text": "# Observability\n\nGoals:\n- structured logs (level, timestamp, correlationId)\n- request/operation correlation\n\nWire concrete logging sinks via your environment/settings.\n" } }
+  ] }
+}

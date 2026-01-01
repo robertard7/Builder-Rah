@@ -1,0 +1,19 @@
+﻿{
+  "id": "recipe.detect_and_adapt.goal.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 90 },
+  "title": "Detect & Adapt: Execute a goal in any repo",
+  "description": "Detects ecosystem/layout, resolves ambiguities via WAIT_USER, maps goal verb to correct tasks, executes, and routes failures to diagnose.",
+  "tags": ["detect", "adapt", "goal", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.detect.ecosystem_and_entrypoints.v1" },
+    { "use": "task.detect.repo_layout_and_conventions.v1" },
+    { "use": "task.detect.project_maturity_and_risk.v1" },
+    { "use": "task.detect.wait_user.ambiguities.v1" },
+    { "use": "task.adapt.map_goal_to_tasks.v1" },
+    { "use": "task.adapt.execute_goal_plan.v1" },
+    { "use": "task.adapt.on_fail.route_to_diagnose.v1" }
+  ] }
+}

@@ -1,0 +1,18 @@
+﻿{
+  "id": "recipe.docs.architecture.base.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 58 },
+  "title": "Architecture: Base",
+  "description": "docs/architecture skeleton with overview and boundaries.",
+  "tags": ["docs", "architecture"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.ensure_dir.v1", "with": { "path": "${projectRoot}/docs/architecture" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": {
+      "path": "${projectRoot}/docs/architecture/overview.md",
+      "onConflict": "skip",
+      "text": "# Architecture Overview\n\n## Goals\n- What the system must do\n\n## Non-goals\n- What it must not do\n\n## Modules\nDescribe key modules and boundaries.\n\n## Data flows\nDescribe major flows at a high level.\n\n## Settings\nDocument the important Settings keys by name (no provider/toolchain IDs).\n"
+    } }
+  ] }
+}

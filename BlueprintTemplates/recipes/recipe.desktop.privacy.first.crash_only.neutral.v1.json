@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.desktop.privacy.first.crash_only.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 74 },
+  "title": "Privacy-first crash handling (neutral)",
+  "description": "Defines crash reporting with strict consent and redaction, producing exportable local bundles only by default.",
+  "tags": ["desktop", "privacy", "crash", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.desktop.crash.define_reporting_contract.v1" }
+  ] }
+}

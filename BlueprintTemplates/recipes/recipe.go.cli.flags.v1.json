@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.go.cli.flags.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": "Go CLI: Flags + Logging",
+  "description": "Adds a minimal flag parser and basic logging output.",
+  "tags": ["go", "cli", "flags"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.generic.v1", "with": { "path": "${projectRoot}/main.go", "text": "package main\n\nimport (\n  \"flag\"\n  \"fmt\"\n  \"log\"\n  \"os\"\n)\n\nfunc main() {\n  name := flag.String(\"name\", \"world\", \"name to greet\")\n  verbose := flag.Bool(\"v\", false, \"verbose logging\")\n  flag.Parse()\n\n  log.SetOutput(os.Stdout)\n  if *verbose {\n    log.Printf(\"verbose enabled\")\n  }\n\n  fmt.Printf(\"Hello, %s\\n\", *name)\n}\n" } }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+﻿{
+  "id": "recipe.docs.readme.base.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "README: Base",
+  "description": "High quality README skeleton with placeholders and structure.",
+  "tags": ["docs", "readme"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": {
+      "path": "${projectRoot}/README.md",
+      "onConflict": "skip",
+      "text": "# ${projectName}\n\n## What this is\nDescribe the goal in 2-4 sentences.\n\n## Status\n- Stability: <alpha/beta/stable>\n- Supported ecosystems: <list>\n\n## Quickstart\nThis repo intentionally avoids hardcoding commands. Use your Settings to build/test/run.\n\n## Project structure\n- apps/: applications (optional)\n- libs/: shared libraries (optional)\n- docs/: documentation\n\n## Contributing\nSee CONTRIBUTING.md\n\n## Security\nSee SECURITY.md\n"
+    } }
+  ] }
+}

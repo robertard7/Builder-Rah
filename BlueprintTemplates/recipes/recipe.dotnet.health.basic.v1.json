@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.dotnet.health.basic.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": ".NET Health: Basic",
+  "description": "Adds health notes and a simple health response helper.",
+  "tags": ["dotnet", "health"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Health/HealthReport.cs", "onConflict": "skip", "text": "namespace Health;\n\npublic sealed record HealthReport(string Status, string? Detail = null);\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/health.md", "onConflict": "skip", "text": "# Health\n\nDefine endpoints:\n- /health (liveness)\n- /ready (readiness)\n\nReadiness should validate DB/cache connectivity if present.\n" } }
+  ] }
+}

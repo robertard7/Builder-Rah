@@ -1,0 +1,11 @@
+﻿{
+  "id": "recipe.go.health.basic.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 15 },
+  "title": "Go Health: Notes",
+  "description": "Adds health docs stub.",
+  "tags": ["go", "health"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [ { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/health.md", "onConflict": "skip", "text": "# Health\n\nExpose /health and /ready.\n" } } ] }
+}

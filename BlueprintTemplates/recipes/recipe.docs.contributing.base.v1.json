@@ -1,0 +1,17 @@
+﻿{
+  "id": "recipe.docs.contributing.base.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": "CONTRIBUTING: Base",
+  "description": "Contributing guidelines that reference Settings for workflow.",
+  "tags": ["docs", "contributing"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": {
+      "path": "${projectRoot}/CONTRIBUTING.md",
+      "onConflict": "skip",
+      "text": "# Contributing\n\n## Principles\n- Keep changes minimal and reviewable.\n- Avoid hardcoding environment assumptions.\n\n## Local workflow\nUse your Settings to:\n- build\n- test\n- format/lint\n\n## Pull requests\n- Include rationale\n- Include test coverage notes\n- Prefer small diffs\n"
+    } }
+  ] }
+}

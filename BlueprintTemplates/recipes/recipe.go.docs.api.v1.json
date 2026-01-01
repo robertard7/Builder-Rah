@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.go.docs.api.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 15 },
+  "title": "Go Docs: API",
+  "description": "Adds OpenAPI stub and routes doc.",
+  "tags": ["go", "docs", "openapi"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/openapi.yaml", "onConflict": "skip", "text": "openapi: 3.0.0\ninfo:\n  title: ${projectName} API\n  version: 0.1.0\npaths: {}\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/routes.md", "onConflict": "skip", "text": "# Routes\n\nDocument routes here.\n" } }
+  ] }
+}

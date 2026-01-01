@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.dotnet.db.sqlite.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": ".NET DB: SQLite Skeleton",
+  "description": "Adds a minimal data access interface and a placeholder SQLite implementation.",
+  "tags": ["dotnet", "db", "sqlite"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Data/IDb.cs", "onConflict": "skip", "text": "using System.Threading.Tasks;\n\nnamespace Data;\n\npublic interface IDb\n{\n  Task<string> PingAsync();\n}\n" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Data/SqliteDb.cs", "onConflict": "skip", "text": "using System.Threading.Tasks;\n\nnamespace Data;\n\n// Placeholder: wire a SQLite provider via your toolchain/settings.\npublic sealed class SqliteDb : IDb\n{\n  public Task<string> PingAsync() => Task.FromResult(\"sqlite:ok\");\n}\n" } }
+    ]
+  }
+}

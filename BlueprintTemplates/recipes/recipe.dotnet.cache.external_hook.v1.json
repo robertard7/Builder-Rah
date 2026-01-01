@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.dotnet.cache.external_hook.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 40 },
+  "title": ".NET Cache: External Hook",
+  "description": "Adds a placeholder external cache adapter.",
+  "tags": ["dotnet", "cache", "external"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Cache/ExternalCacheAdapter.cs", "onConflict": "skip", "text": "namespace Cache;\n\n// Placeholder: integrate external cache via your toolchain/settings.\npublic sealed class ExternalCacheAdapter : ICache\n{\n  public bool TryGet(string key, out string value) { value = \"\"; return false; }\n  public void Set(string key, string value) { }\n}\n" } }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.cpp.feature.logging_config_http.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "C++ Feature: Logging + Config + HTTP",
+  "description": "Adds config.json and a placeholder HTTP sample (no library assumed).",
+  "tags": ["cpp", "logging", "config", "http"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/config.json", "onConflict": "skip", "text": "{\n  \"baseUrl\": \"https://example.com\"\n}\n" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/http_sample.cpp", "onConflict": "skip", "text": "#include <iostream>\n#include <fstream>\n#include <sstream>\n\nint main() {\n  std::ifstream f(\"config.json\");\n  std::stringstream ss;\n  ss << f.rdbuf();\n  std::cout << \"config: \" << ss.str() << std::endl;\n  std::cout << \"HTTP sample: wire an HTTP library via your settings/toolchain if desired\" << std::endl;\n  return 0;\n}\n" } }
+    ]
+  }
+}

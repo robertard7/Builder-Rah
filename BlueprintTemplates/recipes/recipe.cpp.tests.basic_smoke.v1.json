@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.cpp.tests.basic_smoke.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": "C++ Tests: Basic Smoke",
+  "description": "Adds a minimal test source file (framework not assumed).",
+  "tags": ["cpp", "test", "smoke"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/tests/smoke.cpp", "onConflict": "skip", "text": "#include <cassert>\n\nint main() {\n  assert(1 + 1 == 2);\n  return 0;\n}\n" } }
+    ]
+  }
+}

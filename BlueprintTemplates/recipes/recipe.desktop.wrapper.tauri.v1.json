@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.desktop.wrapper.tauri.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 68 },
+  "title": "Desktop Wrapper: Tauri (abstract)",
+  "description": "Wraps a web UI in a Tauri-style desktop shell (abstract, no commands).",
+  "tags": ["desktop", "tauri", "wrapper"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.desktop.wrap_web_app.v1", "with": { "wrapperType": "tauri" } }
+    ]
+  }
+}

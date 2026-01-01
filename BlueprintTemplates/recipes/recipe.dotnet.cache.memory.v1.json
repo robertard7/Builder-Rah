@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.dotnet.cache.memory.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": ".NET Cache: In-Memory",
+  "description": "Adds a minimal in-memory cache interface and implementation.",
+  "tags": ["dotnet", "cache", "memory"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Cache/ICache.cs", "onConflict": "skip", "text": "namespace Cache;\n\npublic interface ICache\n{\n  bool TryGet(string key, out string value);\n  void Set(string key, string value);\n}\n" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/Cache/MemoryCache.cs", "onConflict": "skip", "text": "using System.Collections.Concurrent;\n\nnamespace Cache;\n\npublic sealed class MemoryCache : ICache\n{\n  private readonly ConcurrentDictionary<string,string> _map = new();\n  public bool TryGet(string key, out string value) => _map.TryGetValue(key, out value!);\n  public void Set(string key, string value) => _map[key] = value;\n}\n" } }
+    ]
+  }
+}

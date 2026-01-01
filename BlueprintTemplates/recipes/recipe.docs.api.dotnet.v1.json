@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.docs.api.dotnet.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 46 },
+  "title": "API Docs: .NET placeholder",
+  "description": "Adds docs/api with .NET notes.",
+  "tags": ["docs", "api", "dotnet"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.docs.api.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/api/dotnet.md", "onConflict": "skip", "text": "# API (.NET)\n\n- Decide doc generation via Settings.\n- Keep output paths configurable.\n" } }
+  ] }
+}

@@ -1,0 +1,42 @@
+﻿{
+  "id": "recipe.capabilities.matrix.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 70 },
+  "title": "Capabilities: Ecosystem verb coverage matrix",
+  "description": "A declarative matrix of which core verbs are supported per ecosystem/profile.",
+  "tags": ["capabilities", "matrix", "ecosystem"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "matrix": {
+      "dotnet": {
+        "profiles": ["cli", "gui(winforms)", "library"],
+        "verbs": ["create_project", "add_file", "replace_file", "apply_patch", "build", "test", "run", "format_lint", "package_publish", "diagnose_build_fail_triage"]
+      },
+      "node": {
+        "profiles": ["cli", "web"],
+        "verbs": ["create_project", "add_file", "replace_file", "apply_patch", "build", "test", "run", "format_lint", "package_publish", "diagnose_build_fail_triage"]
+      },
+      "python": {
+        "profiles": ["cli", "api"],
+        "verbs": ["create_project", "add_file", "replace_file", "apply_patch", "build", "test", "run", "format_lint", "package_publish", "diagnose_build_fail_triage"]
+      },
+      "go": {
+        "profiles": ["cli"],
+        "verbs": ["create_project", "add_file", "replace_file", "apply_patch", "build", "test", "run", "format_lint", "package_publish", "diagnose_build_fail_triage"]
+      },
+      "rust": {
+        "profiles": ["cli"],
+        "verbs": ["create_project", "add_file", "replace_file", "apply_patch", "build", "test", "run", "format_lint", "package_publish", "diagnose_build_fail_triage"]
+      },
+      "java": {
+        "profiles": ["cli(maven)"],
+        "verbs": ["create_project", "add_file", "replace_file", "apply_patch", "build", "test", "run", "format_lint", "package_publish", "diagnose_build_fail_triage"]
+      },
+      "cpp": {
+        "profiles": ["cmake"],
+        "verbs": ["create_project", "add_file", "replace_file", "apply_patch", "build", "test", "run", "format_lint", "package_publish", "diagnose_build_fail_triage"]
+      }
+    }
+  }
+}

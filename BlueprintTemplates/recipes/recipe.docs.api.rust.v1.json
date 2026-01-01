@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.docs.api.rust.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 46 },
+  "title": "API Docs: Rust placeholder",
+  "description": "Adds docs/api with Rust notes.",
+  "tags": ["docs", "api", "rust"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.docs.api.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/api/rust.md", "onConflict": "skip", "text": "# API (Rust)\n\n- Decide doc generation via Settings.\n- Keep docs aligned with crate versions.\n" } }
+  ] }
+}

@@ -1,0 +1,11 @@
+﻿{
+  "id": "recipe.cpp.auth.session_skeleton.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 5 },
+  "title": "C++ Auth: Session Notes",
+  "description": "Adds auth notes stub.",
+  "tags": ["cpp", "auth", "session"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [ { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/auth_session.md", "onConflict": "skip", "text": "# Auth (Session)\n\nDocument session strategy.\n" } } ] }
+}

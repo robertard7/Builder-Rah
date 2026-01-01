@@ -1,0 +1,17 @@
+﻿{
+  "id": "recipe.docs.security.policy.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 52 },
+  "title": "SECURITY: Policy",
+  "description": "Security disclosure template and policy.",
+  "tags": ["docs", "security"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": {
+      "path": "${projectRoot}/SECURITY.md",
+      "onConflict": "skip",
+      "text": "# Security Policy\n\n## Reporting a vulnerability\nPlease report privately.\n\n## Scope\n- Source code\n- Build artifacts (where applicable)\n- Supply chain concerns\n\n## Response\nWe aim to acknowledge reports promptly and coordinate a fix.\n"
+    } }
+  ] }
+}
