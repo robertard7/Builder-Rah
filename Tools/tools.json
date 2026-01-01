@@ -315,6 +315,16 @@
       "desc": "Run python module/script. args: <projectDir> <scriptOrModule> [args...]",
       "cmd": "set -- {args}; p=\"$1\"; s=\"$2\"; shift 2 || true; if [ -z \"$p\" ] || [ -z \"$s\" ]; then echo 'usage: <projectDir> <scriptOrModule> [args...]'; exit 2; fi; cd \"$p\" && python3 \"$s\" \"$@\""
     },
+    {
+      "id": "file.read.text",
+      "desc": "Read a small text file (txt|md|json|csv) and emit JSON {filename,sha256,content}. args: <path>",
+      "cmd": "bash -lc \"p=\\\"{args}\\\"; if [ -z \\\"$p\\\" ]; then echo '{\"error\":\"missing_path\"}'; exit 1; fi; ext=${p##*.}; case \\\"${ext,,}\\\" in txt|md|json|csv) ;; *) echo '{\"error\":\"unsupported_extension\"}'; exit 1;; esac; if [ ! -f \\\"$p\\\" ]; then echo '{\"error\":\"not_found\"}'; exit 1; fi; max=52428800; size=$(stat -c%s \\\"$p\\\" 2>/dev/null || echo 0); if [ \"$size\" -gt \"$max\" ]; then echo '{\"error\":\"too_large\"}'; exit 1; fi; PATH_TO_READ=\\\"$p\\\" python3 - <<'PY'\nimport json, hashlib, os\np=os.environ['PATH_TO_READ']\nwith open(p,'rb') as f:\n    data=f.read()\nsha=hashlib.sha256(data).hexdigest()\ntext=data.decode('utf-8','replace')\nprint(json.dumps({\"filename\":os.path.basename(p),\"sha256\":sha,\"content\":text}))\nPY\n\""
+    },
+    {
+      "id": "vision.describe.image",
+      "desc": "Describe an image using a vision-capable model (requires Vision role). args: <imagePath>",
+      "cmd": "echo 'vision.describe.image requires configured Vision role/model; execution is gated by prompts.'"
+    },
 
     {
       "id": "java.maven.build",

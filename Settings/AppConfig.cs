@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.IO;
 
 namespace RahBuilder.Settings;
 
@@ -24,10 +25,14 @@ public sealed class GeneralSettings
     public string RepoRoot { get; set; } = "";
     public string SandboxHostPath { get; set; } = "";
     public string SandboxContainerPath { get; set; } = "";
+    public string InboxHostPath { get; set; } = DefaultInboxPath();
 
     public string ToolsPath { get; set; } = "";                 // tools.json
     public string ToolPromptsPath { get; set; } = "";           // folder: Tools/Prompt (files named by toolId)
     public string BlueprintTemplatesPath { get; set; } = "";    // folder: BlueprintTemplates (prompt library)
+    public string AcceptedAttachmentExtensions { get; set; } = ".txt,.md,.json,.png,.jpg,.jpeg,.pdf,.zip";
+    public long MaxAttachmentBytes { get; set; } = 50 * 1024 * 1024;
+    public long MaxTotalInboxBytes { get; set; } = 500 * 1024 * 1024;
 
     public bool GraphDriven { get; set; } = true;
     public bool ContainerOnly { get; set; } = true;
@@ -36,21 +41,49 @@ public sealed class GeneralSettings
 
     // SAVE POINT: global digest prompt lives here (JSON-only, no tools)
     public string JobSpecDigestPrompt { get; set; } =
-        @"You are the JobSpec Digest. Reply with exactly one JSON object that matches this shape:
+        @"You are the JobSpec Digest. Respond with exactly one JSON object and nothing else.
+Output shape (no code fences, no prose):
 {
-  ""request"": ""<briefly restate the user's ask>"",
+  ""request"": ""<brief restatement of the user's ask>"",
   ""state"": {
-    ""ready"": true,
-    ""missing"": []
+    ""ready"": <true|false>,
+    ""missing"": [""field1"", ""field2""]
   }
 }
 Rules:
-- Output must be valid JSON (no prose, markdown, code fences, or commentary).
-- The top-level object MUST contain state.ready (boolean) and state.missing (array of strings).
-- Do not invent fields. Only include keys explicitly provided by the user plus the required state object.
-- If any required information is missing or ambiguous, set state.ready=false and list the missing field names in state.missing.
-- If everything is present, set state.ready=true and state.missing=[].
+- Emit ONLY valid JSON. No markdown, comments, or additional text.
+- Top-level keys MUST be exactly: request (string) and state (object).
+- state.ready is a boolean. state.missing is an array of strings naming absent/ambiguous fields.
+- If any required information is missing, set state.ready=false and list each missing field in state.missing.
+- If the request is complete, set state.ready=true and state.missing=[].
 - Any non-JSON output is a prompt failure.";
+
+    public void Normalize()
+    {
+        if (string.IsNullOrWhiteSpace(InboxHostPath))
+            InboxHostPath = DefaultInboxPath();
+
+        if (string.IsNullOrWhiteSpace(AcceptedAttachmentExtensions))
+            AcceptedAttachmentExtensions = ".txt,.md,.json,.png,.jpg,.jpeg,.pdf,.zip";
+
+        if (MaxAttachmentBytes <= 0)
+            MaxAttachmentBytes = 50 * 1024 * 1024;
+
+        if (MaxTotalInboxBytes <= 0)
+            MaxTotalInboxBytes = 500 * 1024 * 1024;
+
+        if (string.IsNullOrWhiteSpace(ExecutionTarget))
+            ExecutionTarget = OperatingSystem.IsWindows() ? "WindowsHost" : "LinuxContainer";
+    }
+
+    private static string DefaultInboxPath()
+    {
+        var basePath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(basePath))
+            basePath = AppContext.BaseDirectory;
+
+        return Path.Combine(basePath, "RahBuilder", "inbox");
+    }
 }
 
 public sealed class ProvidersSettings

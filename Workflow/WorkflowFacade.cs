@@ -1,9 +1,13 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using RahBuilder.Settings;
+using RahBuilder.Tools.BlueprintTemplates;
 using RahOllamaOnly.Tools;
 using RahOllamaOnly.Tracing;
 
@@ -14,6 +18,7 @@ public sealed class WorkflowFacade
     private readonly RunTrace _trace;
     private readonly WorkflowRouter _router = new();
     private AppConfig _cfg;
+    private IReadOnlyList<AttachmentInbox.AttachmentEntry> _attachments = Array.Empty<AttachmentInbox.AttachmentEntry>();
 
     private string _lastGraphHash = "";
 
@@ -41,6 +46,11 @@ public sealed class WorkflowFacade
         if (cfg != null) _cfg = cfg;
         SyncGraphToHub(_cfg);
         RefreshTooling();
+    }
+
+    public void SetAttachments(IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments)
+    {
+        _attachments = attachments ?? Array.Empty<AttachmentInbox.AttachmentEntry>();
     }
 
     public void RefreshTooling()
@@ -133,7 +143,8 @@ public sealed class WorkflowFacade
         }
 
         // Run digest.
-        var spec = await RunJobSpecDigestAsync(text, ct).ConfigureAwait(true);
+        var userTextWithAttachments = AppendAttachmentMetadata(text);
+        var spec = await RunJobSpecDigestAsync(userTextWithAttachments, ct).ConfigureAwait(true);
 
         if (!spec.IsComplete)
         {
@@ -159,9 +170,21 @@ public sealed class WorkflowFacade
 
         _forceEditBecauseInvalidJson = false;
 
-        // Save-point honesty: planner not wired yet.
+        var rawJson = spec.Raw?.RootElement.GetRawText() ?? "";
+        var routeDecision = _router.Decide(mermaid, text);
+
         _trace.Emit("[digest:ok] JobSpec complete. Handing off to Planner (not wired in this phase).");
         _trace.Emit("[route:graph_ok] Mermaid workflow graph validated. (Planner dispatch not wired yet.)");
+        if (routeDecision.Ok)
+            _trace.Emit($"[route:selected] {routeDecision.SelectedRoute} (routes={routeDecision.RouteCount}) {routeDecision.Why}");
+        else
+            _trace.Emit("[route:error] " + routeDecision.Message);
+
+        if (!string.IsNullOrWhiteSpace(rawJson))
+            _trace.Emit("[jobspec] " + Trunc(rawJson, 800));
+
+        EmitAttachmentSuggestions();
+        _trace.Emit("[planner] not wired: no execution performed.");
     }
 
     private async Task<JobSpec> RunJobSpecDigestAsync(string userText, CancellationToken ct)
@@ -245,4 +268,141 @@ public sealed class WorkflowFacade
     }
 
     private static bool IsWindowsDesktopProject() => true; // RahBuilder.csproj uses Microsoft.NET.Sdk.WindowsDesktop
+
+    private string AppendAttachmentMetadata(string userText)
+    {
+        if (_attachments == null || _attachments.Count == 0)
+            return userText ?? "";
+
+        var sb = new StringBuilder();
+        sb.AppendLine("ATTACHMENTS:");
+        foreach (var a in _attachments)
+        {
+            sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}");
+        }
+        sb.AppendLine();
+        sb.Append(userText ?? "");
+
+        _trace.Emit($"[digest:attachments] {_attachments.Count} attached");
+        return sb.ToString();
+    }
+
+    private void EmitAttachmentSuggestions()
+    {
+        if (_attachments == null || _attachments.Count == 0)
+        {
+            _trace.Emit("[attachments] none");
+            return;
+        }
+
+        var blueprint = LoadAttachmentBlueprint();
+        if (blueprint == null)
+        {
+            _trace.Emit("[attachments] blueprint attachment.ingest.v1 missing or unreadable.");
+            return;
+        }
+
+        _trace.Emit($"[attachments] {_attachments.Count} attachment(s) present. blueprint={blueprint.TemplatePath} visibility={blueprint.Visibility}");
+
+        foreach (var a in _attachments)
+        {
+            var tools = new List<string>();
+            var kind = (a.Kind ?? "").ToLowerInvariant();
+            if (kind == "image")
+                tools.AddRange(blueprint.ImageTools);
+            else if (kind == "document")
+                tools.AddRange(blueprint.DocumentTools);
+
+            var toolText = tools.Count == 0 ? "none" : string.Join(", ", tools.Distinct(StringComparer.OrdinalIgnoreCase));
+            _trace.Emit($"[attachments:suggest] {a.StoredName} ({kind}, {a.SizeBytes} bytes) -> {toolText}");
+        }
+    }
+
+    private AttachmentBlueprintInfo? LoadAttachmentBlueprint()
+    {
+        var folder = (_cfg.General.BlueprintTemplatesPath ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(folder))
+            return null;
+
+        try
+        {
+            var catalog = BlueprintCatalog.Load(folder);
+            var entry = catalog.FirstOrDefault(e => string.Equals(e.Id, "attachment.ingest.v1", StringComparison.OrdinalIgnoreCase));
+            if (entry == null)
+                return null;
+
+            var path = ResolveTemplatePath(folder, entry.File);
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                return null;
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            var root = doc.RootElement;
+
+            var suggest = root.TryGetProperty("suggest", out var s) && s.ValueKind == JsonValueKind.Object ? s : default;
+            var imageTools = ReadStringArray(suggest, "imageTools");
+            var documentTools = ReadStringArray(suggest, "documentTools");
+
+            if (imageTools.Count == 0 && documentTools.Count == 0)
+            {
+                imageTools.Add("vision.describe.image");
+                documentTools.Add("file.read.text");
+            }
+
+            return new AttachmentBlueprintInfo
+            {
+                TemplatePath = path,
+                Visibility = entry.Visibility,
+                ImageTools = imageTools,
+                DocumentTools = documentTools
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string ResolveTemplatePath(string blueprintTemplatesFolder, string fileFromManifest)
+    {
+        if (string.IsNullOrWhiteSpace(fileFromManifest)) return "";
+
+        var f = fileFromManifest.Replace('\\', '/').Trim();
+        if (f.StartsWith("BlueprintTemplates/", StringComparison.OrdinalIgnoreCase))
+            f = f.Substring("BlueprintTemplates/".Length);
+
+        if (Path.IsPathRooted(f))
+            return f;
+
+        return Path.Combine(blueprintTemplatesFolder, f.Replace('/', Path.DirectorySeparatorChar));
+    }
+
+    private static List<string> ReadStringArray(JsonElement obj, string property)
+    {
+        var list = new List<string>();
+        if (obj.ValueKind != JsonValueKind.Object)
+            return list;
+
+        if (!obj.TryGetProperty(property, out var el) || el.ValueKind != JsonValueKind.Array)
+            return list;
+
+        foreach (var item in el.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.String)
+            {
+                var s = item.GetString();
+                if (!string.IsNullOrWhiteSpace(s))
+                    list.Add(s.Trim());
+            }
+        }
+
+        return list;
+    }
+
+    private sealed class AttachmentBlueprintInfo
+    {
+        public string TemplatePath { get; init; } = "";
+        public string Visibility { get; init; } = "";
+        public List<string> ImageTools { get; init; } = new();
+        public List<string> DocumentTools { get; init; } = new();
+    }
 }
