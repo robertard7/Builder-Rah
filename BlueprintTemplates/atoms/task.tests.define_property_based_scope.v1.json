@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.tests.define_property_based_scope.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Tests: Define property-based testing scope",
+  "description": "Defines properties/invariants for pure logic (parsers, serializers, transforms) and where randomized inputs are useful.",
+  "tags": ["tests", "property", "invariants"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tests_define_property_based_scope",
+    "inputs": ["projectRoot", "modules?"],
+    "outputs": ["propertyTestPlan"],
+    "rules": [
+      "only target deterministic functions",
+      "define invariants in plain language first",
+      "cap runtime and input sizes for CI sanity"
+    ]
+  }
+}

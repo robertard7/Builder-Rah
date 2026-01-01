@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.sec.threat_model.baseline.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Security: Threat model baseline",
+  "description": "Defines assets, entry points, trust boundaries, threat categories, and mitigations at a high level.",
+  "tags": ["security", "threat_model", "baseline"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "sec_threat_model_baseline",
+    "inputs": ["projectRoot", "appType?", "riskProfile", "dataCategories?"],
+    "outputs": ["threatModel"],
+    "rules": [
+      "identify assets and attackers relevant to app type",
+      "define trust boundaries and entry points",
+      "list top threats and mitigations",
+      "avoid vendor-specific references"
+    ]
+  }
+}

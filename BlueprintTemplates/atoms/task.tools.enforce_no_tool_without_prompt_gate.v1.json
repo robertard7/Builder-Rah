@@ -1,0 +1,33 @@
+﻿{
+  "id": "task.tools.enforce_no_tool_without_prompt_gate.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 10 },
+  "title": "Tools: Enforce 'no tool without prompt' gate",
+  "description": "Preflight gate for any execution: collect tool refs, validate prompt registry, block with WAIT_USER if missing.",
+  "tags": ["tools", "gate", "prompts", "preflight"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tool_prompt_gate",
+    "inputs": ["planContext", "promptRegistrySnapshot"],
+    "outputs": ["gateResult", "waitUser?", "questions?"],
+    "pipeline": [
+      { "use": "task.tools.collect_references_from_plan.v1" },
+      { "use": "task.tools.validate_prompt_registry.v1" },
+      { "decision": "if promptValidationReport.missingToolIds length > 0 then WAIT_USER else continue" }
+    ],
+    "onWaitUser": { "use": "task.tools.wait_user.missing_prompts.v1" },
+    "gateResultShape": {
+      "fields": [
+        "isPass",
+        "missingToolIds[]",
+        "notes[]"
+      ]
+    },
+    "rules": [
+      "isPass must be false if any missingToolIds exist",
+      "do not mutate planContext",
+      "do not generate prompts here"
+    ]
+  }
+}

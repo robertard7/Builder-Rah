@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.project.start.scaffold_tests_if_missing.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Start Project: Scaffold tests if missing",
+  "description": "Ensures a basic smoke test suite exists using existing test scaffolding atom.",
+  "tags": ["start_project", "tests"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tests_scaffold_if_missing",
+    "inputs": ["selection"],
+    "uses": ["task.tests.scaffold_if_missing.v1"]
+  }
+}

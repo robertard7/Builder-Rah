@@ -1,0 +1,28 @@
+﻿{
+  "id": "task.tools.map_env_choice_to_execution_target.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Tools: map env choice to execution target",
+  "description": "Maps a user-selected env choice into an abstract executionTarget and updates planContext. No hardcoded tool ids or commands.",
+  "tags": ["tools", "env", "execution_target", "internal"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "select_execution_target",
+    "inputs": ["userSelection", "settingsSnapshot?"],
+    "outputs": ["executionTarget", "planContextDelta"],
+    "executionTargetSchema": {
+      "type": "host|container|wsl|remote",
+      "notes": "string?",
+      "hints": {
+        "containerProfile": "string?",
+        "remoteProfile": "string?"
+      }
+    },
+    "rules": [
+      "only reference Settings by name (eg rolePreset), never provider/model ids",
+      "do not assume container names, paths, or repo roots",
+      "executionTarget is descriptive; actual command wiring is handled elsewhere"
+    ]
+  }
+}

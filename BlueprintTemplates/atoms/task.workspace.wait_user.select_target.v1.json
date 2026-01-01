@@ -1,0 +1,28 @@
+﻿{
+  "id": "task.workspace.wait_user.select_target.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Workspace: WAIT_USER select target",
+  "description": "When workspace has multiple viable targets for a goal, asks the user to select one with minimal friction.",
+  "tags": ["workspace", "wait_user", "select"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "emit_wait_user_questions",
+    "inputs": ["workspaceReport", "targetsReport", "goalVerb"],
+    "outputs": ["questions", "waitUser"],
+    "waitUser": true,
+    "questionRules": [
+      "ask for one selection: target id OR relative path OR displayed name",
+      "if goalVerb=run, prefer listing only run-capable targets",
+      "if goalVerb=test, prefer listing only test-capable targets",
+      "do not ask for provider/model/toolchain ids",
+      "do not ask for environment details unless required"
+    ],
+    "uiHints": {
+      "control": "single_select",
+      "optionsFrom": "targetsReport.targets",
+      "valueFields": ["id", "relativePath", "displayName"]
+    }
+  }
+}

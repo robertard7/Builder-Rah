@@ -1,0 +1,32 @@
+﻿{
+  "id": "task.tools.prompt_gate.capabilities_aware.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 13 },
+  "title": "Tools: Prompt gate (capabilities-aware)",
+  "description": "Resolves capabilityRefs to toolIds, merges with explicit toolRefs, then validates prompt registry coverage. WAIT_USER on missing capabilities or missing prompts.",
+  "tags": ["tools", "capabilities", "prompts", "gate", "wait_user"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tool_prompt_gate_capabilities_aware",
+    "inputs": ["planContext", "toolManifestSnapshot", "promptRegistrySnapshot", "runtimeEnv"],
+    "outputs": ["gateResult", "waitUser?", "questions?"],
+    "pipeline": [
+      { "use": "task.tools.normalize_toolrefs.v1" },
+      { "extract": "capabilityRefs from planContext.content.capabilityRefs (and aliases content.capabilities)" },
+      { "use": "task.tools.resolve_capabilities_to_toolids.v1" },
+      { "decision": "if missingCapabilities length > 0 then WAIT_USER else continue" },
+      { "use": "task.tools.merge_explicit_and_capability_toolrefs.v1" },
+      { "use": "task.tools.validate_prompt_registry.v1" },
+      { "decision": "if promptValidationReport.missingToolIds length > 0 then WAIT_USER else PASS" }
+    ],
+    "onWaitUser": {
+      "action": "emit_wait_user_questions",
+      "questionRules": [
+        "ask only for missing capability/tool prompt coverage needed to proceed",
+        "request exact tool id(s) from manifest and confirm prompt file exists",
+        "never ask for provider/model/toolchain ids"
+      ]
+    }
+  }
+}

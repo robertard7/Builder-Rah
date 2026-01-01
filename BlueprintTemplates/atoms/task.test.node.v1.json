@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.test.node.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Test Node",
+  "description": "Run Node project tests using configured test script/settings.",
+  "tags": ["node", "test"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "test", "ecosystem": "node", "inputs": ["projectRoot"] }
+}

@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.repo.add_editorconfig_by_ecosystem.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Repo: Add .editorconfig",
+  "description": "Adds .editorconfig for consistent formatting. No toolchain assumptions.",
+  "tags": ["repo", "editorconfig", "formatting"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_editorconfig",
+    "inputs": ["projectRoot", "ecosystem"],
+    "route": "recipe.repo.editorconfig.base.v1"
+  }
+}

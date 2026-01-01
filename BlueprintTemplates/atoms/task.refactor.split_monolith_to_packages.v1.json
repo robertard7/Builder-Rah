@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.refactor.split_monolith_to_packages.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Refactor: Split monolith into packages/modules",
+  "description": "Creates a plan and applies a minimal split into modules/packages with clear boundaries. Abstract.",
+  "tags": ["refactor", "monolith", "modules", "packages"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "refactor_split_monolith",
+    "inputs": ["projectRoot", "ecosystem", "targetLayout?", "constraints?"],
+    "outputs": ["modulePlan", "modulesCreated", "importsUpdated"],
+    "defaults": { "targetLayout": "by_domain" },
+    "rules": [
+      "start with smallest safe split",
+      "prefer domain boundaries over technical layers",
+      "keep build green after each step"
+    ]
+  }
+}

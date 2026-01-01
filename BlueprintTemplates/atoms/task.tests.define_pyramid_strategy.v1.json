@@ -1,0 +1,22 @@
+﻿{
+  "id": "task.tests.define_pyramid_strategy.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Tests: Define testing pyramid strategy",
+  "description": "Defines a neutral testing pyramid strategy: unit/integration/e2e proportions, target coverage areas, and gating policy.",
+  "tags": ["tests", "strategy", "pyramid"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tests_define_pyramid_strategy",
+    "inputs": ["projectRoot", "ecosystem", "appType?", "riskProfile?"],
+    "outputs": ["testStrategy"],
+    "defaults": { "riskProfile": "standard" },
+    "rules": [
+      "prefer unit tests for pure logic and deterministic behavior",
+      "integration tests for IO boundaries and adapters",
+      "e2e tests only for core user flows",
+      "gates must be explicit: what blocks merge/release"
+    ]
+  }
+}

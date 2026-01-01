@@ -1,0 +1,36 @@
+﻿{
+  "id": "task.tools.validate_prompt_registry.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 9 },
+  "title": "Tools: Validate tool IDs against prompt registry",
+  "description": "Validates that every referenced tool ID has an associated tool prompt definition. Missing prompts cause a controlled WAIT_USER path.",
+  "tags": ["tools", "prompts", "registry", "validate"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "validate_tool_prompts_exist",
+    "inputs": ["toolRefReport", "promptRegistrySnapshot"],
+    "outputs": ["promptValidationReport"],
+    "promptValidationReportShape": {
+      "fields": [
+        "missingToolIds[]",
+        "presentToolIds[]",
+        "byToolId[]",
+        "notes[]"
+      ]
+    },
+    "byToolIdShape": {
+      "fields": [
+        "toolId",
+        "isPresent",
+        "promptKey?",
+        "sourceRefs[]"
+      ]
+    },
+    "rules": [
+      "promptRegistrySnapshot must be treated as authoritative",
+      "no silent fallback if missingToolIds not empty",
+      "do not auto-generate prompt contents here; this is validation only"
+    ]
+  }
+}

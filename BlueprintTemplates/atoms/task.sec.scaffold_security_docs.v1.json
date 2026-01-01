@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.sec.scaffold_security_docs.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Security: Scaffold SECURITY.md + reporting policy",
+  "description": "Adds neutral security docs: reporting policy, supported versions, and hardening notes.",
+  "tags": ["security", "docs", "policy"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "sec_scaffold_security_docs",
+    "inputs": ["projectRoot", "riskProfile", "contactMethod?"],
+    "outputs": ["docsAdded"],
+    "rules": [
+      "do not include private emails unless provided",
+      "include disclosure expectations and response timeline placeholders",
+      "include dependency policy and release policy references"
+    ]
+  }
+}

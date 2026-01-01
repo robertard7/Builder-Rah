@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.sec.dependency_policy.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 9 },
+  "title": "Security: Dependency policy + upgrade strategy",
+  "description": "Defines dependency constraints, upgrade cadence, and minimal triage steps for vulnerable dependencies.",
+  "tags": ["security", "dependencies", "supply_chain"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "sec_define_dependency_policy",
+    "inputs": ["projectRoot", "ecosystem?", "riskProfile"],
+    "outputs": ["dependencyPolicy"],
+    "rules": [
+      "pin or constrain versions where appropriate",
+      "avoid unmaintained dependencies where possible",
+      "define an upgrade cadence and emergency patch flow",
+      "document how to review transitive dependencies"
+    ]
+  }
+}

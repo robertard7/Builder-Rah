@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.tests.define_fuzz_targets.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 4 },
+  "title": "Tests: Define fuzz targets (safe)",
+  "description": "Defines fuzz targets for parsers/decoders/routers with strict safety scope, resource caps, and crash triage workflow.",
+  "tags": ["tests", "fuzz", "security", "robustness"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tests_define_fuzz_targets",
+    "inputs": ["projectRoot", "modules", "riskProfile?"],
+    "outputs": ["fuzzPlan"],
+    "defaults": { "riskProfile": "standard" },
+    "rules": [
+      "only fuzz pure parsing/decoding boundaries or isolated components",
+      "set strict time/memory limits conceptually",
+      "define crash reproduction and minimization expectations"
+    ]
+  }
+}

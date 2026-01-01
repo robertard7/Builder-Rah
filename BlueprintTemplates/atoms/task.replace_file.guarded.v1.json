@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.replace_file.guarded.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Replace File (Guarded)",
+  "description": "Replace a file only if guards match (hash/contains markers) to prevent accidental clobber.",
+  "tags": ["replace_file", "guard", "safe"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "replace_file",
+    "mode": "guarded",
+    "inputs": ["path", "text"],
+    "guards": {
+      "sha256EqualsOptional": "${expectedSha256?}",
+      "mustContainAllOptional": "${mustContainAll?}",
+      "mustNotContainAnyOptional": "${mustNotContainAny?}"
+    }
+  }
+}

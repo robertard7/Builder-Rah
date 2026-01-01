@@ -1,0 +1,19 @@
+﻿{
+  "id": "task.workspace.apply_target_selection.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Workspace: Apply selected target",
+  "description": "Applies a user-selected target to produce an effective projectRoot for downstream capability detection and execution.",
+  "tags": ["workspace", "select", "apply"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "apply_workspace_target_selection",
+    "inputs": ["workspaceReport", "targetsReport", "selectedTarget"],
+    "outputs": ["effectiveProjectRoot", "targetContext"],
+    "rules": [
+      "effectiveProjectRoot must be workspaceRoot + target relativePath",
+      "targetContext must include selection evidence and supportedVerbs"
+    ]
+  }
+}

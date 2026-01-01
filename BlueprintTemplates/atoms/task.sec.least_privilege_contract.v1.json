@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.sec.least_privilege_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 9 },
+  "title": "Security: Least privilege + permissions contract",
+  "description": "Defines minimal permissions required for runtime operations and restricts access to files/network/actions.",
+  "tags": ["security", "least_privilege", "permissions"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "sec_define_least_privilege_contract",
+    "inputs": ["projectRoot", "runtimeActions", "riskProfile"],
+    "outputs": ["privilegeContract"],
+    "rules": [
+      "default deny, explicitly allow required actions",
+      "separate admin operations from user paths where relevant",
+      "avoid running with elevated privileges unless required"
+    ]
+  }
+}

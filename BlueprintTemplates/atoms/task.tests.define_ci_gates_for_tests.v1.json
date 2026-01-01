@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.tests.define_ci_gates_for_tests.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Tests: Define CI gates for test layers",
+  "description": "Defines which tests run on PR, nightly, and release. Establishes time budgets and required signals.",
+  "tags": ["tests", "ci", "gates"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tests_define_ci_gates",
+    "inputs": ["projectRoot", "testStrategy", "capabilities?"],
+    "outputs": ["ciTestGates"],
+    "rules": [
+      "PR gates must be fast and deterministic",
+      "nightly can include heavier suites",
+      "release gates must include contract tests and key integration coverage"
+    ]
+  }
+}

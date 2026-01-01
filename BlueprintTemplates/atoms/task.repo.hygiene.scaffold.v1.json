@@ -1,0 +1,24 @@
+﻿{
+  "id": "task.repo.hygiene.scaffold.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Repo Hygiene: Scaffold",
+  "description": "Adds docs + templates for PR/issue, contributing, and basic repo hygiene files without assuming toolchain or provider.",
+  "tags": ["repo", "hygiene", "contributing", "templates"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "repo_hygiene_scaffold",
+    "inputs": ["projectRoot", "ecosystem"],
+    "routes": {
+      "generic": ["recipe.repo.hygiene.generic.v1"],
+      "dotnet": ["recipe.repo.hygiene.dotnet.v1"],
+      "node": ["recipe.repo.hygiene.node.v1"],
+      "python": ["recipe.repo.hygiene.python.v1"],
+      "go": ["recipe.repo.hygiene.go.v1"],
+      "rust": ["recipe.repo.hygiene.rust.v1"],
+      "java": ["recipe.repo.hygiene.java.v1"],
+      "cpp": ["recipe.repo.hygiene.cpp.v1"]
+    }
+  }
+}

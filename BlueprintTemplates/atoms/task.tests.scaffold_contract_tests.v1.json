@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.tests.scaffold_contract_tests.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Tests: Scaffold contract tests",
+  "description": "Creates contract test scaffolding and a minimal contract suite based on the contract plan (no framework/toolchain selection).",
+  "tags": ["tests", "contract", "scaffold"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tests_scaffold_contract_tests",
+    "inputs": ["projectRoot", "contractSuitePlan"],
+    "outputs": ["addedContractTests"],
+    "rules": [
+      "contracts must be runnable locally and in CI",
+      "avoid environment-specific assumptions",
+      "keep test data small and committed"
+    ]
+  }
+}

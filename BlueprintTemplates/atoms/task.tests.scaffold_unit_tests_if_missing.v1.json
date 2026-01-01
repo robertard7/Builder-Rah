@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.tests.scaffold_unit_tests_if_missing.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Tests: Scaffold unit tests if missing",
+  "description": "Ensures a unit test harness exists and adds a small set of starter tests for core modules without choosing a specific framework by name.",
+  "tags": ["tests", "unit", "scaffold"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tests_scaffold_unit_tests",
+    "inputs": ["projectRoot", "ecosystem", "entryPoints?"],
+    "outputs": ["testProjectOrFolder", "addedTests"],
+    "rules": [
+      "tests must be deterministic and not rely on network",
+      "prefer table-driven tests where natural",
+      "name tests after behavior, not implementation",
+      "keep fixtures minimal"
+    ]
+  }
+}

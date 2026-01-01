@@ -1,0 +1,23 @@
+﻿{
+  "id": "task.sec.wait_user.risk_profile_and_data.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Security: Ask for risk profile + data categories (WAIT_USER)",
+  "description": "If security requirements are unclear, asks for minimal risk profile, auth needs, and sensitive data categories.",
+  "tags": ["security", "wait_user", "risk"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "emit_wait_user_questions",
+    "inputs": ["projectRoot", "appType?", "exposedToInternet?"],
+    "outputs": ["questions", "waitUser"],
+    "waitUser": true,
+    "questionRules": [
+      "ask risk profile: low/standard/high",
+      "ask if app is internet-facing and if it has auth",
+      "ask sensitive data categories: none/pii/payment/health/keys",
+      "ask deployment environment constraints (basic, enterprise, regulated)",
+      "never ask for provider/toolchain/model ids"
+    ]
+  }
+}

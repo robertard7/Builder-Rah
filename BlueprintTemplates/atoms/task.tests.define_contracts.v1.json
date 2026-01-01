@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.tests.define_contracts.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Tests: Define contract tests for boundaries",
+  "description": "Defines contract tests for API boundaries, module boundaries, and IO adapters: inputs/outputs, error model, backwards compatibility.",
+  "tags": ["tests", "contract", "api"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tests_define_contracts",
+    "inputs": ["projectRoot", "publicInterfaces", "errorModel?"],
+    "outputs": ["contractSuitePlan"],
+    "rules": [
+      "contracts must include invalid/edge inputs",
+      "contracts must assert stable error shapes where user-facing",
+      "contracts must include backwards-compatible expectations where needed"
+    ]
+  }
+}

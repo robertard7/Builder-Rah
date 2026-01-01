@@ -1,0 +1,24 @@
+﻿{
+  "id": "task.workspace.goal_entry.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 9 },
+  "title": "Workspace: Goal entry (select target -> goal runner)",
+  "description": "Workspace-aware entrypoint: detect workspace, enumerate targets, ask user if needed, then delegate to capability-aware goal runner.",
+  "tags": ["workspace", "goal", "router", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "workspace_aware_goal_entry",
+    "inputs": ["projectRoot", "goalVerb", "ecosystemHint?", "profileHint?", "settingsPresetName?"],
+    "outputs": ["executionReceipts", "finalStatus", "waitUser?", "questions?"],
+    "pipeline": [
+      { "use": "task.workspace.detect_root_and_type.v1" },
+      { "use": "task.workspace.enumerate_targets.v1" },
+      { "decision": "if targetsReport.ambiguities not empty OR targetsReport.defaultTarget is null AND targetsReport.targets length > 1 then WAIT_USER else continue" },
+      { "use": "task.workspace.apply_target_selection.v1" },
+      { "delegateTo": "task.capabilities.goal_runner.v1", "inputsMap": { "projectRoot": "effectiveProjectRoot" } }
+    ],
+    "onWaitUser": { "use": "task.workspace.wait_user.select_target.v1" },
+    "onFailure": { "routeTo": "pack.diagnose.unstoppable.v1" }
+  }
+}

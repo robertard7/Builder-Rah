@@ -1,0 +1,24 @@
+﻿{
+  "id": "task.tests.scaffold_if_missing.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Tests: Scaffold if Missing",
+  "description": "If no tests detected, add a minimal smoke test using an ecosystem-appropriate recipe.",
+  "tags": ["tests", "scaffold", "smoke"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "tests_scaffold_if_missing",
+    "inputs": ["projectRoot"],
+    "detect": { "anyGlob": "tests/**,test/**,**/*Tests*.*,**/*test*.*" },
+    "whenMissing": {
+      "dotnet": ["recipe.dotnet.tests.xunit_smoke.v1"],
+      "python": ["recipe.python.tests.pytest_smoke.v1"],
+      "node": ["recipe.node.tests.basic_smoke.v1"],
+      "go": ["recipe.go.tests.basic_smoke.v1"],
+      "rust": ["recipe.rust.tests.basic_smoke.v1"],
+      "java": ["recipe.java.tests.basic_smoke.v1"],
+      "cpp": ["recipe.cpp.tests.basic_smoke.v1"]
+    }
+  }
+}

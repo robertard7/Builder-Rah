@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.sec.secure_defaults_checklist.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Security: Secure defaults checklist",
+  "description": "Creates a checklist for secure defaults (timeouts, limits, safe parsing, safe headers, safe file handling).",
+  "tags": ["security", "defaults", "checklist"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "sec_define_secure_defaults_checklist",
+    "inputs": ["projectRoot", "appType?", "riskProfile"],
+    "outputs": ["secureDefaultsChecklist"],
+    "rules": [
+      "set sane timeouts and size limits",
+      "avoid unsafe deserialization patterns",
+      "restrict file path handling to projectRoot or configured safe dirs",
+      "ensure logging/tracing redaction policy is compatible"
+    ]
+  }
+}

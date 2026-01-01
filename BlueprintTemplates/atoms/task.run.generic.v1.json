@@ -1,0 +1,14 @@
+{
+  "id": "task.run.generic.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Run (Generic)",
+  "description": "Run the project using the ecosystem's configured run mode.",
+  "tags": ["run"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "run",
+    "inputs": ["projectRoot", "runTarget"]
+  }
+}

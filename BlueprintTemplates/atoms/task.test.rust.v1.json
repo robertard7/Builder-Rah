@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.test.rust.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Test Rust",
+  "description": "Run Rust tests using configured settings.",
+  "tags": ["rust", "test"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "test", "ecosystem": "rust", "inputs": ["projectRoot"] }
+}

@@ -1,0 +1,16 @@
+﻿{
+  "id": "task.refactor.extract_interface_or_trait.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Refactor: Extract interface/trait/protocol",
+  "description": "Extracts an abstraction for a component to enable testing and modularity. Abstract across ecosystems.",
+  "tags": ["refactor", "abstraction", "testing"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "refactor_extract_abstraction",
+    "inputs": ["projectRoot", "targetSymbol", "ecosystem"],
+    "outputs": ["abstractionAdded", "callSitesUpdated"],
+    "notes": { "dotnet": "interface", "java": "interface", "go": "interface", "rust": "trait", "python": "protocol/abc", "node": "interface/type shape", "cpp": "pure virtual interface" }
+  }
+}

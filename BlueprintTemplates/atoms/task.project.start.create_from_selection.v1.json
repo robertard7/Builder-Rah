@@ -1,0 +1,28 @@
+﻿{
+  "id": "task.project.start.create_from_selection.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Start Project: Create project from selection",
+  "description": "Routes to the right create_project atom for ecosystem/profile. No commands.",
+  "tags": ["start_project", "create_project"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "create_project_from_selection",
+    "inputs": ["selection"],
+    "routes": {
+      "dotnet.cli": "task.create_project.dotnet.cli.v1",
+      "dotnet.gui": "task.create_project.dotnet.winforms.v1",
+      "dotnet.library": "task.create_project.dotnet.library.v1",
+      "node.cli": "task.create_project.node.cli.v1",
+      "node.web": "task.create_project.node.web.v1",
+      "python.cli": "task.create_project.python.cli.v1",
+      "python.api": "task.create_project.python.api.v1",
+      "go.cli": "task.create_project.go.cli.v1",
+      "rust.cli": "task.create_project.rust.cli.v1",
+      "java.cli": "task.create_project.java.cli.v1",
+      "cpp.cmake": "task.create_project.cpp.cmake.v1"
+    },
+    "fallback": "task.create_project.generic.v1"
+  }
+}

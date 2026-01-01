@@ -1,0 +1,29 @@
+﻿{
+  "id": "task.tools.wait_user.missing_prompts.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Tools: WAIT_USER missing prompt definitions",
+  "description": "Emits a minimal actionable list of missing tool prompt IDs and where they were referenced. Intended to block execution until fixed.",
+  "tags": ["tools", "prompts", "wait_user", "registry"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "emit_wait_user_questions",
+    "inputs": ["promptValidationReport"],
+    "outputs": ["questions", "waitUser"],
+    "waitUser": true,
+    "questionRules": [
+      "present only missing toolIds",
+      "include at least one reference trace per missing id",
+      "do not ask for provider/model/toolchain ids",
+      "ask user whether to: (A) add prompt definitions, (B) remove tool refs from plan, or (C) choose alternative tools already defined"
+    ],
+    "uiHints": {
+      "control": "checklist_and_choice",
+      "fields": [
+        "missingToolIds",
+        "recommendedActions"
+      ]
+    }
+  }
+}

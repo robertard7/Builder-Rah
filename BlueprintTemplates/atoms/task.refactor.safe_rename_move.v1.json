@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.refactor.safe_rename_move.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Refactor: Safe rename/move (project-wide)",
+  "description": "Safely renames or moves files/symbols with reference updates and build validation. Abstract.",
+  "tags": ["refactor", "rename", "move"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "refactor_safe_rename_move",
+    "inputs": ["projectRoot", "changeset"],
+    "outputs": ["changesApplied", "validation"],
+    "rules": [
+      "update references/imports/namespace/module paths",
+      "keep public API stable unless explicitly requested",
+      "run build+tests if available"
+    ]
+  }
+}

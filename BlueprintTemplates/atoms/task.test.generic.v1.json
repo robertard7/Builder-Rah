@@ -1,0 +1,14 @@
+{
+  "id": "task.test.generic.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Test (Generic)",
+  "description": "Run tests using the ecosystem's configured test runner.",
+  "tags": ["test"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "test",
+    "inputs": ["projectRoot"]
+  }
+}
