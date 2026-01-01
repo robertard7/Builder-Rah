@@ -4,16 +4,20 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using RahBuilder.Workflow;
+using RahOllamaOnly.Tracing;
 
 namespace RahBuilder.Settings.Pages;
 
 public sealed class GeneralSettingsPage : UserControl
 {
     private readonly AppConfig _config;
+    private readonly RunTrace? _trace;
 
-    public GeneralSettingsPage(AppConfig config)
+    public GeneralSettingsPage(AppConfig config, RunTrace? trace = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        _trace = trace;
 
         var grid = new TableLayoutPanel
         {
@@ -74,7 +78,58 @@ public sealed class GeneralSettingsPage : UserControl
             row++;
         }
 
-        AddRow("Repo Root", () => _config.General.RepoRoot, v => _config.General.RepoRoot = v);
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var repoLabel = new Label { Text = "Repo Root", AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 10, 0) };
+        var repoPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
+        var repoBox = new TextBox { Width = 420, Text = _config.General.RepoRoot ?? "" };
+        repoBox.TextChanged += (_, _) => { _config.General.RepoRoot = repoBox.Text; AutoSave.Touch(); };
+        var browseBtn = new Button { Text = "Browse…", AutoSize = true, Margin = new Padding(6, 0, 0, 0) };
+        browseBtn.Click += (_, _) =>
+        {
+            using var dlg = new FolderBrowserDialog { Description = "Select Repo Root" };
+            try
+            {
+                var current = _config.General.RepoRoot ?? "";
+                if (!string.IsNullOrWhiteSpace(current) && Directory.Exists(current))
+                    dlg.SelectedPath = current;
+            }
+            catch { }
+
+            if (dlg.ShowDialog() == DialogResult.OK)
+                repoBox.Text = dlg.SelectedPath;
+        };
+        var openRepoBtn = new Button { Text = "Open Folder", AutoSize = true, Margin = new Padding(6, 0, 0, 0) };
+        openRepoBtn.Click += (_, _) =>
+        {
+            var path = (_config.General.RepoRoot ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(path)) return;
+            try
+            {
+                Directory.CreateDirectory(path);
+                Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+            }
+            catch { }
+        };
+        var validateBtn = new Button { Text = "Validate RepoRoot", AutoSize = true, Margin = new Padding(6, 0, 0, 0) };
+        validateBtn.Click += (_, _) =>
+        {
+            var scope = RepoScope.Resolve(_config);
+            var message = scope.Message;
+            if (_trace != null)
+                _trace.Emit(message);
+            else
+                Debug.WriteLine(message);
+
+            MessageBox.Show(message, "RepoRoot", MessageBoxButtons.OK, scope.Ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        };
+        repoPanel.Controls.Add(repoBox);
+        repoPanel.Controls.Add(browseBtn);
+        repoPanel.Controls.Add(openRepoBtn);
+        repoPanel.Controls.Add(validateBtn);
+        grid.Controls.Add(repoLabel, 0, row);
+        grid.Controls.Add(repoPanel, 1, row);
+        row++;
+
         AddRow("Sandbox Host Path", () => _config.General.SandboxHostPath, v => _config.General.SandboxHostPath = v);
         AddRow("Sandbox Container Path", () => _config.General.SandboxContainerPath, v => _config.General.SandboxContainerPath = v);
 
