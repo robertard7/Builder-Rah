@@ -12,8 +12,16 @@ public static class ModelCatalog
     {
         "gpt-4o-mini",
         "gpt-4.1-mini",
-        "gpt-4.1",
+        "gpt-4.1", // vision-capable
         "o4-mini"
+    };
+
+    // Vision-capable OpenAI models (multimodal).
+    public static readonly string[] VisionOpenAiModels =
+    {
+        "gpt-4.1",
+        "gpt-4o",
+        "gpt-4o-mini"
     };
 
     public static readonly string[] DefaultHuggingFaceModels =
@@ -21,6 +29,14 @@ public static class ModelCatalog
         "Qwen/Qwen2.5-7B-Instruct",
         "meta-llama/Llama-3.1-8B-Instruct",
         "mistralai/Mistral-7B-Instruct-v0.3"
+    };
+
+    // Vision-capable HuggingFace instruction models (multimodal).
+    public static readonly string[] VisionHuggingFaceModels =
+    {
+        "Qwen/Qwen2-VL-7B-Instruct",
+        "llava-hf/llava-v1.6-mistral-7b-hf",
+        "llava-hf/llava-1.5-7b-hf"
     };
 
     public static readonly string[] DefaultOllamaModels =
@@ -33,14 +49,30 @@ public static class ModelCatalog
         "nomic-embed-text:latest"
     };
 
+    // Vision-capable Ollama models (multimodal).
+    public static readonly string[] VisionOllamaModels =
+    {
+        "llava:latest",
+        "llava",
+        "bakllava"
+    };
+
     public static IReadOnlyList<string> GetModelsForProvider(AppConfig cfg, string provider)
-        => provider switch
+    {
+        var list = provider switch
         {
-            "OpenAI" => DefaultOpenAiModels,
-            "HuggingFace" => DefaultHuggingFaceModels,
-            "Ollama" => DefaultOllamaModels,
+            "OpenAI" => DefaultOpenAiModels.Concat(VisionOpenAiModels),
+            "HuggingFace" => DefaultHuggingFaceModels.Concat(VisionHuggingFaceModels),
+            "Ollama" => DefaultOllamaModels.Concat(VisionOllamaModels),
             _ => Array.Empty<string>()
         };
+
+        return list
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Select(s => s.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 
     // Role prompts come from BlueprintTemplates (your prompt library), not tool prompts.
     // Minimal: list BlueprintTemplates\manifest.json entries if present, else return "default".

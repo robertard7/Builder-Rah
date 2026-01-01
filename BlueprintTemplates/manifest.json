@@ -39,6 +39,24 @@
                                  ]
                     },
                     {
+                        "id":  "attachment.ingest.v1",
+                        "kind":  "atom",
+                        "version":  "1",
+                        "meta":  {
+                                     "visibility":  "public",
+                                     "priority":  10
+                                 },
+                        "file":  "BlueprintTemplates/atoms/attachment.ingest.v1.json",
+                        "sha256":  "4bf23cae9bd76d70e307009f9347f1a122ee63777b63c1ffa76adc6d885a2609",
+                        "updatedUtc":  "2025-12-29T04:04:44.8583533Z",
+                        "tags":  [
+                                     "attachments",
+                                     "ingest",
+                                     "vision",
+                                     "files"
+                                 ]
+                    },
+                    {
                         "id":  "task.adapt.execute_goal_plan.v1",
                         "kind":  "atom",
                         "version":  "1",
