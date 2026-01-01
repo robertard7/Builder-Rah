@@ -1,0 +1,18 @@
+﻿{
+  "id": "pack.project.api.service.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 125 },
+  "title": "Python API Service",
+  "description": "Create a lightweight Python API service.",
+  "tags": ["python", "api"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "ecosystem": "python",
+    "profile": "api",
+    "uses": [
+      "task.create_project.python.api.v1",
+      "task.run.python.v1"
+    ]
+  }
+}

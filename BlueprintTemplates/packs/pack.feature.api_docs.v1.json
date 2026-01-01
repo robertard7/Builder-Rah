@@ -1,0 +1,16 @@
+﻿{
+  "id": "pack.feature.api_docs.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 150 },
+  "title": "Feature: API Docs",
+  "description": "Adds API documentation scaffolding (OpenAPI stub + route docs).",
+  "tags": ["feature", "docs"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.feature.add_api_docs.v1"
+    ]
+  }
+}

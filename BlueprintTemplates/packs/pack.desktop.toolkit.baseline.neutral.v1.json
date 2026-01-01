@@ -1,0 +1,13 @@
+﻿{
+  "id": "pack.desktop.toolkit.baseline.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 185 },
+  "title": "Desktop app toolkit baseline (neutral)",
+  "description": "Turns a desktop app into something shippable: settings, config, offline mode, updates policy, crash handling, packaging contract, startup health.",
+  "tags": ["desktop", "toolkit", "release", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": [
+    "recipe.desktop.toolkit.baseline.neutral.v1"
+  ] }
+}

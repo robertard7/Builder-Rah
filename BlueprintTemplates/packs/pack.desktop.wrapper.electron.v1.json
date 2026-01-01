@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.desktop.wrapper.electron.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 145 },
+  "title": "Wrap UI as Desktop App (Electron-style)",
+  "description": "Wraps an existing web UI into an Electron-style desktop shell (abstract).",
+  "tags": ["desktop", "electron", "wrapper"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.desktop.wrapper.electron.v1"] }
+}

@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.deploy.neutral.preview.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 175 },
+  "title": "Deploy Preview (vendor-neutral)",
+  "description": "Vendor-neutral preview deployment plan with contracts, smoke tests, rollback.",
+  "tags": ["deploy", "preview", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.deploy.neutral.preview.v1"] }
+}

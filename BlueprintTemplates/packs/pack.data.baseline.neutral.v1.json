@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.data.baseline.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 185 },
+  "title": "Data baseline (neutral)",
+  "description": "Storage-agnostic persistence baseline with domain model, contracts, migration safety, and testability.",
+  "tags": ["data", "persistence", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.data.baseline.neutral.v1"] }
+}

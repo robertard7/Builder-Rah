@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.goal.diagnose.unstoppable.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 180 },
+  "title": "Goal: Diagnose (capability-aware)",
+  "description": "Runs diagnosis flow with evidence collection and minimal fix loop. Uses repo capabilities to choose the right evidence points.",
+  "tags": ["goal", "diagnose", "capabilities"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["pack.diagnose.unstoppable.v1"] }
+}

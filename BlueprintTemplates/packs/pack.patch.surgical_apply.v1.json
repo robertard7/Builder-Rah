@@ -1,0 +1,18 @@
+﻿{
+  "id": "pack.patch.surgical_apply.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 230 },
+  "title": "Surgical Patch Apply (safe rails)",
+  "description": "Preflight + change budget + minimal patch + receipts + post-apply validation. Refuses broad rewrites without explicit approval.",
+  "tags": ["patch", "safe", "surgical", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": ["recipe.patch.surgical_apply_and_validate.v1"],
+    "inputs": {
+      "goalVerb": "apply_patch or build/test/run/format_lint/publish fix",
+      "patchPlan?": "optional patch plan hints",
+      "allowGenerated?": "optional boolean"
+    }
+  }
+}

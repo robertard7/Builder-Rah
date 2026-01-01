@@ -1,0 +1,14 @@
+﻿{
+  "id": "pack.goal_runner.unstoppable.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 210 },
+  "title": "Unstoppable Goal Runner (neutral)",
+  "description": "Capability-aware goal execution: detects repo, maps intent to feasible steps, executes, and only asks questions when evidence is missing.",
+  "tags": ["goal", "capabilities", "unstoppable", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": ["recipe.capabilities.goal_runner.neutral.v1"],
+    "inputs": ["goalVerb", "ecosystemHint?", "profileHint?", "settingsPresetName?"]
+  }
+}

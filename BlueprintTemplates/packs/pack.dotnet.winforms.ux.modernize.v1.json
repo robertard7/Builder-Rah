@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.dotnet.winforms.ux.modernize.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 150 },
+  "title": "Modernize WinForms UX (baseline patterns)",
+  "description": "Applies a set of WinForms UX modernization patterns without hardcoding any UI library/toolkit.",
+  "tags": ["dotnet", "winforms", "ux", "modernize"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.dotnet.winforms.ux.modernize.v1"] }
+}

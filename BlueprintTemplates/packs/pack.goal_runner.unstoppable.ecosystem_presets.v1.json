@@ -1,0 +1,16 @@
+﻿{
+  "id": "pack.goal_runner.unstoppable.ecosystem_presets.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 242 },
+  "title": "Goal Runner (unstoppable, ecosystem presets)",
+  "description": "Runs ecosystem preset preflight then detect+adapt goal runner. Blocks with WAIT_USER when required coverage is missing.",
+  "tags": ["goal", "runner", "unstoppable", "capabilities", "presets", "preflight"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "pack.tools.capabilities_preset_preflight.v1",
+      "pack.detect_and_adapt.goal_runner.v1"
+    ]
+  }
+}

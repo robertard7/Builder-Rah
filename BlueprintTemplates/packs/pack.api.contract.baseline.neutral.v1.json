@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.api.contract.baseline.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 190 },
+  "title": "API contract baseline (neutral)",
+  "description": "API contract + versioning + error model + docs + gates + contract tests. Tooling-agnostic and safe.",
+  "tags": ["api", "contract", "neutral", "compat"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.api.contract.baseline.neutral.v1"] }
+}

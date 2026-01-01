@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.patch.apply.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 150 },
+  "title": "Apply Patch Safely",
+  "description": "Safely apply patch changes with verification and minimal damage.",
+  "tags": ["patch", "apply", "safe"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.apply_patch.generic.v1",
+      "task.build.${ecosystem}.v1",
+      "task.test.${ecosystem}.v1"
+    ]
+  }
+}

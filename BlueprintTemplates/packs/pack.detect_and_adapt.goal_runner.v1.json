@@ -1,0 +1,18 @@
+﻿{
+  "id": "pack.detect_and_adapt.goal_runner.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 210 },
+  "title": "Detect & Adapt: Run any goal (build/test/run/format/publish)",
+  "description": "Works on almost any repo: detect, resolve ambiguity, map goal to tasks, execute, diagnose if needed.",
+  "tags": ["detect", "adapt", "goal", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": ["recipe.detect_and_adapt.goal.v1"],
+    "inputs": {
+      "goalVerb": "one of: build/test/run/format_lint/package_publish/diagnose_build_fail_triage/create_project/add_file/replace_file/apply_patch",
+      "hintEcosystem?": "optional ecosystem hint",
+      "hintProfile?": "optional profile hint (cli/web/api/gui/library)"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+﻿{
+  "id": "pack.feature.health_checks.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Feature: Health Checks",
+  "description": "Adds /health (and readiness notes) scaffolding where applicable.",
+  "tags": ["feature", "health", "readiness", "liveness"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.feature.add_health_checks.v1"
+    ]
+  }
+}

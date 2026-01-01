@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.perf.optimize_from_evidence.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 170 },
+  "title": "Optimize from evidence (neutral)",
+  "description": "Identifies bottlenecks and proposes safe optimizations with validation and rollback plans.",
+  "tags": ["perf", "optimization", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.perf.optimize_from_evidence.neutral.v1"] }
+}

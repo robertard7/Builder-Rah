@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.goal.run_or_wait.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 170 },
+  "title": "Goal: Run (capability-aware)",
+  "description": "Runs a detected entrypoint. If ambiguous (multiple apps/services), asks user to choose one.",
+  "tags": ["goal", "run", "capabilities"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["pack.goal_runner.unstoppable.neutral.v1"], "goalVerb": "run" }
+}

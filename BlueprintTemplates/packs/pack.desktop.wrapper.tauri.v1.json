@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.desktop.wrapper.tauri.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 145 },
+  "title": "Wrap UI as Desktop App (Tauri-style)",
+  "description": "Wraps an existing web UI into a Tauri-style desktop shell (abstract).",
+  "tags": ["desktop", "tauri", "wrapper"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.desktop.wrapper.tauri.v1"] }
+}

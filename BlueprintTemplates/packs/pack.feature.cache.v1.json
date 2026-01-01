@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.feature.cache.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 155 },
+  "title": "Feature: Cache",
+  "description": "Adds caching scaffolding (memory or external hook).",
+  "tags": ["feature", "cache"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.feature.add_cache.v1"
+    ],
+    "defaults": { "cacheMode": "memory" }
+  }
+}

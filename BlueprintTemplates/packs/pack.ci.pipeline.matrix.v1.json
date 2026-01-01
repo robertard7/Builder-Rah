@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.ci.pipeline.matrix.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 170 },
+  "title": "CI Pipeline (Matrix)",
+  "description": "Runs a profile matrix CI (debug/release) using ecosystem detection.",
+  "tags": ["ci", "matrix", "pipeline"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["task.ci.pipeline.matrix.v1"] }
+}

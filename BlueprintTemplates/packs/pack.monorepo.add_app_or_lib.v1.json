@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.monorepo.add_app_or_lib.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Monorepo: Add App or Library",
+  "description": "Adds a new app or library into apps/ or libs/ and updates workspace docs.",
+  "tags": ["monorepo", "workspace", "add"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.monorepo.add_project_skeleton.v1",
+      "task.monorepo.add_root_build_docs.v1"
+    ],
+    "defaults": { "ecosystem": "dotnet", "profile": "cli", "kind": "app" }
+  }
+}

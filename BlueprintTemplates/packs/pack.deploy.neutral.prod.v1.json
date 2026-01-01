@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.deploy.neutral.prod.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 180 },
+  "title": "Deploy Production (vendor-neutral)",
+  "description": "Vendor-neutral production deployment plan with contracts, optional DB migrations contract, smoke tests, rollback.",
+  "tags": ["deploy", "prod", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.deploy.neutral.prod.v1"] }
+}

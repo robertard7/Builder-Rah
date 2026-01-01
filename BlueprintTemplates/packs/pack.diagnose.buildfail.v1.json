@@ -1,0 +1,15 @@
+﻿{
+  "id": "pack.diagnose.buildfail.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 140 },
+  "title": "Diagnose Build Failure",
+  "description": "General-purpose build failure triage and diagnosis.",
+  "tags": ["diagnose", "build", "triage"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.diagnose_build_fail_triage.generic.v1"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+﻿{
+  "id": "pack.monorepo.standardize.layout.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 150 },
+  "title": "Monorepo: Standardize Layout",
+  "description": "Normalizes an existing multi-project repo into a clearer apps/libs structure and adds docs (non-destructive guidance).",
+  "tags": ["monorepo", "layout", "standardize"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.monorepo.detect_workspace.v1",
+      "recipe.monorepo.migration.plan_only.v1"
+    ]
+  }
+}

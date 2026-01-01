@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.package.publish.contract_first.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 175 },
+  "title": "Publish: Contract-first (neutral) with manifest + gates",
+  "description": "Creates artifact manifest + verification gates and produces a publish plan contract for approval. Does not hardcode registry/tooling.",
+  "tags": ["publish", "neutral", "contract", "manifest", "gates"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.publish.neutral.plan_manifest_gates.v1"] }
+}

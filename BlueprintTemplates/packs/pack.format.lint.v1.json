@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.format.lint.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 125 },
+  "title": "Format and Lint",
+  "description": "Run formatting and linting workflow for the current project ecosystem.",
+  "tags": ["format", "lint", "quality"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.format_lint.${ecosystem}.v1",
+      "task.build.${ecosystem}.v1",
+      "task.test.${ecosystem}.v1"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.obs.baseline.neutral.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 185 },
+  "title": "Observability baseline (neutral)",
+  "description": "Adds structured logs, correlation IDs, tracing and metrics plans, redaction policy, and scaffolding across critical flows.",
+  "tags": ["observability", "logging", "tracing", "metrics", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.obs.baseline.neutral.v1"] }
+}

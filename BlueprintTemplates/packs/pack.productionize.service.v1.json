@@ -1,0 +1,17 @@
+﻿{
+  "id": "pack.productionize.service.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 190 },
+  "title": "Productionize: Service",
+  "description": "Adds core production scaffolding: observability + health checks + resilience + release hygiene docs. Toolchain left to Settings.",
+  "tags": ["productionize", "service", "release"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.productionize.service_bundle.v1"
+    ],
+    "defaults": { "strategy": "retry_backoff" }
+  }
+}

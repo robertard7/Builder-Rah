@@ -1,0 +1,11 @@
+﻿{
+  "id": "pack.detect_and_adapt.repo_intake.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 160 },
+  "title": "Detect & Adapt: Repo intake",
+  "description": "Analyzes a repo and recommends next packs (docs, hygiene, tests, security, env) without executing changes.",
+  "tags": ["detect", "intake", "analysis"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "uses": ["recipe.detect_and_adapt.repo_intake.v1"] }
+}

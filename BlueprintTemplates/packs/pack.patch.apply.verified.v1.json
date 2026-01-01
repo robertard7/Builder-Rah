@@ -1,0 +1,16 @@
+﻿{
+  "id": "pack.patch.apply.verified.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 165 },
+  "title": "Apply Patch (Verified)",
+  "description": "Apply a patch and verify via build/test. Uses ecosystem detection when needed.",
+  "tags": ["patch", "verify", "safe"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.detect.project_shape.v1",
+      "task.apply_patch.verified.v1"
+    ]
+  }
+}

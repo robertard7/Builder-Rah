@@ -1,0 +1,22 @@
+﻿{
+  "id": "pack.diagnose.classify_and_fix.v1",
+  "kind": "pack",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 170 },
+  "title": "Diagnose: Classify and Fix",
+  "description": "Classify failure type then run targeted diagnosis and minimal safe repair steps.",
+  "tags": ["diagnose", "repair", "triage"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "uses": [
+      "task.diagnose.restore_fail.v1",
+      "task.diagnose.compile_fail.v1",
+      "task.diagnose.test_fail.v1",
+      "task.diagnose.run_fail.v1",
+      "task.diagnose.publish_fail.v1",
+      "task.apply_patch.generic.v1",
+      "task.build.${ecosystem}.v1",
+      "task.test.${ecosystem}.v1"
+    ]
+  }
+}
