@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.node.web.basic_routes.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "Node Web: Basic Routes",
+  "description": "Adds minimal web server routes: /health and /",
+  "tags": ["node", "web", "routes"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.generic.v1", "with": { "path": "${projectRoot}/src/server.js", "text": "const http = require('http');\n\nconst port = process.env.PORT || 3000;\n\nfunction handler(req, res) {\n  if (req.url === '/health') {\n    res.writeHead(200, { 'Content-Type': 'application/json' });\n    res.end(JSON.stringify({ ok: true }));\n    return;\n  }\n  if (req.url === '/') {\n    res.writeHead(200, { 'Content-Type': 'text/plain' });\n    res.end('Hello from Node web app');\n    return;\n  }\n  res.writeHead(404, { 'Content-Type': 'text/plain' });\n  res.end('Not Found');\n}\n\nhttp.createServer(handler).listen(port, () => {\n  console.log(`listening on ${port}`);\n});\n" } }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.node.resilience.retry_backoff.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 35 },
+  "title": "Node Resilience: Retry + Backoff",
+  "description": "Adds retry helper (no dependencies).",
+  "tags": ["node", "resilience", "retry"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/resilience/retry.js", "onConflict": "skip", "text": "async function withBackoff(op, attempts=3, baseDelayMs=150){\n  let last;\n  for(let i=0;i<attempts;i++){\n    try { return await op(); }\n    catch(e){ last=e; const d=baseDelayMs*Math.pow(2,i); await new Promise(r=>setTimeout(r,d)); }\n  }\n  throw last || new Error('Retry failed');\n}\nmodule.exports = { withBackoff };\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/resilience.md", "onConflict": "skip", "text": "# Resilience\n\nDefault:\n- retry + exponential backoff\n- timeouts\n- idempotency\n" } }
+  ] }
+}

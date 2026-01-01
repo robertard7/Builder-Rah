@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.python.src_layout.base.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "Python src/ Layout Base",
+  "description": "Adds src/ package layout and minimal metadata files.",
+  "tags": ["python", "src", "layout"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/${projectName}/__init__.py", "onConflict": "skip", "text": "" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/pyproject.toml", "onConflict": "fail", "text": "[project]\nname = \"${projectName}\"\nversion = \"0.1.0\"\nrequires-python = \">=3.10\"\n\n[tool.pytest.ini_options]\ntestpaths = [\"tests\"]\n" } }
+    ]
+  }
+}

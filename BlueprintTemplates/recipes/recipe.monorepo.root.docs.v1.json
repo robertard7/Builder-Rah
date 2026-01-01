@@ -1,0 +1,18 @@
+﻿{
+  "id": "recipe.monorepo.root.docs.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": "Workspace: Root docs",
+  "description": "Adds docs describing how to build/test/run in a multi-project repo using Settings.",
+  "tags": ["monorepo", "docs"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.ensure_dir.v1", "with": { "path": "${projectRoot}/docs" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": {
+      "path": "${projectRoot}/docs/workspace.md",
+      "onConflict": "skip",
+      "text": "# Workspace\n\nThis repo contains multiple projects.\n\n## Layout\n- apps/: applications\n- libs/: shared libraries\n\n## Build/Test/Run\nUse your environment Settings to select how each ecosystem builds/tests/runs.\n\n## Adding a new project\nUse the 'Monorepo: Add App or Library' pack and choose ecosystem/profile.\n"
+    } }
+  ] }
+}

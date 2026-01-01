@@ -1,0 +1,11 @@
+﻿{
+  "id": "recipe.java.cache.memory.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 5 },
+  "title": "Java Cache: Memory Notes",
+  "description": "Adds cache notes stub.",
+  "tags": ["java", "cache", "memory"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [ { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/cache.md", "onConflict": "skip", "text": "# Cache\n\nIn-memory cache strategy.\n" } } ] }
+}

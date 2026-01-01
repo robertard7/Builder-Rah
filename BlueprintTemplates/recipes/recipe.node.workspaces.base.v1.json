@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.node.workspaces.base.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "Node Workspaces Base",
+  "description": "Adds a basic workspace root package.json and folders.",
+  "tags": ["node", "workspaces", "monorepo"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/package.json", "onConflict": "fail", "text": "{\n  \"name\": \"${projectName}\",\n  \"private\": true,\n  \"workspaces\": [\"packages/*\", \"apps/*\"]\n}\n" } },
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/README.md", "onConflict": "skip", "text": "# ${projectName}\n\nMonorepo workspace.\n" } }
+    ]
+  }
+}

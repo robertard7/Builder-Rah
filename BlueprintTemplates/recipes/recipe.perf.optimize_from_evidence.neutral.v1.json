@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.perf.optimize_from_evidence.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 78 },
+  "title": "Optimize from evidence (neutral)",
+  "description": "Uses baseline evidence to identify bottlenecks and propose safe optimizations with validation/rollback plans.",
+  "tags": ["perf", "optimization", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.perf.identify_bottlenecks.v1" },
+    { "use": "task.perf.propose_optimizations.safe.v1" }
+  ] }
+}

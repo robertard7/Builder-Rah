@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.node.health.basic.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 40 },
+  "title": "Node Health: Basic",
+  "description": "Adds health handler stub.",
+  "tags": ["node", "health"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/health/health.js", "onConflict": "skip", "text": "function health(){ return { status:'ok' }; }\nfunction readiness(){ return { status:'ok' }; }\nmodule.exports = { health, readiness };\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/health.md", "onConflict": "skip", "text": "# Health\n\nExpose:\n- /health\n- /ready\n\nReadiness should validate DB/cache if present.\n" } }
+  ] }
+}

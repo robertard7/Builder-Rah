@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.node.db.postgres.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 45 },
+  "title": "Node DB: Postgres Skeleton",
+  "description": "Adds a db module stub for Postgres integration.",
+  "tags": ["node", "db", "postgres"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/db/postgresDb.js", "onConflict": "skip", "text": "// Placeholder: wire Postgres driver via toolchain/settings.\nfunction ping() { return 'postgres:ok'; }\nmodule.exports = { ping };\n" } }
+  ] }
+}

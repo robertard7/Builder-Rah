@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.python.auth.jwt_skeleton.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 35 },
+  "title": "Python Auth: JWT Skeleton",
+  "description": "Adds token service placeholder.",
+  "tags": ["python", "auth", "jwt"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/auth_tokens.py", "onConflict": "skip", "text": "def issue(subject: str) -> str:\n    return f\"token:{subject}\"\n\ndef try_validate(token: str):\n    if not token.startswith('token:'):\n        return (False, None)\n    return (True, token[len('token:'):])\n" } }
+  ] }
+}

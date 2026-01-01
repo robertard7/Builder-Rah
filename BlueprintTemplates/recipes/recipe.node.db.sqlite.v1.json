@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.node.db.sqlite.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 45 },
+  "title": "Node DB: SQLite Skeleton",
+  "description": "Adds a db module stub for SQLite integration.",
+  "tags": ["node", "db", "sqlite"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/db/sqliteDb.js", "onConflict": "skip", "text": "// Placeholder: wire SQLite driver via toolchain/settings.\nfunction ping() { return 'sqlite:ok'; }\nmodule.exports = { ping };\n" } }
+  ] }
+}

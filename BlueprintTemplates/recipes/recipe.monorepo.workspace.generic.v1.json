@@ -1,0 +1,17 @@
+﻿{
+  "id": "recipe.monorepo.workspace.generic.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 55 },
+  "title": "Workspace: Generic scaffold",
+  "description": "Creates apps/, libs/, docs/ with minimal README stubs.",
+  "tags": ["monorepo", "workspace", "generic"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.ensure_dir.v1", "with": { "path": "${projectRoot}/apps" } },
+    { "use": "task.ensure_dir.v1", "with": { "path": "${projectRoot}/libs" } },
+    { "use": "task.ensure_dir.v1", "with": { "path": "${projectRoot}/docs" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/apps/README.md", "onConflict": "skip", "text": "# Apps\n\nApplication projects live here.\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/libs/README.md", "onConflict": "skip", "text": "# Libraries\n\nReusable libraries live here.\n" } }
+  ] }
+}

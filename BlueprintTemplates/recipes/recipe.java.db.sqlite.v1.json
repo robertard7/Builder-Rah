@@ -1,0 +1,11 @@
+﻿{
+  "id": "recipe.java.db.sqlite.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 5 },
+  "title": "Java DB: SQLite Notes",
+  "description": "Adds db notes stub.",
+  "tags": ["java", "db", "sqlite"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [ { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/db_sqlite.md", "onConflict": "skip", "text": "# DB (SQLite)\n\nIntegrate via library choice.\n" } } ] }
+}

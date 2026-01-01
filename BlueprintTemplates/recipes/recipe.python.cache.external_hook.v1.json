@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.python.cache.external_hook.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 15 },
+  "title": "Python Cache: External Hook",
+  "description": "Adds placeholder external cache adapter.",
+  "tags": ["python", "cache", "external"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/cache_external.py", "onConflict": "skip", "text": "def get(k):\n    return None\n\ndef set(k,v):\n    pass\n" } }
+  ] }
+}

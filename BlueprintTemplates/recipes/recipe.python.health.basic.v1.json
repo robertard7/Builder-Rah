@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.python.health.basic.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 35 },
+  "title": "Python Health: Basic",
+  "description": "Adds health docs stub.",
+  "tags": ["python", "health"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/health.md", "onConflict": "skip", "text": "# Health\n\nExpose:\n- /health\n- /ready\n\nReadiness should validate DB/cache if present.\n" } }
+  ] }
+}

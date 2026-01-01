@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.python.resilience.retry_backoff.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 30 },
+  "title": "Python Resilience: Retry + Backoff",
+  "description": "Adds retry helper (no deps).",
+  "tags": ["python", "resilience", "retry"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/retry.py", "onConflict": "skip", "text": "import time\n\ndef with_backoff(op, attempts=3, base_delay_ms=150):\n    last = None\n    for i in range(attempts):\n        try:\n            return op()\n        except Exception as e:\n            last = e\n            delay = base_delay_ms * (2 ** i) / 1000.0\n            time.sleep(delay)\n    raise last if last else RuntimeError('Retry failed')\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/resilience.md", "onConflict": "skip", "text": "# Resilience\n\nDefault:\n- retry + exponential backoff\n- timeouts\n- idempotency\n" } }
+  ] }
+}

@@ -1,0 +1,16 @@
+﻿{
+  "id": "recipe.perf.baseline_and_gates.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 82 },
+  "title": "Performance baseline + regression gates (neutral)",
+  "description": "Defines SLOs, collects baseline metrics, defines load profile, and sets regression gates.",
+  "tags": ["perf", "baseline", "gates", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.perf.define_slos_and_budgets.v1" },
+    { "use": "task.perf.collect_baseline_metrics.v1" },
+    { "use": "task.perf.define_load_profile.v1" },
+    { "use": "task.perf.regression_gates.v1" }
+  ] }
+}

@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.python.cache.memory.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 25 },
+  "title": "Python Cache: In-Memory",
+  "description": "Adds a simple dict cache helper.",
+  "tags": ["python", "cache", "memory"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/cache_memory.py", "onConflict": "skip", "text": "_cache = {}\n\ndef get(k):\n    return _cache.get(k)\n\ndef set(k,v):\n    _cache[k]=v\n" } }
+  ] }
+}

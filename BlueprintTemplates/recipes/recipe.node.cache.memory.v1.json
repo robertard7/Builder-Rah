@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.node.cache.memory.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 35 },
+  "title": "Node Cache: In-Memory",
+  "description": "Adds a simple in-memory cache helper.",
+  "tags": ["node", "cache", "memory"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/cache/memoryCache.js", "onConflict": "skip", "text": "const map = new Map();\nfunction get(k){ return map.has(k) ? map.get(k) : null; }\nfunction set(k,v){ map.set(k,v); }\nmodule.exports = { get, set };\n" } }
+  ] }
+}

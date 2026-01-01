@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.node.db.generic.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 35 },
+  "title": "Node DB: Generic Notes",
+  "description": "Adds a docs note for DB integration points.",
+  "tags": ["node", "db", "generic"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/db.md", "onConflict": "skip", "text": "# Database\n\nProvide:\n- connect()\n- query()\n- migrations\n\nImplementation via environment/settings.\n" } }
+  ] }
+}

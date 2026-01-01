@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.python.api.basic_endpoints.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 60 },
+  "title": "Python API: Basic Endpoints",
+  "description": "Adds minimal API endpoints: /health and /",
+  "tags": ["python", "api", "endpoints"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.generic.v1", "with": { "path": "${projectRoot}/app.py", "text": "from flask import Flask, jsonify\n\napp = Flask(__name__)\n\n@app.get('/health')\ndef health():\n    return jsonify({\"ok\": True})\n\n@app.get('/')\ndef root():\n    return 'Hello from Python API'\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=5000)\n" } }
+    ]
+  }
+}

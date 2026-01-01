@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.node.observability.basic.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 45 },
+  "title": "Node Observability: Basic",
+  "description": "Adds logger stub + correlation id helper.",
+  "tags": ["node", "observability", "logging"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/obs/logger.js", "onConflict": "skip", "text": "function log(level, message, meta){\n  const entry = { ts: new Date().toISOString(), level, message, ...(meta||{}) };\n  console.log(JSON.stringify(entry));\n}\nmodule.exports = {\n  info:(m,meta)=>log('info',m,meta),\n  warn:(m,meta)=>log('warn',m,meta),\n  error:(m,meta)=>log('error',m,meta)\n};\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/src/obs/correlation.js", "onConflict": "skip", "text": "let currentId = '';\nfunction get(){ return currentId; }\nfunction withId(id, fn){ const prev=currentId; currentId=id; try{ return fn(); } finally { currentId=prev; } }\nmodule.exports = { get, withId };\n" } },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/observability.md", "onConflict": "skip", "text": "# Observability\n\n- structured logs (JSON)\n- correlation id per request\n\nIntegrate log sinks/tracing via environment/settings.\n" } }
+  ] }
+}

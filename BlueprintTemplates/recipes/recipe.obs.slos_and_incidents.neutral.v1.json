@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.obs.slos_and_incidents.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 86 },
+  "title": "SLOs + incident playbook (neutral)",
+  "description": "Defines SLOs and alert policy, and scaffolds an incident playbook/runbook and postmortem template.",
+  "tags": ["observability", "slo", "incident", "runbook", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.obs.define_slos_and_alerts.v1" },
+    { "use": "task.obs.scaffold_incident_playbook.v1" }
+  ] }
+}

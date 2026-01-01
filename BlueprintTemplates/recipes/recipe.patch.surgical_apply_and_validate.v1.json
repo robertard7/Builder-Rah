@@ -1,0 +1,19 @@
+﻿{
+  "id": "recipe.patch.surgical_apply_and_validate.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 92 },
+  "title": "Surgical Patch: Preflight -> Budget -> Apply -> Validate",
+  "description": "Applies minimal safe patches with receipts and validates (build/test/run/format) afterward. Asks user only when scope is risky.",
+  "tags": ["patch", "surgical", "safe", "validate"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.detect.ecosystem_and_entrypoints.v1" },
+    { "use": "task.patch.preflight.scan_targets.v1" },
+    { "use": "task.patch.define_change_budget.v1" },
+    { "use": "task.patch.plan_surgical_patch.v1" },
+    { "use": "task.patch.wait_user.approve_budget_or_scope.v1" },
+    { "use": "task.patch.apply_with_receipts.v1" },
+    { "use": "task.patch.validate_post_apply.v1" }
+  ] }
+}

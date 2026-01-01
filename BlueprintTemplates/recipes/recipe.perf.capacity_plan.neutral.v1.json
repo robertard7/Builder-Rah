@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.perf.capacity_plan.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 72 },
+  "title": "Capacity plan (neutral)",
+  "description": "Creates a neutral capacity plan based on SLOs and load profile assumptions.",
+  "tags": ["perf", "capacity", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.perf.capacity_plan.neutral.v1" }
+  ] }
+}

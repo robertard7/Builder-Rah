@@ -1,0 +1,13 @@
+﻿{
+  "id": "recipe.harden.baseline_pass.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 76 },
+  "title": "Harden: Baseline pass (service)",
+  "description": "Applies baseline hardening (logging/timeouts/health/config) to a service without toolchain assumptions.",
+  "tags": ["harden", "baseline", "service"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.harden.pass.baseline_bundle.v1" }
+  ] }
+}

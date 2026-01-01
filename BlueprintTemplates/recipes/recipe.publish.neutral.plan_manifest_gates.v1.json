@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.publish.neutral.plan_manifest_gates.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 84 },
+  "title": "Publish (neutral): Plan + manifest + gates",
+  "description": "Produces an artifact manifest and a publish plan contract; routes to WAIT_USER to approve destination mapping when needed.",
+  "tags": ["publish", "neutral", "manifest", "gates"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.artifacts.manifest_and_gates.baseline.v1" },
+    { "use": "task.artifacts.publish_plan_contract.neutral.v1" },
+    { "use": "task.artifacts.emit_publish_plan_wait_user.v1" }
+  ] }
+}

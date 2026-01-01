@@ -1,0 +1,15 @@
+﻿{
+  "id": "recipe.node.tests.basic_smoke.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": "Node Tests: Basic Smoke",
+  "description": "Adds a minimal test file using built-in assert (no deps assumed).",
+  "tags": ["node", "test", "smoke"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "steps": [
+      { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/test/smoke.test.js", "onConflict": "skip", "text": "const assert = require('assert');\n\ndescribe('smoke', () => {\n  it('works', () => {\n    assert.strictEqual(1 + 1, 2);\n  });\n});\n" } }
+    ]
+  }
+}

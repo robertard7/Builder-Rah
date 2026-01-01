@@ -1,0 +1,22 @@
+﻿{
+  "id": "recipe.obs.baseline.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 90 },
+  "title": "Observability baseline (neutral)",
+  "description": "Defines log schema, correlation contract, trace/metrics plans, redaction policy, and scaffolds integrations.",
+  "tags": ["observability", "baseline", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.obs.wait_user.select_risk_profile.v1" },
+    { "use": "task.obs.define_redaction_policy.v1" },
+    { "use": "task.obs.define_log_schema.v1" },
+    { "use": "task.obs.add_correlation_id_contract.v1" },
+    { "use": "task.obs.define_trace_spans.v1" },
+    { "use": "task.obs.define_metrics_contract.v1" },
+    { "use": "task.obs.scaffold_logging_integration.v1" },
+    { "use": "task.obs.scaffold_tracing_integration.v1" },
+    { "use": "task.obs.scaffold_metrics_integration.v1" },
+    { "use": "task.obs.validate_observability_coverage.v1" }
+  ] }
+}

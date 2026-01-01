@@ -1,0 +1,14 @@
+﻿{
+  "id": "recipe.monorepo.workspace.cpp.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 50 },
+  "title": "Workspace: C++ conventions",
+  "description": "Generic workspace scaffold plus CMake notes.",
+  "tags": ["monorepo", "cpp"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "recipe.monorepo.workspace.generic.v1" },
+    { "use": "task.add_file.conflict_policy.v1", "with": { "path": "${projectRoot}/docs/workspace_cpp.md", "onConflict": "skip", "text": "# Workspace (C++)\n\n- Prefer a root build orchestration strategy described in docs.\n- Keep shared libraries in libs/.\n- Build/test via Settings.\n" } }
+  ] }
+}
