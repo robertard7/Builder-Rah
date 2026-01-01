@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.deploy.preview_plan.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Deploy: Preview environment plan",
+  "description": "Creates a neutral preview deployment plan (staging/preview) including health checks and smoke tests. Abstract.",
+  "tags": ["deploy", "preview", "plan"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "deploy_plan_preview",
+    "inputs": ["projectRoot", "ecosystem", "serviceType?", "options?"],
+    "outputs": ["previewPlan", "smokeChecklist"],
+    "defaults": { "serviceType": "web|api|worker|cli" },
+    "rules": [
+      "no vendor-specific resources",
+      "health check endpoint or check required for services",
+      "plan must include rollback notes"
+    ]
+  }
+}

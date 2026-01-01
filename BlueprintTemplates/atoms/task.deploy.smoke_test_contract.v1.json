@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.deploy.smoke_test_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Deploy: Smoke test contract",
+  "description": "Defines minimal smoke tests for post-deploy validation (health, critical path). Abstract.",
+  "tags": ["deploy", "smoke", "validation"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "deploy_smoke_test_contract",
+    "inputs": ["projectRoot", "serviceType?", "options?"],
+    "outputs": ["smokeTests"],
+    "defaults": { "serviceType": "web|api|worker|cli" },
+    "rules": [
+      "tests must be minimal and deterministic",
+      "include how to capture evidence on failure"
+    ]
+  }
+}

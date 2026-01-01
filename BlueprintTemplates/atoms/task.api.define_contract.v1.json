@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.api.define_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "API: Define contract (endpoints, models, errors)",
+  "description": "Defines an API contract (routes, request/response shapes, error model) without selecting a tooling format.",
+  "tags": ["api", "contract", "models"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "api_define_contract",
+    "inputs": ["projectRoot", "serviceType?", "useCases?"],
+    "outputs": ["apiContract"],
+    "rules": [
+      "contract must be human-readable",
+      "must define error model and status mapping conceptually",
+      "avoid tool-specific schema syntax"
+    ]
+  }
+}

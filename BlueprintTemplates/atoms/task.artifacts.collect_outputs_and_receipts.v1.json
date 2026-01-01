@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.artifacts.collect_outputs_and_receipts.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Artifacts: Collect outputs and receipts",
+  "description": "Collects build/test/publish receipts and enumerates produced outputs for manifest generation.",
+  "tags": ["artifacts", "receipts", "build", "publish"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "collect_artifact_outputs_and_receipts",
+    "inputs": ["projectRoot", "goalVerb", "validationResult?", "patchReceipts?"],
+    "outputs": ["artifactEvidenceBundle"],
+    "rules": [
+      "prefer deterministic evidence (paths, sizes, hashes if present)",
+      "include links to prior receipts when available",
+      "do not guess outputs; only report what exists or was reported"
+    ]
+  }
+}

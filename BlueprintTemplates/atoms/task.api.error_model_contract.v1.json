@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.api.error_model_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "API: Error model contract",
+  "description": "Defines a standard error payload model (code, message, details, correlation id) and mapping rules.",
+  "tags": ["api", "errors", "observability"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "api_define_error_model",
+    "inputs": ["projectRoot", "needs?"],
+    "outputs": ["errorModel"],
+    "rules": [
+      "errors must be stable for clients",
+      "include correlation id concept for tracing",
+      "do not leak sensitive data in errors"
+    ]
+  }
+}

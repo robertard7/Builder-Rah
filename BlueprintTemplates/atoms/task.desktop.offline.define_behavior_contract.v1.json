@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.desktop.offline.define_behavior_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Desktop: Define offline mode contract",
+  "description": "Defines what the app does when offline: caching rules, degraded behavior, user messaging, and retry strategy.",
+  "tags": ["desktop", "offline", "resilience"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "desktop_define_offline_mode_contract",
+    "inputs": ["projectRoot", "appType?", "networkFeatures?"],
+    "outputs": ["offlineModeContract"],
+    "rules": [
+      "define what works offline and what does not",
+      "cache must have limits and eviction policy",
+      "retry behavior must avoid infinite loops",
+      "user must be informed when in degraded mode"
+    ]
+  }
+}

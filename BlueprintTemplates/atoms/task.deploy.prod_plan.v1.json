@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.deploy.prod_plan.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Deploy: Production deployment plan",
+  "description": "Creates a neutral production deployment plan with promotion gates and rollback strategy. Abstract.",
+  "tags": ["deploy", "prod", "plan"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "deploy_plan_prod",
+    "inputs": ["projectRoot", "ecosystem", "riskProfile?", "options?"],
+    "outputs": ["prodPlan", "rollbackPlan", "gates"],
+    "defaults": { "riskProfile": "low|medium|high" },
+    "rules": [
+      "explicit gate between preview and prod",
+      "database migrations must be called out if applicable",
+      "use canary/blue-green conceptually (no vendor impl)"
+    ]
+  }
+}

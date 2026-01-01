@@ -1,0 +1,25 @@
+﻿{
+  "id": "task.capabilities.normalize_goal_to_feasible_verbs.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Capabilities: Normalize goal to feasible verbs",
+  "description": "Given a user goal (one of the core verbs), chooses feasible verbs/sub-steps based on detected capabilities.",
+  "tags": ["capabilities", "goal", "plan"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "normalize_goal_to_feasible_verbs",
+    "inputs": ["goalVerb", "capabilitiesReport", "ecosystemHint?", "profileHint?"],
+    "outputs": ["normalizedGoalPlan"],
+    "rules": [
+      "if requested verb is infeasible, propose minimal enabling steps (scaffold tests, add config) or WAIT_USER",
+      "prefer smallest plan that satisfies the goal",
+      "never introduce provider/model/toolchain constraints"
+    ],
+    "examples": [
+      { "ifGoal": "test", "whenMissing": "hasTests=false", "then": "propose scaffold tests OR WAIT_USER approve skip tests" },
+      { "ifGoal": "run", "whenMissing": "knownRunTargets empty", "then": "WAIT_USER ask for entrypoint or approve adding one" },
+      { "ifGoal": "package_publish", "whenMissing": "hasPackagingConfig=false", "then": "propose scaffold packaging config OR WAIT_USER" }
+    ]
+  }
+}

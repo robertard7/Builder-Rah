@@ -1,0 +1,19 @@
+﻿{
+  "id": "task.data.define_domain_model.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Data: Define domain model (entities/value objects)",
+  "description": "Defines domain entities/value objects and invariants. Abstract across ecosystems.",
+  "tags": ["data", "domain", "model"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "data_define_domain_model",
+    "inputs": ["projectRoot", "boundedContext?", "useCases?"],
+    "outputs": ["domainModel", "invariants"],
+    "rules": [
+      "model should be storage-agnostic",
+      "avoid leaking persistence concerns into domain types"
+    ]
+  }
+}

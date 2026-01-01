@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.deploy.define_env_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Deploy: Define environment variable contract",
+  "description": "Defines a stable environment variable contract and documents it (names, types, defaults, required/optional). Abstract.",
+  "tags": ["deploy", "env", "contract"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "deploy_define_env_contract",
+    "inputs": ["projectRoot", "ecosystem", "profiles?"],
+    "outputs": ["envContract", "docsArtifacts"],
+    "rules": [
+      "no secrets in docs values",
+      "defaults must be safe for local dev",
+      "prod must require explicit values for sensitive settings"
+    ]
+  }
+}

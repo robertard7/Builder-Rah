@@ -1,0 +1,16 @@
+﻿{
+  "id": "task.add_file.conflict_policy.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Add File (Conflict Policy)",
+  "description": "Add a file with a conflict policy (fail/skip/rename) if path exists.",
+  "tags": ["add_file", "safe"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_file",
+    "mode": "conflict_policy",
+    "inputs": ["path", "text"],
+    "policy": "${onConflict}" 
+  }
+}

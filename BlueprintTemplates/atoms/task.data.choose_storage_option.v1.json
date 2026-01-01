@@ -1,0 +1,22 @@
+﻿{
+  "id": "task.data.choose_storage_option.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Data: Choose storage option (WAIT_USER when unclear)",
+  "description": "Selects a storage option (embedded DB, server DB, document store, file-based) based on constraints. If constraints missing, emits WAIT_USER questions.",
+  "tags": ["data", "storage", "wait_user", "decision"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "data_choose_storage_option",
+    "inputs": ["constraints?", "scale?", "offline?", "consistency?", "opsTolerance?"],
+    "outputs": ["storageOption", "waitUser", "questions"],
+    "options": ["embedded_sql", "server_sql", "document", "kv", "file_based"],
+    "questionRules": [
+      "ask for expected scale and durability needs",
+      "ask whether offline/local-only is required",
+      "ask ops tolerance (managed vs self-hosted)",
+      "never ask for provider/toolchain/model ids"
+    ]
+  }
+}

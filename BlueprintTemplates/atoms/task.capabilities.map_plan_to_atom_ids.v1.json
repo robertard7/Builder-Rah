@@ -1,0 +1,26 @@
+﻿{
+  "id": "task.capabilities.map_plan_to_atom_ids.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Capabilities: Map feasible plan to atom IDs",
+  "description": "Maps the normalized goal plan into concrete atom IDs (existing task.* templates) using ecosystem/profile hints.",
+  "tags": ["capabilities", "map", "atoms", "router"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "map_plan_to_atom_ids",
+    "inputs": ["normalizedGoalPlan", "capabilitiesReport", "ecosystemHint?", "profileHint?"],
+    "outputs": ["atomExecutionPlan"],
+    "mappingRules": [
+      "prefer ecosystem-specific atoms when available, else fall back to generic atoms",
+      "never reference templates that do not exist; if missing, route to diagnose or WAIT_USER",
+      "use deterministic selection order: ecosystem-specific -> profile-specific -> generic"
+    ],
+    "fallbacks": [
+      { "verb": "add_file", "fallbackAtom": "task.add_file.generic.v1" },
+      { "verb": "replace_file", "fallbackAtom": "task.replace_file.generic.v1" },
+      { "verb": "apply_patch", "fallbackAtom": "task.apply_patch.generic.v1" },
+      { "verb": "diagnose_build_fail_triage", "fallbackAtom": "task.diagnose_build_fail_triage.generic.v1" }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.add_file.generic.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 4 },
+  "title": "Add file (generic)",
+  "description": "Adds a file at a relative path under projectRoot with provided content.",
+  "tags": ["add_file", "generic"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "add_file",
+    "inputs": ["projectRoot", "relativePath", "textContent", "encoding?"],
+    "outputs": ["writtenPath"]
+  }
+}

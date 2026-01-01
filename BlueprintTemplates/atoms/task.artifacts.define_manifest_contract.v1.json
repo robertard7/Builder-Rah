@@ -1,0 +1,31 @@
+﻿{
+  "id": "task.artifacts.define_manifest_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Artifacts: Define artifact manifest contract",
+  "description": "Defines a neutral, provider-agnostic artifact manifest schema (what was built, where it is, how to verify).",
+  "tags": ["artifacts", "manifest", "publish", "deploy", "contract"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "define_artifact_manifest_contract",
+    "inputs": ["ecosystem?", "projectRoot", "entrypoints?", "buildOutputs?"],
+    "outputs": ["artifactManifestContract"],
+    "schema": {
+      "fields": [
+        "projectName",
+        "version",
+        "ecosystem",
+        "profiles",
+        "artifacts[]: { kind, path, platform?, arch?, hash?, sizeBytes?, producedByStep?, notes? }",
+        "checks[]: { name, verb, target?, expected?, notes? }",
+        "provenance: { updatedUtc, inputsHash?, receiptsRef? }"
+      ]
+    },
+    "rules": [
+      "paths must be relative to ${projectRoot} when possible",
+      "never include secrets in manifests",
+      "hashes are optional; include only if already computed by engine"
+    ]
+  }
+}

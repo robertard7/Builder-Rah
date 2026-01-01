@@ -1,0 +1,15 @@
+﻿{
+  "id": "task.create_project.generic.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Create project (generic)",
+  "description": "Abstract project creation. Orchestrator/tooling resolves actual project scaffolding.",
+  "tags": ["create_project", "generic"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "create_project",
+    "inputs": ["projectRoot", "projectName", "ecosystem?", "profile?"],
+    "outputs": ["projectRoot", "summary"]
+  }
+}

@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.artifacts.validate_gates_or_wait_user.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Artifacts: Validate gates or WAIT_USER",
+  "description": "Ensures verification gates are satisfied. If missing (no tests, no run target), asks user to approve alternate gate set.",
+  "tags": ["artifacts", "gates", "wait_user", "publish"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "validate_gates_or_wait_user",
+    "inputs": ["projectRoot", "verificationGates", "detectionReport?", "evidenceBundle?"],
+    "outputs": ["gateDecision", "questions?", "waitUser?"],
+    "waitUser": false,
+    "questionRules": [
+      "ask only when a required gate cannot be run due to missing targets",
+      "offer options: scaffold tests, relax gate, provide custom smoke command hint (as intent, not command)",
+      "never ask for provider/model/toolchain ids"
+    ]
+  }
+}

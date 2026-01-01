@@ -1,0 +1,27 @@
+﻿{
+  "id": "task.artifacts.define_verification_gates.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Artifacts: Define verification gates",
+  "description": "Defines minimum verification gates for packaging/publishing/deploy: build, test, smoke run, and lint/format where applicable.",
+  "tags": ["artifacts", "verify", "gates", "publish", "deploy"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "define_verification_gates",
+    "inputs": ["ecosystem?", "profile?", "riskProfile?"],
+    "outputs": ["verificationGates"],
+    "defaults": {
+      "riskProfile": "standard",
+      "requireBuild": true,
+      "requireTests": true,
+      "requireFormatLint": false,
+      "requireSmokeRun": true
+    },
+    "rules": [
+      "for libraries, smoke run may be skipped if tests cover usage",
+      "for services, require health check or basic request smoke if available",
+      "if gates cannot be satisfied, route to WAIT_USER with options"
+    ]
+  }
+}

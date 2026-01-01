@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.api.versioning_strategy.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "API: Versioning strategy",
+  "description": "Defines how API versions are expressed and evolved (path/header/media-type) conceptually, with compatibility rules.",
+  "tags": ["api", "versioning", "compat"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "api_define_versioning_strategy",
+    "inputs": ["projectRoot", "constraints?"],
+    "outputs": ["versioningStrategy"],
+    "options": ["path_version", "header_version", "media_type_version"],
+    "rules": [
+      "default to additive changes within a major version",
+      "breaking changes require a new major version",
+      "deprecations must have timelines and migration notes"
+    ]
+  }
+}

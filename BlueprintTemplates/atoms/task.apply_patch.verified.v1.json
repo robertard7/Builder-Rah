@@ -1,0 +1,19 @@
+﻿{
+  "id": "task.apply_patch.verified.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Apply Patch (Verified)",
+  "description": "Apply a patch then verify by running configured build/test steps (no hardcoded commands).",
+  "tags": ["apply_patch", "verify", "safe"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "apply_patch",
+    "mode": "verified",
+    "inputs": ["patchText", "projectRoot"],
+    "verify": {
+      "build": "task.build.${ecosystem}.v1",
+      "test": "task.test.${ecosystem}.v1"
+    }
+  }
+}

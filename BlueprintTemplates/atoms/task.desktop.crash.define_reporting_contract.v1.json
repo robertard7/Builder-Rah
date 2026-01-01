@@ -1,0 +1,24 @@
+﻿{
+  "id": "task.desktop.crash.define_reporting_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Desktop: Define crash reporting contract",
+  "description": "Defines what is captured on crashes, redaction rules, user consent, storage, and export path (neutral).",
+  "tags": ["desktop", "crash", "telemetry", "privacy"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "desktop_define_crash_reporting_contract",
+    "inputs": ["projectRoot", "privacyPosture?"],
+    "outputs": ["crashReportingContract"],
+    "rules": [
+      "default must respect user privacy and consent",
+      "redact secrets and tokens",
+      "support user-exportable crash bundle",
+      "define retention and deletion behavior"
+    ],
+    "defaults": {
+      "privacyPosture": "consent_required"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.artifacts.write_manifest_file.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Artifacts: Write manifest file",
+  "description": "Writes artifact manifest JSON to a deterministic location under the repo (no hardcoded paths).",
+  "tags": ["artifacts", "manifest", "write"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "write_artifact_manifest_file",
+    "inputs": ["projectRoot", "artifactManifest", "relativeOutPath?"],
+    "outputs": ["manifestPath"],
+    "defaults": { "relativeOutPath": ".rah/artifacts/manifest.json" },
+    "rules": [
+      "ensure directory exists before writing",
+      "never write outside ${projectRoot}",
+      "if file exists, replace only if content differs"
+    ]
+  }
+}

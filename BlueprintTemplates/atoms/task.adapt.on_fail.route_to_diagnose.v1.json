@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.adapt.on_fail.route_to_diagnose.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 7 },
+  "title": "Adapt: On failure, route to diagnose",
+  "description": "If build/test/run/publish fails, captures evidence and routes to the diagnose unstoppable pack/graph.",
+  "tags": ["adapt", "diagnose", "triage"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "route_on_failure",
+    "inputs": ["goalVerb", "result", "projectRoot"],
+    "outputs": ["nextPackId", "evidenceBundle"],
+    "rules": [
+      "prefer pack.diagnose.unstoppable.v1 when present",
+      "include stage hint when possible (restore/compile/test/run/publish/format)",
+      "avoid destructive changes; propose minimal fixes"
+    ]
+  }
+}

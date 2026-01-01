@@ -1,0 +1,14 @@
+{
+  "id": "task.build.generic.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Build (Generic)",
+  "description": "Build the project using the ecosystem's configured build system.",
+  "tags": ["build"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "build",
+    "inputs": ["projectRoot"]
+  }
+}

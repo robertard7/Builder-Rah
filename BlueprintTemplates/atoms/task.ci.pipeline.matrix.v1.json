@@ -1,0 +1,24 @@
+﻿{
+  "id": "task.ci.pipeline.matrix.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "CI Pipeline (Matrix)",
+  "description": "Run CI steps across a profile matrix (debug/release, lint on/off) using settings-driven executors.",
+  "tags": ["ci", "matrix", "pipeline"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "pipeline_matrix",
+    "inputs": ["projectRoot"],
+    "matrix": {
+      "buildProfile": ["debug", "release"],
+      "lint": ["on"]
+    },
+    "steps": [
+      "task.detect.project_shape.v1",
+      "task.format_lint.${ecosystem}.v1",
+      "task.build.${ecosystem}.v1",
+      "task.test.${ecosystem}.v1"
+    ]
+  }
+}

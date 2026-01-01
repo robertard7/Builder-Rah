@@ -1,0 +1,20 @@
+{
+  "id": "task.create_project.dotnet.gui.v1",
+  "kind": "taskboard",
+  "version": "v1",
+  "meta": { "visibility": "internal", "priority": 10 },
+  "title": "Create .NET GUI project (abstract)",
+  "description": "Abstract steps for creating a .NET GUI project. Command/tool mapping happens later per toolchain. No hardcoded paths.",
+  "tags": ["task", "dotnet", "create_project", "gui"],
+  "updatedUtc": "2025-12-28T00:00:00.0000000Z",
+  "content": {
+    "inputs": ["projectRoot", "folderName", "projectName", "targetFramework?"],
+    "steps": [
+      { "action": "ensure_dir", "path": "${projectRoot}/${folderName}" },
+      { "action": "create_project", "template": "dotnet.winforms", "name": "${projectName}", "framework": "${targetFramework?}" }
+    ],
+    "verify": [
+      { "action": "build" }
+    ]
+  }
+}

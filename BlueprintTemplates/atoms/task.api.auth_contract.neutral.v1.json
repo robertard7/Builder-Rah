@@ -1,0 +1,21 @@
+﻿{
+  "id": "task.api.auth_contract.neutral.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "API: Auth contract (neutral)",
+  "description": "Defines authentication/authorization contract conceptually (tokens/sessions/keys) without committing to a product.",
+  "tags": ["api", "auth", "security"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "api_define_auth_contract",
+    "inputs": ["projectRoot", "serviceAudience?", "riskProfile?"],
+    "outputs": ["authContract"],
+    "defaults": { "riskProfile": "low|medium|high" },
+    "rules": [
+      "auth is optional; define when required",
+      "least privilege, explicit scopes/roles if applicable",
+      "never store secrets in repo"
+    ]
+  }
+}

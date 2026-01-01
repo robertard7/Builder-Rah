@@ -1,0 +1,11 @@
+﻿{
+  "id": "task.build.node.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 11 },
+  "title": "Build Node",
+  "description": "Build a Node project using configured build script/settings.",
+  "tags": ["node", "build"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "action": "build", "ecosystem": "node", "inputs": ["projectRoot"] }
+}

@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.artifacts.generate_manifest.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Artifacts: Generate artifact manifest",
+  "description": "Generates an artifact manifest instance from the contract and evidence bundle.",
+  "tags": ["artifacts", "manifest", "generate"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "generate_artifact_manifest",
+    "inputs": ["artifactManifestContract", "artifactEvidenceBundle", "projectName?", "version?"],
+    "outputs": ["artifactManifest"],
+    "rules": [
+      "include verification checks appropriate to goalVerb",
+      "include platform/arch only if detected",
+      "manifest must be stable across reruns when outputs unchanged"
+    ]
+  }
+}

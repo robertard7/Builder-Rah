@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.data.migrations_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Data: Migrations contract (safe)",
+  "description": "Defines how migrations are created, applied, verified, and rolled back conceptually.",
+  "tags": ["data", "migrations", "safety"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "data_define_migrations_contract",
+    "inputs": ["projectRoot", "schemaContract", "ecosystem"],
+    "outputs": ["migrationsContract", "safetyChecklist"],
+    "rules": [
+      "must be reversible where possible",
+      "destructive migrations require explicit user approval",
+      "include backup strategy notes"
+    ]
+  }
+}

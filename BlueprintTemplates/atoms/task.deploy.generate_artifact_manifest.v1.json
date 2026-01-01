@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.deploy.generate_artifact_manifest.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Deploy: Generate deployable artifact manifest",
+  "description": "Defines what gets built and deployed (artifacts, images, packages) and how versions are derived. Abstract.",
+  "tags": ["deploy", "artifact", "manifest"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "deploy_generate_artifact_manifest",
+    "inputs": ["projectRoot", "ecosystem", "publishProfile?"],
+    "outputs": ["artifactManifest"],
+    "rules": [
+      "no toolchain hardcoding",
+      "versions derived from repo/version strategy",
+      "document outputs and locations relative to ${projectRoot}"
+    ]
+  }
+}

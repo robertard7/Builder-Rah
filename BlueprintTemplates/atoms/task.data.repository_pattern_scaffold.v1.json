@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.data.repository_pattern_scaffold.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 6 },
+  "title": "Data: Repository pattern scaffold",
+  "description": "Scaffolds repository/service boundaries for persistence with testability and clear transaction boundaries.",
+  "tags": ["data", "repository", "transactions"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "data_scaffold_repository_pattern",
+    "inputs": ["projectRoot", "storageContract", "ecosystem"],
+    "outputs": ["repoScaffold", "txBoundaryNotes"],
+    "rules": [
+      "explicit transaction boundary per use-case",
+      "avoid ambient globals",
+      "prefer dependency injection where idiomatic"
+    ]
+  }
+}

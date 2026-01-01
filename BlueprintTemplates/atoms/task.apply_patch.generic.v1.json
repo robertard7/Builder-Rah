@@ -1,0 +1,16 @@
+﻿{
+  "id": "task.apply_patch.generic.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 4 },
+  "title": "Apply patch (generic)",
+  "description": "Applies a unified diff patch to files under projectRoot.",
+  "tags": ["apply_patch", "generic"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "apply_patch",
+    "inputs": ["projectRoot", "patchText", "strict?"],
+    "outputs": ["applied", "filesTouched", "rejects?"],
+    "defaults": { "strict": true }
+  }
+}

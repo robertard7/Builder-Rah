@@ -1,0 +1,23 @@
+﻿{
+  "id": "task.capabilities.goal_runner.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 8 },
+  "title": "Capabilities: Goal runner (detect -> normalize -> map -> execute)",
+  "description": "End-to-end capability-aware goal runner. Executes the requested verb using detected repo capabilities and existing atom templates.",
+  "tags": ["capabilities", "goal", "unstoppable"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "capability_aware_goal_runner",
+    "inputs": ["projectRoot", "goalVerb", "ecosystemHint?", "profileHint?", "settingsPresetName?"],
+    "outputs": ["executionReceipts", "finalStatus", "waitUser?", "questions?"],
+    "pipeline": [
+      { "use": "task.capabilities.detect_repo_features.v1" },
+      { "use": "task.capabilities.normalize_goal_to_feasible_verbs.v1" },
+      { "use": "task.capabilities.map_plan_to_atom_ids.v1" },
+      { "use": "task.capabilities.execute_atom_plan.v1" }
+    ],
+    "onAmbiguity": { "use": "task.capabilities.wait_user.resolve_ambiguities.v1" },
+    "onFailure": { "routeTo": "pack.diagnose.unstoppable.v1" }
+  }
+}

@@ -1,0 +1,20 @@
+﻿{
+  "id": "task.desktop.health.define_startup_shutdown_contract.v1",
+  "kind": "atom",
+  "version": 1,
+  "meta": { "visibility": "internal", "priority": 5 },
+  "title": "Desktop: Define startup/shutdown health contract",
+  "description": "Defines startup validation, safe mode triggers, and shutdown persistence guarantees (neutral).",
+  "tags": ["desktop", "startup", "shutdown", "safe_mode"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": {
+    "action": "desktop_define_startup_shutdown_contract",
+    "inputs": ["projectRoot", "configStorageContract"],
+    "outputs": ["startupShutdownContract"],
+    "rules": [
+      "define what constitutes a 'bad startup' and safe mode entry",
+      "ensure settings are flushed safely on exit",
+      "avoid data loss on crash by using atomic write patterns conceptually"
+    ]
+  }
+}
