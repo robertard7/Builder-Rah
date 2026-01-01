@@ -1,0 +1,13 @@
+{
+  "id": "recipe.a11y.baseline.neutral.v1",
+  "kind": "recipe",
+  "version": 1,
+  "meta": { "visibility": "public", "priority": 78 },
+  "title": "Accessibility baseline (neutral)",
+  "description": "Adds baseline accessibility checklist and risk scan without selecting specific linters or toolchains.",
+  "tags": ["a11y", "accessibility", "neutral"],
+  "updatedUtc": "2025-12-28T00:00:00Z",
+  "content": { "steps": [
+    { "use": "task.a11y.baseline_checks.neutral.v1" }
+  ] }
+}
