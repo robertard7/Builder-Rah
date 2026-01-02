@@ -21,6 +21,7 @@ public sealed class AttachmentInbox
         public string Sha256 { get; set; } = "";
         public DateTime AddedUtc { get; set; }
         public string Kind { get; set; } = "other";
+        public bool Active { get; set; } = true;
     }
 
     public sealed class AttachmentOperationResult
@@ -100,6 +101,7 @@ public sealed class AttachmentInbox
                 var entry = CopyAndHash(file, hostPath, storedName);
                 entry.OriginalName = Path.GetFileName(file) ?? storedName;
                 entry.Kind = DetermineKind(ext);
+                entry.Active = true;
                 entry.AddedUtc = DateTime.UtcNow;
 
                 manifest.Items.Add(entry);
@@ -148,6 +150,29 @@ public sealed class AttachmentInbox
         }
     }
 
+    public AttachmentOperationResult SetActive(string storedName, bool active)
+    {
+        var result = new AttachmentOperationResult();
+        if (string.IsNullOrWhiteSpace(storedName))
+            return Fail(result, "storedName required");
+
+        lock (_lock)
+        {
+            var manifest = LoadManifest();
+            var match = manifest.Items.FirstOrDefault(i => string.Equals(i.StoredName, storedName, StringComparison.OrdinalIgnoreCase));
+            if (match == null)
+                return Fail(result, "Attachment not found");
+
+            match.Active = active;
+            SaveManifest(manifest);
+
+            result.Ok = true;
+            result.Message = "Updated";
+            result.Added.Add(match);
+            return result;
+        }
+    }
+
     private void EnsureInbox()
     {
         try
@@ -171,7 +196,16 @@ public sealed class AttachmentInbox
                 return new AttachmentManifest();
 
             var json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<AttachmentManifest>(json, JsonOptions()) ?? new AttachmentManifest();
+            var hasActive = json.IndexOf("\"active\"", StringComparison.OrdinalIgnoreCase) >= 0;
+            var manifest = JsonSerializer.Deserialize<AttachmentManifest>(json, JsonOptions()) ?? new AttachmentManifest();
+            foreach (var item in manifest.Items)
+            {
+                if (!hasActive)
+                    item.Active = true;
+                if (string.IsNullOrWhiteSpace(item.Kind))
+                    item.Kind = DetermineKind(Path.GetExtension(item.StoredName));
+            }
+            return manifest;
         }
         catch (Exception ex)
         {
