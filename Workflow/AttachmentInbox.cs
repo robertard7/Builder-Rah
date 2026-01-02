@@ -265,7 +265,8 @@ public sealed class AttachmentInbox
         ext = (ext ?? "").ToLowerInvariant();
         if (ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp") return "image";
         if (ext is ".zip" or ".rar" or ".7z" or ".tar" or ".gz") return "archive";
-        if (ext is ".txt" or ".md" or ".json" or ".pdf" or ".doc" or ".docx") return "document";
+        if (ext is ".cs" or ".cpp" or ".cxx" or ".cc" or ".c" or ".h" or ".hpp" or ".hh" or ".py" or ".js" or ".ts" or ".tsx" or ".jsx" or ".java" or ".go" or ".rb" or ".rs" or ".php" or ".swift" or ".kt" or ".kts" or ".m" or ".mm" or ".sh" or ".ps1" or ".bat" or ".cmd") return "code";
+        if (ext is ".txt" or ".md" or ".json" or ".pdf" or ".doc" or ".docx" or ".rtf" or ".tex" or ".yaml" or ".yml" or ".csv" or ".toml" or ".xml") return "document";
         return "other";
     }
 

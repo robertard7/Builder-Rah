@@ -8,6 +8,10 @@ public static class ClarificationQuestionBank
 {
     private static readonly Dictionary<string, string> Map = new()
     {
+        { "goal", "What’s the main goal you want to achieve?" },
+        { "actions", "Should I describe, summarize, or combine the materials in a specific way?" },
+        { "attachments", "Which attachment(s) should I focus on and how should I use them?" },
+        { "context", "Anything in particular I should know about the background or purpose?" },
         { "targets", "What project or folder should this apply to?" },
         { "acceptance", "What counts as done? (e.g., build succeeds, tests pass)" },
         { "constraints", "Any constraints? (no rewrites, no new deps, etc.)" },
