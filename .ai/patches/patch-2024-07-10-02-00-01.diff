@@ -1,0 +1,44 @@
+diff --git a/Workflow/JobSpecParser.cs b/Workflow/JobSpecParser.cs
+index 8f6814e..dcebc5e 100644
+--- a/Workflow/JobSpecParser.cs
++++ b/Workflow/JobSpecParser.cs
+@@
+         AddMissingIfEmpty(request, "request", missing);
+         AddMissingIfEmpty(goal, "goal", missing);
+         AddMissingIfEmpty(actions, "actions", missing);
+         AddMissingIfEmpty(attachments, "attachments", missing);
++        AddMissingIfEmpty(context, "context", missing);
++        AddMissingIfEmpty(constraints, "constraints", missing);
+@@
+         if (actions.Count == 0 && attachments.Count > 0)
+         {
+             actions = SuggestActionsFromAttachments(attachments);
+             if (actions.Count > 0)
+                 missing.RemoveAll(m => string.Equals(m, "actions", StringComparison.OrdinalIgnoreCase));
+         }
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 989a9ad..6d02403 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@
+             var question = spec.Clarification;
+             if (string.IsNullOrWhiteSpace(question) && unanswered.Count > 0)
+             {
+                 var qs = ClarificationQuestionBank.PickQuestions(targets, 1);
+                 _state.PendingQuestions = qs;
+                 question = qs.FirstOrDefault();
+             }
+-            else if (string.IsNullOrWhiteSpace(question) && missing.Count > 0)
+-            {
+-                question = "I still need details on " + string.Join(", ", missing) + " to finish the JobSpec.";
+-                _state.PendingQuestions = new List<string> { question };
+-            }
+-            else
++            else
+             {
+-                _state.PendingQuestions = new List<string> { question };
++                var qs = ClarificationQuestionBank.PickQuestions(missing, 1);
++                _state.PendingQuestions = string.IsNullOrWhiteSpace(question) ? qs : new List<string> { question };
++                if (string.IsNullOrWhiteSpace(question))
++                    question = qs.FirstOrDefault();
+             }

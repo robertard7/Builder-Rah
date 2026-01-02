@@ -322,14 +322,12 @@ public sealed class WorkflowFacade
                 _state.PendingQuestions = qs;
                 question = qs.FirstOrDefault();
             }
-            else if (string.IsNullOrWhiteSpace(question) && missing.Count > 0)
-            {
-                question = "I still need details on " + string.Join(", ", missing) + " to finish the JobSpec.";
-                _state.PendingQuestions = new List<string> { question };
-            }
             else
             {
-                _state.PendingQuestions = new List<string> { question };
+                var qs = ClarificationQuestionBank.PickQuestions(missing, 1);
+                _state.PendingQuestions = string.IsNullOrWhiteSpace(question) ? qs : new List<string> { question };
+                if (string.IsNullOrWhiteSpace(question))
+                    question = qs.FirstOrDefault();
             }
 
             if (string.IsNullOrWhiteSpace(question))

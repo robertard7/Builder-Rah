@@ -86,6 +86,8 @@ public static class JobSpecParser
         AddMissingIfEmpty(goal, "goal", missing);
         AddMissingIfEmpty(actions, "actions", missing);
         AddMissingIfEmpty(attachments, "attachments", missing);
+        AddMissingIfEmpty(context, "context", missing);
+        AddMissingIfEmpty(constraints, "constraints", missing);
 
         var inferred = InferActions(request, attachments);
         if (actions.Count == 0 && inferred.Count > 0)
