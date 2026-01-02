@@ -302,6 +302,13 @@ public sealed class WorkflowFacade
             foreach (var m in unanswered)
                 _state.AskedMissingFields.Add(m);
 
+            if (unanswered.Count == 0)
+            {
+                _trace.Emit("[route:wait_user] JobSpec incomplete; awaiting answers for: " + string.Join(",", missing));
+                NotifyStatus("Waiting clarification");
+                return;
+            }
+
             var targets = unanswered.Count > 0 ? unanswered : missing;
             var question = spec.Clarification;
             if (string.IsNullOrWhiteSpace(question) && unanswered.Count > 0)

@@ -112,11 +112,14 @@ public sealed class MainForm : Form
 
         var demoIntent = new Button { Text = "Intent Demo Flow", AutoSize = true };
         demoIntent.Click += async (_, _) => await RunIntentDemoAsync().ConfigureAwait(true);
+        var demoEdgeCase = new Button { Text = "Intent Edge Case", AutoSize = true };
+        demoEdgeCase.Click += async (_, _) => await RunEdgeCaseAsync().ConfigureAwait(true);
 
         topButtons.Controls.Add(toggleTrace);
         topButtons.Controls.Add(demoAttachments);
         topButtons.Controls.Add(demoRequest);
         topButtons.Controls.Add(demoIntent);
+        topButtons.Controls.Add(demoEdgeCase);
 
         _clarifyPanel = new Panel
         {
@@ -436,6 +439,13 @@ public sealed class MainForm : Form
     {
         CreateDemoAttachments();
         await SendNowAsync("Describe this image and document and combine results.").ConfigureAwait(true);
+    }
+
+    private async Task RunEdgeCaseAsync()
+    {
+        _composer.ReloadAttachments(Array.Empty<AttachmentInbox.AttachmentEntry>());
+        _workflow.SetAttachments(Array.Empty<AttachmentInbox.AttachmentEntry>());
+        await SendNowAsync("Summarize the attached file and image.").ConfigureAwait(true);
     }
 
     private static string ExtractNextStep(string? summary)
