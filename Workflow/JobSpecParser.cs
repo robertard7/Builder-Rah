@@ -76,6 +76,13 @@ public static class JobSpecParser
         AddMissingIfEmpty(actions, "actions", missing);
         AddMissingIfEmpty(attachments, "attachments", missing);
 
+        if (actions.Count == 0 && attachments.Count > 0)
+        {
+            actions = SuggestActionsFromAttachments(attachments);
+            if (actions.Count > 0)
+                missing.RemoveAll(m => string.Equals(m, "actions", StringComparison.OrdinalIgnoreCase));
+        }
+
         var ready = readyEl.GetBoolean() && missing.Count == 0;
 
         spec = JobSpec.FromJson(
@@ -202,6 +209,23 @@ public static class JobSpecParser
     {
         if (string.IsNullOrWhiteSpace(value))
             AddMissing(field, missing);
+    }
+
+    private static List<string> SuggestActionsFromAttachments(List<JobSpecAttachment> attachments)
+    {
+        var actions = new List<string>();
+        if (attachments == null || attachments.Count == 0)
+            return actions;
+
+        var kinds = attachments.Select(a => NormalizeKind(a.Kind)).ToList();
+        if (kinds.Any(k => k == "image"))
+            actions.Add("describe image");
+        if (kinds.Any(k => k == "document" || k == "code"))
+            actions.Add("summarize document");
+        if (actions.Count > 1)
+            actions.Add("combine findings");
+
+        return actions;
     }
 
     private static string NormalizeKind(string kind)
