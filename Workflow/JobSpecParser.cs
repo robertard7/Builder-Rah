@@ -87,11 +87,21 @@ public static class JobSpecParser
         AddMissingIfEmpty(actions, "actions", missing);
         AddMissingIfEmpty(attachments, "attachments", missing);
 
+        var inferred = InferActions(request, attachments);
+        if (actions.Count == 0 && inferred.Count > 0)
+            actions = inferred;
+        else if (inferred.Count > 0)
+            actions = MergeActions(actions, inferred);
+
         if (actions.Count == 0 && attachments.Count > 0)
         {
             actions = SuggestActionsFromAttachments(attachments);
             if (actions.Count > 0)
                 missing.RemoveAll(m => string.Equals(m, "actions", StringComparison.OrdinalIgnoreCase));
+        }
+        else if (actions.Count > 0)
+        {
+            missing.RemoveAll(m => string.Equals(m, "actions", StringComparison.OrdinalIgnoreCase));
         }
 
         var ready = readyEl.GetBoolean() && missing.Count == 0;
@@ -237,6 +247,48 @@ public static class JobSpecParser
             actions.Add("combine findings");
 
         return actions;
+    }
+
+    private static List<string> InferActions(string request, List<JobSpecAttachment> attachments)
+    {
+        var actions = new List<string>();
+        var text = (request ?? "").ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(text))
+            return actions;
+
+        bool hasImage = attachments.Any(a => NormalizeKind(a.Kind) == "image");
+        bool hasDoc = attachments.Any(a => NormalizeKind(a.Kind) is "document" or "code");
+
+        if (text.Contains("describe") && hasImage)
+            actions.Add("describe image");
+        if ((text.Contains("summarize") || text.Contains("read") || text.Contains("analyze")) && hasDoc)
+            actions.Add("summarize document");
+        if (text.Contains("compare"))
+            actions.Add("compare attachments");
+        if (text.Contains("combine") || text.Contains("then") || text.Contains("after"))
+            actions.Add("combine findings");
+
+        return NormalizeActions(actions);
+    }
+
+    private static List<string> MergeActions(List<string> existing, List<string> inferred)
+    {
+        var merged = new List<string>(existing ?? new List<string>());
+        foreach (var a in inferred ?? Enumerable.Empty<string>())
+        {
+            if (!merged.Contains(a, StringComparer.OrdinalIgnoreCase))
+                merged.Add(a);
+        }
+        return NormalizeActions(merged);
+    }
+
+    private static List<string> NormalizeActions(IEnumerable<string> actions)
+    {
+        return actions
+            ?.Select(a => (a ?? "").Trim())
+            .Where(a => a.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? new List<string>();
     }
 
     private static string NormalizeKind(string kind)
