@@ -1,0 +1,186 @@
+diff --git a/Workflow/IntentExtractor.cs b/Workflow/IntentExtractor.cs
+index 79bb064..7d7c578 100644
+--- a/Workflow/IntentExtractor.cs
++++ b/Workflow/IntentExtractor.cs
+@@ -162,6 +162,12 @@ internal static class IntentExtractionParser
+                 actions.Add(mapped);
+         }
+ 
++        foreach (var inferred in InferSemanticActions(userText))
++        {
++            if (!actions.Contains(inferred, StringComparer.OrdinalIgnoreCase))
++                actions.Add(inferred);
++        }
++
+         var ready = extraction.Ready && (extraction.Missing?.Count ?? 0) == 0 && actions.Count > 0 && extraction.Goal.Trim().Length > 0;
+         return new IntentExtraction(
+             extraction.Mode,
+@@ -207,17 +213,48 @@ internal static class IntentExtractionParser
+         var lower = text.ToLowerInvariant();
+         if (lower.Contains("describe") && lower.Contains("image"))
+             return "vision.describe.image";
++        if (lower.Contains("caption"))
++            return "vision.describe.image";
+         if (lower.Contains("web") && lower.Contains("server"))
+             return "code.generate.webserver";
++        if (lower.Contains("rest") && lower.Contains("api"))
++            return "code.generate.api";
++        if (lower.Contains("api") && lower.Contains("tests"))
++            return "code.test.generate";
+         if (lower.Contains("test"))
+             return "code.generate.tests";
+         if (lower.Contains("auth"))
+             return "code.generate.auth";
++        if (lower.Contains("login"))
++            return "code.generate.auth";
+         if (lower.Contains("read") && (lower.Contains("file") || lower.Contains("document")))
+             return "file.read.text";
++        if (lower.Contains("code") && lower.Contains("generate"))
++            return "code.generate";
++        if (lower.Contains("build") && lower.Contains("app"))
++            return "code.generate.app";
++        if (lower.Contains("doc") || lower.Contains("readme"))
++            return "code.generate.docs";
+         return text;
+     }
+ 
++    private static IEnumerable<string> InferSemanticActions(string text)
++    {
++        var lower = (text ?? "").ToLowerInvariant();
++        if (lower.Contains("write tests") || lower.Contains("add tests") || lower.Contains("unit test"))
++            yield return "code.generate.tests";
++        if (lower.Contains("include auth") || lower.Contains("authentication") || lower.Contains("login"))
++            yield return "code.generate.auth";
++        if (lower.Contains("rest api") || lower.Contains("api endpoints"))
++            yield return "code.generate.api";
++        if (lower.Contains("database") || lower.Contains("sqlite") || lower.Contains("db"))
++            yield return "code.generate.database";
++        if (lower.Contains("docs") || lower.Contains("documentation") || lower.Contains("readme"))
++            yield return "code.generate.docs";
++        if (lower.Contains("package") || lower.Contains("zip"))
++            yield return "code.package";
++    }
++
+     private static string ReadString(JsonElement obj, string name, string fallback)
+     {
+         if (obj.ValueKind != JsonValueKind.Object) return fallback;
+diff --git a/Workflow/ProgramArtifactGenerator.cs b/Workflow/ProgramArtifactGenerator.cs
+index dd8a817..a350612 100644
+--- a/Workflow/ProgramArtifactGenerator.cs
++++ b/Workflow/ProgramArtifactGenerator.cs
+@@ -143,6 +143,16 @@ public sealed class ProgramArtifactGenerator
+         }
+     }
+ 
++    public static string BuildTreePreview(IEnumerable<ProgramArtifact> files)
++    {
++        var sb = new System.Text.StringBuilder();
++        foreach (var file in files.OrderBy(f => f.Path, StringComparer.OrdinalIgnoreCase))
++        {
++            sb.AppendLine(file.Path.Replace("\\", "/"));
++        }
++        return sb.ToString().TrimEnd();
++    }
++
+     private static string Sanitize(string path)
+     {
+         path ??= "";
+diff --git a/Workflow/ProviderApiHost.cs b/Workflow/ProviderApiHost.cs
+index d3bb108..50214f3 100644
+--- a/Workflow/ProviderApiHost.cs
++++ b/Workflow/ProviderApiHost.cs
+@@ -89,6 +89,13 @@ public sealed class ProviderApiHost : IDisposable
+                 return;
+             }
+ 
++            if (path.EndsWith("/api/artifacts", StringComparison.OrdinalIgnoreCase))
++            {
++                var cards = _workflow.GetOutputCards().Where(c => c.Kind == OutputCardKind.Program).ToList();
++                await WriteJsonAsync(ctx, new { cards }).ConfigureAwait(false);
++                return;
++            }
++
+             if (path.EndsWith("/api/plan", StringComparison.OrdinalIgnoreCase))
+             {
+                 await WriteJsonAsync(ctx, new
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 82ad0a5..1a19285 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -1274,6 +1274,19 @@ public sealed class WorkflowFacade
+             var result = await _executor.RunNextAsync(_cfg, _attachments, _toolManifest, _toolPrompts, ct).ConfigureAwait(false);
+             if (!result.Ok)
+             {
++                var errorCard = new OutputCard
++                {
++                    Kind = OutputCardKind.Error,
++                    Title = "Step failed",
++                    Summary = result.Message,
++                    Preview = result.Message,
++                    FullContent = result.Message,
++                    Tags = new[] { "error" },
++                    ToolId = step.ToolId,
++                    CreatedUtc = DateTimeOffset.UtcNow
++                };
++                _state.OutputCards.Add(errorCard);
++                OutputCardProduced?.Invoke(errorCard);
+                 EmitWaitUser(result.Message, "Something went wrong. Want me to retry this step?");
+                 NotifyStatus("Tool execution");
+                 TraceAttentionRequested?.Invoke();
+@@ -1412,15 +1425,21 @@ public sealed class WorkflowFacade
+             return;
+         }
+ 
++        if (!string.IsNullOrWhiteSpace(result.ZipPath))
++            _state.ArtifactPackages.Add(result.ZipPath);
++
+         var previewLines = result.Files.Take(5).Select(f => $"- {f.Path}");
++        var tree = ProgramArtifactGenerator.BuildTreePreview(result.Files);
+         var card = new OutputCard
+         {
+             Kind = OutputCardKind.Program,
+             Title = "Program artifacts",
+             Summary = $"Generated {result.Files.Count} files",
+             Preview = string.Join("\n", previewLines),
+-            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}",
+-            Tags = new[] { "program", "artifact" }
++            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}\n\nFiles:\n{tree}",
++            Tags = new[] { "program", "artifact" },
++            CreatedUtc = DateTimeOffset.UtcNow,
++            Metadata = result.ZipPath
+         };
+ 
+         _state.OutputCards.Add(card);
+@@ -1486,6 +1505,12 @@ public sealed class WorkflowFacade
+         var request = (spec.Request ?? intent?.Request ?? "").Trim();
+         var goal = (spec.Goal ?? intent?.Goal ?? "").Trim();
+         var context = string.IsNullOrWhiteSpace(spec.Context) ? intent?.Context ?? "" : spec.Context;
++        if (string.IsNullOrWhiteSpace(context))
++        {
++            var mem = _state.Memory.Summarize(4);
++            if (!string.IsNullOrWhiteSpace(mem))
++                context = mem;
++        }
+         var actions = spec.Actions?.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList() ?? new List<string>();
+         if (actions.Count == 0 && intent?.Actions != null)
+             actions = intent.Actions.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList();
+diff --git a/Workflow/WorkflowState.cs b/Workflow/WorkflowState.cs
+index 3cedcb6..7895060 100644
+--- a/Workflow/WorkflowState.cs
++++ b/Workflow/WorkflowState.cs
+@@ -27,6 +27,7 @@ public sealed class WorkflowState
+     public HashSet<string> AskedMissingFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+     public bool GenerateArtifacts { get; set; }
+     public string SessionToken { get; set; } = Guid.NewGuid().ToString("N");
++    public List<string> ArtifactPackages { get; set; } = new();
+ 
+     public void ClearPlan()
+     {
+@@ -40,6 +41,7 @@ public sealed class WorkflowState
+         AutoApproveAll = false;
+         PlanPaused = false;
+         GenerateArtifacts = false;
++        ArtifactPackages = new List<string>();
+     }
+ 
+     public void ClearClarifications()

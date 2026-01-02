@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Threading;
@@ -32,6 +33,7 @@ public sealed class MainForm : Form
     private readonly ToolStripStatusLabel _repoStatus;
     private readonly ToolStripStatusLabel _attachmentsStatus;
     private readonly ToolStripStatusLabel _workflowStatus;
+    private readonly List<OutputCard> _cards = new();
     private readonly TableLayoutPanel _stepPanel;
     private readonly Label _planSummaryLabel;
     private readonly Label _stepLabel;
@@ -39,9 +41,12 @@ public sealed class MainForm : Form
     private readonly Button _runNextButton;
     private readonly Button _stopButton;
     private readonly Button _editPlanButton;
+    private readonly Button _previewPlanButton;
     private readonly Panel _clarifyPanel;
     private readonly Label _clarifyLabel;
     private readonly SplitContainer _chatSplit;
+    private readonly ListBox _cardList;
+    private readonly RichTextBox _cardDetail;
 
     public MainForm()
     {
@@ -56,11 +61,13 @@ public sealed class MainForm : Form
         _inbox = new AttachmentInbox(_config.General, _trace);
 
         _workflow = new WorkflowFacade(_trace);
-        _workflow.UserFacingMessage += s => AppendChat(s + "\n");
+        _workflow.UserFacingMessage += OnUserFacingMessage;
         _workflow.StatusChanged += UpdateStatus;
         _workflow.PendingQuestionChanged += UpdateClarify;
         _workflow.PendingStepChanged += UpdateStepPanel;
+        _workflow.OutputCardProduced += OnOutputCardProduced;
         _workflow.TraceAttentionRequested += ShowTracePane;
+        _workflow.PlanReady += OnPlanReady;
 
         var tabs = new TabControl { Dock = DockStyle.Fill };
 
@@ -165,12 +172,15 @@ public sealed class MainForm : Form
         _stopButton.Click += (_, _) => StopPlan();
         _editPlanButton = new Button { Text = "Modify Plan", AutoSize = true };
         _editPlanButton.Click += (_, _) => EditPlan();
+        _previewPlanButton = new Button { Text = "Preview Plan", AutoSize = true };
+        _previewPlanButton.Click += (_, _) => PreviewPlan();
 
         buttonRow.Controls.Add(_stepLabel);
         buttonRow.Controls.Add(_runAllButton);
         buttonRow.Controls.Add(_runNextButton);
         buttonRow.Controls.Add(_stopButton);
         buttonRow.Controls.Add(_editPlanButton);
+        buttonRow.Controls.Add(_previewPlanButton);
         _stepPanel.Controls.Add(_planSummaryLabel, 0, 0);
         _stepPanel.Controls.Add(buttonRow, 0, 1);
 
@@ -185,7 +195,7 @@ public sealed class MainForm : Form
         _clarifyPanel.BringToFront();
         topButtons.BringToFront();
 
-        // Right side: trace
+        // Right side: trace + output cards
         _traceBox = new TextBox
         {
             Dock = DockStyle.Fill,
@@ -195,6 +205,37 @@ public sealed class MainForm : Form
             WordWrap = false,
             Font = new Font("Consolas", 9f)
         };
+
+        _cardList = new ListBox
+        {
+            Dock = DockStyle.Left,
+            Width = 260,
+            HorizontalScrollbar = true
+        };
+        _cardList.SelectedIndexChanged += (_, _) => ShowSelectedCard();
+
+        _cardDetail = new RichTextBox
+        {
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            ReadOnly = true,
+            WordWrap = true,
+            Font = new Font("Segoe UI", 9f)
+        };
+
+        var outputSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            Panel1MinSize = 200,
+            SplitterDistance = 260
+        };
+        outputSplit.Panel1.Controls.Add(_cardList);
+        outputSplit.Panel2.Controls.Add(_cardDetail);
+
+        var auxTabs = new TabControl { Dock = DockStyle.Fill };
+        auxTabs.TabPages.Add(new TabPage("Trace") { Controls = { _traceBox } });
+        auxTabs.TabPages.Add(new TabPage("Outputs") { Controls = { outputSplit } });
 
         _traceWriter.Updated += () =>
         {
@@ -209,7 +250,7 @@ public sealed class MainForm : Form
         };
 
         _chatSplit.Panel1.Controls.Add(leftPanel);
-        _chatSplit.Panel2.Controls.Add(_traceBox);
+        _chatSplit.Panel2.Controls.Add(auxTabs);
 
         tabs.TabPages.Add(new TabPage("Chat") { Controls = { _chatSplit } });
 
@@ -244,7 +285,9 @@ public sealed class MainForm : Form
             _workflow.StatusChanged -= UpdateStatus;
             _workflow.PendingQuestionChanged -= UpdateClarify;
             _workflow.PendingStepChanged -= UpdateStepPanel;
+            _workflow.OutputCardProduced -= OnOutputCardProduced;
             _workflow.TraceAttentionRequested -= ShowTracePane;
+            _workflow.PlanReady -= OnPlanReady;
         };
 
         UpdateStatus(null);
@@ -356,6 +399,29 @@ public sealed class MainForm : Form
         _stepPanel.Visible = hasPlan && !string.IsNullOrWhiteSpace(summary);
     }
 
+    private void OnOutputCardProduced(OutputCard card)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action<OutputCard>(OnOutputCardProduced), card);
+            return;
+        }
+
+        _cards.Add(card);
+        _cardList.Items.Add($"{card.Kind}: {card.Title}");
+        if (_cardList.Items.Count > 0)
+            _cardList.SelectedIndex = _cardList.Items.Count - 1;
+        _cardDetail.Text = card.ToDisplayText();
+    }
+
+    private void ShowSelectedCard()
+    {
+        if (_cardList.SelectedIndex < 0 || _cardList.SelectedIndex >= _cards.Count)
+            return;
+
+        _cardDetail.Text = _cards[_cardList.SelectedIndex].ToDisplayText();
+    }
+
     private void ToggleTracePane()
     {
         _chatSplit.Panel2Collapsed = !_chatSplit.Panel2Collapsed;
@@ -414,8 +480,47 @@ public sealed class MainForm : Form
 
     private void EditPlan()
     {
-        _workflow.RequestPlanEdit();
-        UpdateStepPanel(null, false);
+        var plan = _workflow.GetPendingPlan();
+        if (plan == null)
+        {
+            _workflow.RequestPlanEdit();
+            UpdateStepPanel(null, false);
+            return;
+        }
+
+        using var editor = new PlanEditorForm(plan);
+        if (editor.ShowDialog(this) == DialogResult.OK && editor.Result != null)
+        {
+            _workflow.ApplyEditedPlan(editor.Result);
+        }
+    }
+
+    private void PreviewPlan()
+    {
+        var plan = _workflow.GetPendingPlan();
+        if (plan == null) return;
+
+        var definition = PlanDefinition.FromToolPlan("", plan);
+        using var preview = new PlanPreviewForm(definition);
+        if (preview.ShowDialog(this) == DialogResult.OK && preview.Result != null)
+        {
+            _workflow.ApplyEditedPlan(preview.Result.ToToolPlan());
+            _workflow.ConfirmPlan();
+        }
+    }
+
+    private void OnPlanReady(PlanDefinition def)
+    {
+        if (!IsHandleCreated) return;
+        BeginInvoke(new Action(() =>
+        {
+            using var preview = new PlanPreviewForm(def);
+            if (preview.ShowDialog(this) == DialogResult.OK && preview.Result != null)
+            {
+                _workflow.ApplyEditedPlan(preview.Result.ToToolPlan());
+                _workflow.ConfirmPlan();
+            }
+        }));
     }
 
     private void CreateDemoAttachments()
