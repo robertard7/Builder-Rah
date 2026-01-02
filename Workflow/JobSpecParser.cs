@@ -261,14 +261,30 @@ public static class JobSpecParser
         bool hasImage = attachments.Any(a => NormalizeKind(a.Kind) == "image");
         bool hasDoc = attachments.Any(a => NormalizeKind(a.Kind) is "document" or "code");
 
-        if (text.Contains("describe") && hasImage)
-            actions.Add("describe image");
-        if ((text.Contains("summarize") || text.Contains("read") || text.Contains("analyze")) && hasDoc)
-            actions.Add("summarize document");
-        if (text.Contains("compare"))
-            actions.Add("compare attachments");
-        if (text.Contains("combine") || text.Contains("then") || text.Contains("after"))
-            actions.Add("combine findings");
+        var clauses = SplitClauses(text);
+        foreach (var clause in clauses)
+        {
+            if (clause.Contains("describe") && hasImage)
+                actions.Add("describe image");
+            if ((clause.Contains("summarize") || clause.Contains("read") || clause.Contains("analyze")) && hasDoc)
+                actions.Add("summarize document");
+            if (clause.Contains("compare"))
+                actions.Add("compare findings");
+            if (clause.Contains("combine"))
+                actions.Add("combine findings");
+        }
+
+        if (actions.Count == 0)
+        {
+            if (text.Contains("describe") && hasImage)
+                actions.Add("describe image");
+            if ((text.Contains("summarize") || text.Contains("read") || text.Contains("analyze")) && hasDoc)
+                actions.Add("summarize document");
+            if (text.Contains("compare"))
+                actions.Add("compare findings");
+            if (text.Contains("combine") || text.Contains("then") || text.Contains("after"))
+                actions.Add("combine findings");
+        }
 
         return NormalizeActions(actions);
     }
@@ -286,11 +302,27 @@ public static class JobSpecParser
 
     private static List<string> NormalizeActions(IEnumerable<string> actions)
     {
-        return actions
-            ?.Select(a => (a ?? "").Trim())
-            .Where(a => a.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList() ?? new List<string>();
+        var list = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var a in actions ?? Enumerable.Empty<string>())
+        {
+            var val = (a ?? "").Trim();
+            if (val.Length == 0 || seen.Contains(val)) continue;
+            seen.Add(val);
+            list.Add(val);
+        }
+        return list;
+    }
+
+    private static List<string> SplitClauses(string text)
+    {
+        var separators = new[] { " then ", " and then ", " after that ", " after ", " next ", ";", "." };
+        var parts = new List<string> { text };
+        foreach (var sep in separators)
+        {
+            parts = parts.SelectMany(p => p.Split(sep, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).ToList();
+        }
+        return parts.Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
     }
 
     private static string NormalizeKind(string kind)
