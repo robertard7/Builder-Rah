@@ -109,9 +109,13 @@ public sealed class MainForm : Form
         var demoRequest = new Button { Text = "Demo Request", AutoSize = true };
         demoRequest.Click += async (_, _) => await SendNowAsync("Read the note and describe the picture.").ConfigureAwait(true);
 
+        var demoIntent = new Button { Text = "Demo Intent Test", AutoSize = true };
+        demoIntent.Click += async (_, _) => await SendNowAsync("Describe this image and text file and then combine results.").ConfigureAwait(true);
+
         topButtons.Controls.Add(toggleTrace);
         topButtons.Controls.Add(demoAttachments);
         topButtons.Controls.Add(demoRequest);
+        topButtons.Controls.Add(demoIntent);
 
         _clarifyPanel = new Panel
         {

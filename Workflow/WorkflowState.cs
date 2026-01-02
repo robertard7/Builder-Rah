@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 
@@ -17,6 +18,7 @@ public sealed class WorkflowState
     public List<string> ClarificationAnswers { get; set; } = new();
     public List<string> PendingQuestions { get; set; } = new();
     public bool AutoApproveAll { get; set; }
+    public HashSet<string> AskedMissingFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void ClearPlan()
     {
@@ -33,5 +35,6 @@ public sealed class WorkflowState
     {
         ClarificationAnswers = new List<string>();
         PendingQuestions = new List<string>();
+        AskedMissingFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 }
