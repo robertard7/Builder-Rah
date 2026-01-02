@@ -1,0 +1,216 @@
+diff --git a/.github/workflows/windows-runner-build.yml b/.github/workflows/windows-runner-build.yml
+index fa53b6b..f8ab1dc 100644
+--- a/.github/workflows/windows-runner-build.yml
++++ b/.github/workflows/windows-runner-build.yml
+@@ -1,7 +1,6 @@
+ name: Windows Runner Build
+ 
+ on:
+-  pull_request:
+   push:
+     branches: [ main ]
+   workflow_dispatch:
+@@ -42,6 +41,43 @@ jobs:
+           dotnet build .\RahBuilder.csproj -c Release --no-restore 2>&1 | Tee-Object -FilePath .\artifacts\build.log
+           exit $LASTEXITCODE
+ 
++      - name: Annotate build failures
++        if: always()
++        shell: pwsh
++        run: |
++          $logPath = Join-Path $PWD 'artifacts\build.log'
++          if (-not (Test-Path $logPath)) {
++            Write-Output "::warning title=Build log missing::artifacts/build.log not found"
++            exit 0
++          }
++
++          $lines = Get-Content $logPath
++          $pattern = ':\s*error\s*([A-Z0-9]+:)?'
++          $matches = @()
++
++          for ($i = 0; $i -lt $lines.Length; $i++) {
++            if ($lines[$i] -match $pattern) {
++              $matches += [PSCustomObject]@{
++                Line = $i + 1
++                Text = $lines[$i]
++              }
++            }
++          }
++
++          if ($matches.Count -eq 0) {
++            Write-Output "::notice title=Build::No errors found in artifacts/build.log"
++            exit 0
++          }
++
++          $top = $matches | Select-Object -First 10
++          foreach ($m in $top) {
++            $msg = $m.Text -replace '::','`::' -replace '%','`%'
++            Write-Output "::error file=artifacts/build.log,line=$($m.Line)::$msg"
++          }
++
++          $summary = ($top | ForEach-Object { "`$($_.Line): $($_.Text)" }) -join "`n"
++          "## Build errors`n`n$summary" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding UTF8
++
+       - name: Upload build logs
+         if: always()
+         uses: actions/upload-artifact@v4
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 6037a6c..65b00ed 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -29,8 +29,24 @@ public sealed class WorkflowFacade
+ 
+     // If true, the ONLY allowed reply is: "edit <rewrite>"
+     private bool _forceEditBecauseInvalidJson = false;
+-
+-    public event Action<string>? UserFacingMessage;
++
++    public sealed record RunnerBuildSummary(
++        bool Ok,
++        long RunId,
++        string Status,
++        string Conclusion,
++        string HtmlUrl,
++        IReadOnlyList<string> Logs,
++        string Error)
++    {
++        public static RunnerBuildSummary Success(long runId, string status, string conclusion, string htmlUrl, IReadOnlyList<string> logs) =>
++            new(true, runId, status, conclusion, htmlUrl, logs, "");
++
++        public static RunnerBuildSummary Failed(string error, string detail = "") =>
++            new(false, 0, "", "", "", Array.Empty<string>(), string.IsNullOrWhiteSpace(detail) ? error : $"{error}: {detail}");
++    }
++
++    public event Action<string>? UserFacingMessage;
+ 
+     public WorkflowFacade(RunTrace trace)
+     {
+@@ -178,6 +194,9 @@ public sealed class WorkflowFacade
+             return;
+         }
+ 
++        if (!EnsureProvidersConfigured() || !EnsureToolPromptsReady())
++            return;
++
+         RepoScope.CheckGit(repoScope, _trace);
+ 
+         SyncGraphToHub(_cfg);
+@@ -274,6 +293,65 @@ public sealed class WorkflowFacade
+             EmitToolPlanWait();
+     }
+ 
++    public async Task<RunnerBuildSummary> RunFromCodexAsync(CancellationToken ct)
++    {
++        var repoScope = RepoScope.Resolve(_cfg);
++        _trace.Emit(repoScope.Message);
++        if (!repoScope.Ok)
++            return RunnerBuildSummary.Failed("repo_invalid", repoScope.Message);
++
++        if (!EnsureProvidersConfigured() || !EnsureToolPromptsReady())
++            return RunnerBuildSummary.Failed("validation_failed");
++
++        var repo = Environment.GetEnvironmentVariable("GITHUB_REPOSITORY") ?? "";
++        if (string.IsNullOrWhiteSpace(repo))
++            return RunnerBuildSummary.Failed("missing_repository", "Set GITHUB_REPOSITORY=owner/repo");
++
++        var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN") ?? Environment.GetEnvironmentVariable("GH_TOKEN") ?? "";
++        if (string.IsNullOrWhiteSpace(token))
++            return RunnerBuildSummary.Failed("missing_token", "Set GITHUB_TOKEN or GH_TOKEN for workflow_dispatch.");
++
++        var client = new GitHubActionsClient(repo, token, _trace);
++
++        if (!await client.DispatchAsync("windows-runner-build.yml", "main", ct).ConfigureAwait(false))
++            return RunnerBuildSummary.Failed("dispatch_failed");
++
++        var since = DateTimeOffset.UtcNow.AddMinutes(-1);
++        WorkflowRunInfo? run = null;
++        for (var attempt = 0; attempt < 12 && run == null; attempt++)
++        {
++            ct.ThrowIfCancellationRequested();
++            run = await client.FindLatestRunAsync("windows-runner-build.yml", since, ct).ConfigureAwait(false);
++            if (run == null)
++                await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
++        }
++
++        if (run == null)
++            return RunnerBuildSummary.Failed("run_not_found");
++
++        _trace.Emit($"[gh:run] tracking run {run.Id} ({run.HtmlUrl})");
++
++        while (!run.IsCompleted)
++        {
++            await Task.Delay(TimeSpan.FromSeconds(10), ct).ConfigureAwait(false);
++            run = await client.GetRunAsync(run.Id, ct).ConfigureAwait(false) ?? run;
++        }
++
++        _trace.Emit($"[gh:run:done] status={run.Status} conclusion={run.Conclusion}");
++
++        IReadOnlyList<string> logs = Array.Empty<string>();
++        try
++        {
++            logs = await client.DownloadLogsAsync(run.Id, ct).ConfigureAwait(false);
++        }
++        catch (Exception ex)
++        {
++            _trace.Emit("[gh:logs:warn] " + ex.Message);
++        }
++
++        return RunnerBuildSummary.Success(run.Id, run.Status, run.Conclusion, run.HtmlUrl, logs);
++    }
++
+     private async Task<JobSpec> RunJobSpecDigestAsync(string userText, CancellationToken ct)
+     {
+         var prompt = (_cfg.General.JobSpecDigestPrompt ?? "").Trim();
+@@ -442,6 +520,52 @@ public sealed class WorkflowFacade
+         return Path.Combine(blueprintTemplatesFolder, f.Replace('/', Path.DirectorySeparatorChar));
+     }
+ 
++    private bool EnsureProvidersConfigured()
++    {
++        var missing = new List<string>();
++        var roles = _cfg.Orchestrator?.Roles ?? new List<OrchestratorRoleConfig>();
++
++        foreach (var role in roles)
++        {
++            var name = role?.Role ?? "(unknown)";
++            if (string.IsNullOrWhiteSpace(role?.Provider) || string.IsNullOrWhiteSpace(role?.Model))
++                missing.Add(name);
++        }
++
++        if (missing.Count == 0)
++            return true;
++
++        var msg = "Missing provider/model for roles: " + string.Join(", ", missing);
++        _trace.Emit("[providers:error] " + msg);
++        EmitWaitUser(msg, "Update provider/model settings and retry.");
++        return false;
++    }
++
++    private bool EnsureToolPromptsReady()
++    {
++        if (_toolManifest == null || _toolManifest.ToolsById.Count == 0)
++        {
++            _trace.Emit("[tooling:error] Tools manifest is empty or failed to load.");
++            EmitWaitUser("Tools manifest not loaded. Set ToolsPath in Settings.");
++            return false;
++        }
++
++        var missingPrompts = new List<string>();
++        foreach (var id in _toolManifest.ToolsById.Keys)
++        {
++            if (!_toolPrompts.Has(id))
++                missingPrompts.Add(id);
++        }
++
++        if (missingPrompts.Count == 0)
++            return true;
++
++        var msg = "Missing tool prompts: " + string.Join(", ", missingPrompts);
++        _trace.Emit("[tooling:error] " + msg);
++        EmitWaitUser(msg, "Add prompt files for missing tools.");
++        return false;
++    }
++
+     private static List<string> ReadStringArray(JsonElement obj, string property)
+     {
+         var list = new List<string>();

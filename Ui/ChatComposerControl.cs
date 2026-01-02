@@ -230,7 +230,7 @@ public sealed class ChatComposerControl : UserControl
         var panel = new FlowLayoutPanel
         {
             AutoSize = true,
-            BackColor = Color.FromArgb(230, 230, 230),
+            BackColor = entry.Active ? Color.FromArgb(230, 230, 230) : Color.FromArgb(245, 230, 230),
             Margin = new Padding(0, 0, 6, 6),
             Padding = new Padding(6, 4, 6, 4),
             FlowDirection = FlowDirection.LeftToRight,
@@ -244,6 +244,15 @@ public sealed class ChatComposerControl : UserControl
             Padding = new Padding(0, 2, 6, 0)
         };
 
+        var activeToggle = new CheckBox
+        {
+            Text = "Active",
+            Checked = entry.Active,
+            AutoSize = true,
+            Padding = new Padding(0, 0, 6, 0)
+        };
+        activeToggle.CheckedChanged += (_, _) => ToggleAttachmentActive(entry.StoredName, activeToggle.Checked);
+
         var remove = new Button
         {
             Text = "x",
@@ -254,8 +263,22 @@ public sealed class ChatComposerControl : UserControl
         remove.Click += (_, _) => RemoveAttachment(entry.StoredName);
 
         panel.Controls.Add(name);
+        panel.Controls.Add(activeToggle);
         panel.Controls.Add(remove);
         return panel;
+    }
+
+    private void ToggleAttachmentActive(string storedName, bool active)
+    {
+        var result = _inbox.SetActive(storedName, active);
+        if (!result.Ok)
+        {
+            ShowStatus(result.Message, true);
+            return;
+        }
+
+        RefreshAttachments(_inbox.List());
+        ShowStatus(active ? "Attachment active." : "Attachment inactive.", false);
     }
 
     private void OnDragEnter(object? _, DragEventArgs e)
