@@ -1,0 +1,27 @@
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 6d02403..f6a8b23 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@
+             var unanswered = missing.Where(m => !_state.AskedMissingFields.Contains(m)).ToList();
+             foreach (var m in unanswered)
+                 _state.AskedMissingFields.Add(m);
+ 
+             if (unanswered.Count == 0)
+             {
+-                _trace.Emit("[route:wait_user] JobSpec incomplete; awaiting answers for: " + string.Join(",", missing));
+-                NotifyStatus("Waiting clarification");
+-                return;
++                var reminder = _state.PendingQuestion;
++                if (string.IsNullOrWhiteSpace(reminder))
++                    reminder = "I’m waiting on your answer so I can finish the plan.";
++
++                _trace.Emit("[route:wait_user] JobSpec incomplete; awaiting prior answers for: " + string.Join(",", missing));
++                EmitWaitUser(reminder, reminder);
++                NotifyStatus("Waiting clarification");
++                return;
+             }
+ 
+             var targets = unanswered.Count > 0 ? unanswered : missing;
+             var question = spec.Clarification;
+             if (string.IsNullOrWhiteSpace(question) && unanswered.Count > 0)

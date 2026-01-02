@@ -26,6 +26,7 @@ public sealed class WorkflowFacade
     private ToolPromptRegistry _toolPrompts = new();
 
     private string _lastGraphHash = "";
+    private bool _recentlyCompleted;
 
     // If true, the ONLY allowed reply is: "edit <rewrite>"
     private bool _forceEditBecauseInvalidJson = false;
@@ -85,17 +86,28 @@ public sealed class WorkflowFacade
     }
 
     public Task ApproveNextStepAsync(CancellationToken ct) => ExecuteCurrentStepAsync(ct);
+    public Task ApproveAllStepsAsync(CancellationToken ct)
+    {
+        _state.AutoApproveAll = true;
+        return ExecuteCurrentStepAsync(ct, true);
+    }
 
     public void StopPlan()
     {
+        _recentlyCompleted = false;
         _state.ClearPlan();
+        _state.PendingUserRequest = "";
+        _state.ClearClarifications();
         PendingStepChanged?.Invoke("", false);
         NotifyStatus();
     }
 
     public void RequestPlanEdit()
     {
+        _recentlyCompleted = false;
         _state.ClearPlan();
+        _state.PendingUserRequest = "";
+        _state.ClearClarifications();
         PendingStepChanged?.Invoke("", false);
         EmitWaitUser("Plan cleared. Tell me what you’d like instead.");
         NotifyStatus();
@@ -148,9 +160,10 @@ public sealed class WorkflowFacade
         text ??= "";
 
         _trace.Emit($"[chat] {text}");
+        _recentlyCompleted = false;
 
         var action = UserReplyInterpreter.Interpret(_cfg, _state, text);
-        NotifyStatus("Processing");
+        NotifyStatus("Digesting intent");
 
         // If last attempt produced invalid_json, DO NOT spin. Only accept "edit ...".
         if (_forceEditBecauseInvalidJson)
@@ -294,6 +307,18 @@ public sealed class WorkflowFacade
             foreach (var m in unanswered)
                 _state.AskedMissingFields.Add(m);
 
+            if (unanswered.Count == 0)
+            {
+                var reminder = _state.PendingQuestion;
+                if (string.IsNullOrWhiteSpace(reminder))
+                    reminder = "I’m waiting on your answer so I can finish the plan.";
+
+                _trace.Emit("[route:wait_user] JobSpec incomplete; awaiting prior answers for: " + string.Join(",", missing));
+                EmitWaitUser(reminder, reminder);
+                NotifyStatus("Waiting clarification");
+                return;
+            }
+
             var targets = unanswered.Count > 0 ? unanswered : missing;
             var question = spec.Clarification;
             if (string.IsNullOrWhiteSpace(question) && unanswered.Count > 0)
@@ -302,14 +327,12 @@ public sealed class WorkflowFacade
                 _state.PendingQuestions = qs;
                 question = qs.FirstOrDefault();
             }
-            else if (string.IsNullOrWhiteSpace(question) && missing.Count > 0)
-            {
-                question = "I still need details on " + string.Join(", ", missing) + " to finish the JobSpec.";
-                _state.PendingQuestions = new List<string> { question };
-            }
             else
             {
-                _state.PendingQuestions = new List<string> { question };
+                var qs = ClarificationQuestionBank.PickQuestions(missing, 1);
+                _state.PendingQuestions = string.IsNullOrWhiteSpace(question) ? qs : new List<string> { question };
+                if (string.IsNullOrWhiteSpace(question))
+                    question = qs.FirstOrDefault();
             }
 
             if (string.IsNullOrWhiteSpace(question))
@@ -593,21 +616,22 @@ public sealed class WorkflowFacade
 
     private string ComputeWorkflowPhase()
     {
+        if (_recentlyCompleted)
+            return "Done";
+
         if (_state.PendingToolPlan != null)
         {
             var idx = Math.Max(0, _state.PendingStepIndex);
             var count = _state.PendingToolPlan.Steps.Count;
             if (idx >= count)
                 return "Done";
-            if (idx == 0 && _state.ToolOutputs.Count == 0)
-                return "Planning";
-            if (_state.AutoApproveAll || _state.ToolOutputs.Count > 0)
-                return "Executing tools";
-            return "Waiting user action";
+            if (_state.ToolOutputs.Count > 0 || idx > 0 || _state.AutoApproveAll)
+                return "Tool execution";
+            return "Planning";
         }
 
         if (!string.IsNullOrWhiteSpace(_state.PendingQuestion))
-            return "Clarifying";
+            return "Waiting clarification";
 
         if (!string.IsNullOrWhiteSpace(_state.PendingUserRequest))
             return "Digesting intent";
@@ -623,22 +647,76 @@ public sealed class WorkflowFacade
         return string.IsNullOrWhiteSpace(name) ? repoRoot : name;
     }
 
+    private static string BuildAttachmentSummary(AttachmentInbox.AttachmentEntry att)
+    {
+        var kind = NormalizeAttachmentKind(att.Kind);
+        return kind switch
+        {
+            "image" => "Image to describe with vision",
+            "document" => "Document to read or summarize",
+            "code" => "Code file to inspect or summarize",
+            _ => "Supporting attachment"
+        };
+    }
+
+    private static List<string> BuildAttachmentTags(AttachmentInbox.AttachmentEntry att)
+    {
+        var tags = new List<string>();
+        var kind = NormalizeAttachmentKind(att.Kind);
+        if (!string.IsNullOrWhiteSpace(kind))
+            tags.Add(kind);
+
+        var stem = Path.GetFileNameWithoutExtension(att.OriginalName) ?? "";
+        foreach (var token in stem.Split(new[] { ' ', '_', '-', '.', '/' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var t = token.Trim();
+            if (t.Length > 0 && !tags.Contains(t, StringComparer.OrdinalIgnoreCase))
+                tags.Add(t);
+        }
+
+        foreach (var t in SplitCamel(stem))
+        {
+            if (t.Length > 0 && !tags.Contains(t, StringComparer.OrdinalIgnoreCase))
+                tags.Add(t);
+        }
+
+        var ext = Path.GetExtension(att.OriginalName);
+        if (!string.IsNullOrWhiteSpace(ext))
+        {
+            var cleaned = ext.Trim('.').ToLowerInvariant();
+            if (cleaned.Length > 0 && !tags.Contains(cleaned, StringComparer.OrdinalIgnoreCase))
+                tags.Add(cleaned);
+        }
+
+        if (!string.IsNullOrWhiteSpace(att.StoredName) && tags.Count == 0)
+            tags.Add(att.StoredName);
+
+        return tags;
+    }
+
     private string AppendAttachmentMetadata(string userText)
     {
         var activeAttachments = GetActiveAttachments();
-        if (activeAttachments.Count == 0)
-            return userText ?? "";
-
         var sb = new StringBuilder();
         sb.AppendLine("ATTACHMENTS:");
-        foreach (var a in activeAttachments)
+        if (activeAttachments.Count == 0)
         {
-            var kind = NormalizeAttachmentKind(a.Kind);
-            var suggestedTool = SuggestToolForKind(kind);
-            var toolText = string.IsNullOrWhiteSpace(suggestedTool) ? "n/a" : suggestedTool;
-            sb.AppendLine($"- storedName: {a.StoredName}, originalName: {a.OriginalName}, kind: {kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}, suggestedTool: {toolText}");
+            sb.AppendLine("- none");
+        }
+        else
+        {
+            foreach (var a in activeAttachments)
+            {
+                var kind = NormalizeAttachmentKind(a.Kind);
+                var suggestedTool = SuggestToolForKind(kind);
+                var toolText = string.IsNullOrWhiteSpace(suggestedTool) ? "" : suggestedTool;
+                var tags = BuildAttachmentTags(a);
+                var summary = BuildAttachmentSummary(a);
+                sb.AppendLine($"- storedName: {a.StoredName}, originalName: {a.OriginalName}, kind: {kind}, status: present, summary: {summary}, tags: [{string.Join(", ", tags)}], tools: [{toolText}]");
+            }
         }
         sb.AppendLine();
+        sb.AppendLine("REQUEST:");
         sb.Append(userText ?? "");
 
         _trace.Emit($"[digest:attachments] {activeAttachments.Count} attached (active)");
@@ -920,7 +998,7 @@ public sealed class WorkflowFacade
         _state.LastJobSpecJson = jobSpecJson;
         _state.OriginalUserText = userText;
         _state.PendingQuestion = null;
-        NotifyStatus("Tool plan pending");
+        NotifyStatus("Planning");
         return true;
     }
 
@@ -1023,9 +1101,10 @@ public sealed class WorkflowFacade
         }
 
         _state.PendingQuestion = null;
-        if (!string.IsNullOrWhiteSpace(stepSummary))
-            PendingStepChanged?.Invoke(stepSummary, true);
-        NotifyStatus("Tool plan pending");
+        var panelSummary = string.IsNullOrWhiteSpace(planSummary) ? stepSummary : planSummary;
+        if (!string.IsNullOrWhiteSpace(panelSummary))
+            PendingStepChanged?.Invoke(panelSummary, true);
+        NotifyStatus("Planning");
     }
 
     private async Task ExecuteCurrentStepAsync(CancellationToken ct, bool approveAll = false)
@@ -1047,12 +1126,12 @@ public sealed class WorkflowFacade
         }
 
         var step = _state.PendingToolPlan.Steps[_state.PendingStepIndex];
-        NotifyStatus($"Running {DescribeStep(step)}");
+        NotifyStatus("Tool execution");
         var result = await ToolStepRunner.RunAsync(step, _cfg, _trace, _attachments, _toolManifest, _toolPrompts, ct).ConfigureAwait(false);
         if (!result.Ok)
         {
             EmitWaitUser(result.Message, "Something went wrong. Want me to retry this step?");
-            NotifyStatus("Tool step failed");
+            NotifyStatus("Tool execution");
             TraceAttentionRequested?.Invoke();
             return;
         }
@@ -1116,6 +1195,10 @@ public sealed class WorkflowFacade
 
         _trace.Emit("[final] " + Trunc(resp, 1200));
         UserFacingMessage?.Invoke(resp);
+        _recentlyCompleted = true;
+        _state.PendingUserRequest = "";
+        _state.ClearClarifications();
+        NotifyStatus("Done");
     }
 
     private static string ComputeChangeStrategy(string text)
@@ -1133,12 +1216,15 @@ public sealed class WorkflowFacade
         if (spec == null) return JobSpec.Invalid("invalid_spec");
 
         var missing = spec.GetMissingFields();
+        var request = (spec.Request ?? "").Trim();
         var goal = (spec.Goal ?? "").Trim();
         var context = spec.Context ?? "";
         var actions = spec.Actions?.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList() ?? new List<string>();
         var constraints = spec.Constraints?.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim()).ToList() ?? new List<string>();
         var attachments = spec.Attachments?.Where(a => a != null && !string.IsNullOrWhiteSpace(a.StoredName)).ToList() ?? new List<JobSpecAttachment>();
 
+        if (string.IsNullOrWhiteSpace(request))
+            AddMissing("request", missing);
         if (string.IsNullOrWhiteSpace(goal))
             AddMissing("goal", missing);
         if (actions.Count == 0)
@@ -1155,8 +1241,16 @@ public sealed class WorkflowFacade
                 continue;
             }
 
+            if (att.Tools == null || att.Tools.Count == 0)
+            {
+                AddMissing("attachments", missing);
+                continue;
+            }
+
             var expectedTool = SuggestToolForKind(kind);
             if (string.IsNullOrWhiteSpace(expectedTool))
+                AddMissing("attachments", missing);
+            else if (!att.Tools.Contains(expectedTool, StringComparer.OrdinalIgnoreCase))
                 AddMissing("attachments", missing);
         }
 
@@ -1165,6 +1259,7 @@ public sealed class WorkflowFacade
         return JobSpec.FromJson(
             spec.Raw,
             string.IsNullOrWhiteSpace(spec.Mode) ? "jobspec.v2" : spec.Mode,
+            request,
             goal,
             context,
             actions,
@@ -1192,10 +1287,16 @@ public sealed class WorkflowFacade
         for (int i = 0; i < plan.Steps.Count; i++)
         {
             var marker = i == currentStepIndex ? "->" : "-";
-            sb.AppendLine($"{marker} Step {i + 1}: {DescribeStep(plan.Steps[i])}");
+            sb.AppendLine($"{marker} {StepPhrase(i, plan.Steps[i])}");
         }
-        sb.AppendLine("Use Run Next to continue, Stop to cancel, or Edit Plan to change it.");
+        sb.AppendLine("Use Run All to execute, Run Next for one step, Modify Plan to edit, or Stop to cancel.");
         return sb.ToString().TrimEnd();
+    }
+
+    private static string StepPhrase(int index, ToolPlanStep step)
+    {
+        var action = DescribeStep(step);
+        return $"Step {index + 1}: {action}";
     }
 
     private void SendChatStepSummary(ToolRunResult result)
@@ -1212,13 +1313,24 @@ public sealed class WorkflowFacade
                 var name = root.TryGetProperty("storedName", out var n) ? n.GetString() : "";
                 var content = root.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
                 var preview = content.Length <= 240 ? content : content.Substring(0, 240) + "...";
-                var sb = new StringBuilder();
-                sb.AppendLine("🗂️ File read");
-                sb.AppendLine($"Name: {name}");
-                sb.AppendLine("Preview:");
-                sb.AppendLine(preview);
-                sb.AppendLine("Tap Run Next to continue or Edit Plan to change steps.");
-                UserFacingMessage?.Invoke(sb.ToString().TrimEnd());
+                var full = content.Length > 1200 ? content.Substring(0, 1200) + "…" : content;
+                var bullets = content.Replace("\r", "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).Take(3).Select(l => "- " + l).ToList();
+                var card = new StringBuilder();
+                card.AppendLine("┌─ File result");
+                card.AppendLine($"│ Name: {name}");
+                card.AppendLine($"│ Characters: {content.Length}");
+                if (bullets.Count > 0)
+                {
+                    card.AppendLine("├─ Summary");
+                    foreach (var b in bullets)
+                        card.AppendLine("│ " + b);
+                }
+                card.AppendLine("├─ Preview");
+                card.AppendLine(IndentMultiline(preview, "│ "));
+                card.AppendLine("├─ Full content");
+                card.AppendLine(IndentMultiline(full, "│ "));
+                card.AppendLine("└ Use Run Next to continue or Edit Plan to adjust the plan.");
+                UserFacingMessage?.Invoke(card.ToString().TrimEnd());
             }
             else if (toolId.Equals("vision.describe.image", StringComparison.OrdinalIgnoreCase))
             {
@@ -1227,17 +1339,48 @@ public sealed class WorkflowFacade
                 var tags = root.TryGetProperty("tags", out var tagsEl) && tagsEl.ValueKind == JsonValueKind.Array
                     ? string.Join(", ", tagsEl.EnumerateArray().Where(t => t.ValueKind == JsonValueKind.String).Select(t => t.GetString()).Where(s => !string.IsNullOrWhiteSpace(s)))
                     : "";
-                var sb = new StringBuilder();
-                sb.AppendLine("🖼️ Vision result");
-                sb.AppendLine($"Image: {name}");
+                var card = new StringBuilder();
+                card.AppendLine("┌─ Vision result");
+                card.AppendLine($"│ Image: {name}");
                 if (!string.IsNullOrWhiteSpace(caption))
-                    sb.AppendLine("Caption: " + caption);
+                    card.AppendLine("│ Caption: " + caption);
                 if (!string.IsNullOrWhiteSpace(tags))
-                    sb.AppendLine("Tags: " + tags);
-                sb.AppendLine("Tap Run Next to continue or Edit Plan to change steps.");
-                UserFacingMessage?.Invoke(sb.ToString().TrimEnd());
+                    card.AppendLine("│ Tags: " + tags);
+                card.AppendLine("└ Use Run Next to continue or Edit Plan to adjust the plan.");
+                UserFacingMessage?.Invoke(card.ToString().TrimEnd());
             }
         }
         catch { }
+    }
+
+    private static string IndentMultiline(string text, string prefix)
+    {
+        var lines = (text ?? "").Replace("\r", "").Split('\n');
+        var sb = new StringBuilder();
+        foreach (var line in lines)
+            sb.AppendLine(prefix + line);
+        return sb.ToString().TrimEnd();
+    }
+
+    private static List<string> SplitCamel(string text)
+    {
+        var list = new List<string>();
+        if (string.IsNullOrWhiteSpace(text)) return list;
+
+        var sb = new StringBuilder();
+        foreach (var ch in text)
+        {
+            if (char.IsUpper(ch) && sb.Length > 0)
+            {
+                list.Add(sb.ToString());
+                sb.Clear();
+            }
+            sb.Append(ch);
+        }
+
+        if (sb.Length > 0)
+            list.Add(sb.ToString());
+
+        return list;
     }
 }

@@ -58,6 +58,7 @@ public static class JobSpecParser
             return false;
 
         var mode = ReadString(doc.RootElement, "mode", "jobspec.v2");
+        var request = ReadString(doc.RootElement, "request", "");
         var goal = ReadString(doc.RootElement, "goal", "").Trim();
         var context = ReadString(doc.RootElement, "context", "");
         var actions = ReadStringArray(doc.RootElement, "actions").Select(a => a.Trim()).Where(a => a.Length > 0).ToList();
@@ -70,15 +71,47 @@ public static class JobSpecParser
         if (string.IsNullOrWhiteSpace(clarification))
             clarification = ReadString(state, "clarify", "");
 
+        if (!HasProperty(doc.RootElement, "context"))
+            AddMissing("context", missing);
+        if (!HasProperty(doc.RootElement, "constraints"))
+            AddMissing("constraints", missing);
+        if (!HasProperty(doc.RootElement, "clarification"))
+            AddMissing("clarification", missing);
+        if (!HasProperty(doc.RootElement, "actions"))
+            AddMissing("actions", missing);
+        if (!HasProperty(doc.RootElement, "attachments"))
+            AddMissing("attachments", missing);
+
+        AddMissingIfEmpty(request, "request", missing);
         AddMissingIfEmpty(goal, "goal", missing);
         AddMissingIfEmpty(actions, "actions", missing);
         AddMissingIfEmpty(attachments, "attachments", missing);
+        AddMissingIfEmpty(context, "context", missing);
+        AddMissingIfEmpty(constraints, "constraints", missing);
+
+        var inferred = InferActions(request, attachments);
+        if (actions.Count == 0 && inferred.Count > 0)
+            actions = inferred;
+        else if (inferred.Count > 0)
+            actions = MergeActions(actions, inferred);
+
+        if (actions.Count == 0 && attachments.Count > 0)
+        {
+            actions = SuggestActionsFromAttachments(attachments);
+            if (actions.Count > 0)
+                missing.RemoveAll(m => string.Equals(m, "actions", StringComparison.OrdinalIgnoreCase));
+        }
+        else if (actions.Count > 0)
+        {
+            missing.RemoveAll(m => string.Equals(m, "actions", StringComparison.OrdinalIgnoreCase));
+        }
 
         var ready = readyEl.GetBoolean() && missing.Count == 0;
 
         spec = JobSpec.FromJson(
             doc,
             mode,
+            request,
             goal,
             context,
             actions,
@@ -116,7 +149,7 @@ public static class JobSpecParser
 
             var kind = NormalizeKind(ReadString(item, "kind", "other"));
             var status = NormalizeStatus(ReadString(item, "status", "present"));
-            var summary = ReadString(item, "summary", "");
+            var summary = ReadString(item, "summary", "").Trim();
             var tags = ReadStringArray(item, "tags");
 
             var tools = ReadStringArray(item, "tools");
@@ -201,6 +234,97 @@ public static class JobSpecParser
             AddMissing(field, missing);
     }
 
+    private static List<string> SuggestActionsFromAttachments(List<JobSpecAttachment> attachments)
+    {
+        var actions = new List<string>();
+        if (attachments == null || attachments.Count == 0)
+            return actions;
+
+        var kinds = attachments.Select(a => NormalizeKind(a.Kind)).ToList();
+        if (kinds.Any(k => k == "image"))
+            actions.Add("describe image");
+        if (kinds.Any(k => k == "document" || k == "code"))
+            actions.Add("summarize document");
+        if (actions.Count > 1)
+            actions.Add("combine findings");
+
+        return actions;
+    }
+
+    private static List<string> InferActions(string request, List<JobSpecAttachment> attachments)
+    {
+        var actions = new List<string>();
+        var text = (request ?? "").ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(text))
+            return actions;
+
+        bool hasImage = attachments.Any(a => NormalizeKind(a.Kind) == "image");
+        bool hasDoc = attachments.Any(a => NormalizeKind(a.Kind) is "document" or "code");
+
+        var clauses = SplitClauses(text);
+        foreach (var clause in clauses)
+        {
+            if (clause.Contains("describe") && hasImage)
+                actions.Add("describe image");
+            if ((clause.Contains("summarize") || clause.Contains("read") || clause.Contains("analyze")) && hasDoc)
+                actions.Add("summarize document");
+            if (clause.Contains("compare"))
+                actions.Add("compare findings");
+            if (clause.Contains("combine"))
+                actions.Add("combine findings");
+        }
+
+        if (actions.Count == 0)
+        {
+            if (text.Contains("describe") && hasImage)
+                actions.Add("describe image");
+            if ((text.Contains("summarize") || text.Contains("read") || text.Contains("analyze")) && hasDoc)
+                actions.Add("summarize document");
+            if (text.Contains("compare"))
+                actions.Add("compare findings");
+            if (text.Contains("combine") || text.Contains("then") || text.Contains("after"))
+                actions.Add("combine findings");
+        }
+
+        return NormalizeActions(actions);
+    }
+
+    private static List<string> MergeActions(List<string> existing, List<string> inferred)
+    {
+        var merged = new List<string>(existing ?? new List<string>());
+        foreach (var a in inferred ?? Enumerable.Empty<string>())
+        {
+            if (!merged.Contains(a, StringComparer.OrdinalIgnoreCase))
+                merged.Add(a);
+        }
+        return NormalizeActions(merged);
+    }
+
+    private static List<string> NormalizeActions(IEnumerable<string> actions)
+    {
+        var list = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var a in actions ?? Enumerable.Empty<string>())
+        {
+            var val = (a ?? "").Trim();
+            if (val.Length == 0 || seen.Contains(val)) continue;
+            seen.Add(val);
+            list.Add(val);
+        }
+        return list;
+    }
+
+    private static List<string> SplitClauses(string text)
+    {
+        var separators = new[] { " then ", " and then ", " after that ", " after ", " next ", ";", "." };
+        var parts = new List<string> { text };
+        foreach (var sep in separators)
+        {
+            parts = parts.SelectMany(p => p.Split(sep, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).ToList();
+        }
+        return parts.Where(p => !string.IsNullOrWhiteSpace(p)).ToList();
+    }
+
     private static string NormalizeKind(string kind)
     {
         var k = (kind ?? "").ToLowerInvariant();
@@ -227,5 +351,10 @@ public static class JobSpecParser
         if (k == "image") return new List<string> { "vision.describe.image" };
         if (k == "document" || k == "code") return new List<string> { "file.read.text" };
         return new List<string>();
+    }
+
+    private static bool HasProperty(JsonElement obj, string property)
+    {
+        return obj.ValueKind == JsonValueKind.Object && obj.TryGetProperty(property, out _);
     }
 }

@@ -46,9 +46,10 @@ public sealed class GeneralSettings
     // SAVE POINT: global digest prompt lives here (JSON-only, no tools)
     public string JobSpecDigestPrompt { get; set; } =
         @"You are the JobSpec Digest. Respond with ONE JSON object only (no prose, no code fences).
-Summarize intent as: {Goal, Attachments, Actions, Context, Constraints}
+Summarize intent as: {Request, Goal, Attachments, Actions, Context, Constraints}
 Output shape:
 {
+  ""request"": ""<verbatim user request text>"",
   ""mode"": ""jobspec.v2"",
   ""goal"": ""<plain goal>"",
   ""context"": ""<helpful background or empty>"",
@@ -60,17 +61,18 @@ Output shape:
       ""kind"": ""image|document|code|other"",
       ""status"": ""present|missing|pending"",
       ""summary"": ""<how to use this attachment>"",
-      ""tags"": [""<keywords>"", ""...""],
+      ""tags"": [""<keywords from filename or ATTACHMENTS>"", ""...""],
       ""tools"": [""vision.describe.image"" or ""file.read.text""]
     }
   ],
   ""clarification"": ""<one short natural question if anything important is missing; empty when ready>"",
-  ""state"": { ""ready"": <true|false>, ""missing"": [""goal"", ""actions"", ""attachments"", ""context"", ""constraints""] }
+  ""state"": { ""ready"": <true|false>, ""missing"": [""request"", ""goal"", ""actions"", ""attachments"", ""context"", ""constraints""] }
 }
 Rules:
 - ALWAYS emit valid JSON; no markdown or comments.
-- Use the ATTACHMENTS section to pre-fill attachments with storedName, kind, and tool suggestion (vision.describe.image for images; file.read.text for documents/code).
-- Include an attachments array even if empty.
+- Always include an attachments array (can be empty).
+- Use the ATTACHMENTS section to pre-fill storedName, kind, status (default present), summary, tags (keywords from filename/description), and tools (vision.describe.image for images; file.read.text for documents/code).
+- Base actions on attachments and intent: e.g., describe images, read/summarize documents/code, then combine results when requested.
 - If any required field is missing/ambiguous, set state.ready=false and list the missing concepts in state.missing. Otherwise, set ready=true and missing=[].
 - Ask at most ONE clarifying question in ""clarification"" when ready=false; leave it empty when ready=true.
 - Do NOT invent tools beyond vision.describe.image or file.read.text.";

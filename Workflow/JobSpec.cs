@@ -29,6 +29,7 @@ public sealed class JobSpec
 {
     public JsonDocument Raw { get; }
     public string Mode { get; }
+    public string Request { get; }
     public string Goal { get; }
     public string Context { get; }
     public IReadOnlyList<string> Actions { get; }
@@ -43,6 +44,7 @@ public sealed class JobSpec
     private JobSpec(
         JsonDocument raw,
         string mode,
+        string request,
         string goal,
         string context,
         List<string> actions,
@@ -54,6 +56,7 @@ public sealed class JobSpec
     {
         Raw = raw;
         Mode = mode;
+        Request = request;
         Goal = goal;
         Context = context;
         Actions = actions;
@@ -67,12 +70,13 @@ public sealed class JobSpec
     public static JobSpec Invalid(string reason)
     {
         var doc = JsonDocument.Parse($@"{{""mode"":""jobspec.v2"",""state"":{{""ready"":false,""missing"":[""{Escape(reason)}""]}}}}");
-        return new JobSpec(doc, "jobspec.v2", "", "", new List<string>(), new List<string>(), new List<JobSpecAttachment>(), null, false, new List<string> { reason });
+        return new JobSpec(doc, "jobspec.v2", "", "", "", new List<string>(), new List<string>(), new List<JobSpecAttachment>(), null, false, new List<string> { reason });
     }
 
     public static JobSpec FromJson(
         JsonDocument raw,
         string mode,
+        string request,
         string goal,
         string context,
         List<string> actions,
@@ -87,7 +91,7 @@ public sealed class JobSpec
         actions ??= new List<string>();
         constraints ??= new List<string>();
         attachments ??= new List<JobSpecAttachment>();
-        return new JobSpec(raw, mode, goal, context, actions, constraints, attachments, clarification, ready, missing);
+        return new JobSpec(raw, mode, request, goal, context, actions, constraints, attachments, clarification, ready, missing);
     }
 
     public List<string> GetMissingFields() => new List<string>(Missing);
