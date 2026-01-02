@@ -1,0 +1,387 @@
+diff --git a/Settings/AppConfig.cs b/Settings/AppConfig.cs
+index 7809716..986455f 100644
+--- a/Settings/AppConfig.cs
++++ b/Settings/AppConfig.cs
+@@ -107,25 +107,26 @@ Rules:
+     { ""id"": ""step1"", ""toolId"": ""file.read.text"" or ""vision.describe.image"", ""inputs"": { ""storedName"": ""<storedName>"" }, ""why"": ""<reason>"" }
+   ]
+ }
+-
+-public enum ConversationMode
+-{
+-    Conversational,
+-    Strict
+-}
+ Rules:
+ - Allowed tools ONLY: file.read.text, vision.describe.image.
+ - Use storedName exactly as provided in attachments.
+ - Always set tweakFirst=true.
+ - Prefer the smallest steps; NEVER suggest rebuild/rewrite/reinitialize.
+-- Use one step per attachment type needed to satisfy the request.";
++- Use one step per attachment type needed to satisfy the request.
++- Do NOT output prose or markdown; ONLY JSON.";
+ 
+     private static string DefaultFinalAnswerPrompt() =>
+-        @"You are the Final Responder. Use the TOOL_OUTPUTS JSON plus attachments metadata to answer the user's request in prose.
++        @"You are the Final Responder. Use the TOOL_OUTPUTS JSON plus attachments metadata to answer the user's request in natural, concise language.
+ Rules:
+-- Never claim to have run tools beyond TOOL_OUTPUTS.
++- Do not mention internal systems or planner details.
+ - Reference content and captions from TOOL_OUTPUTS explicitly.
+-- Be concise and clear.";
++- Keep it brief and helpful.";
++}
++
++public enum ConversationMode
++{
++    Conversational,
++    Strict
+ }
+ 
+ public sealed class ProvidersSettings
+diff --git a/Settings/Pages/GeneralSettingsPage.cs b/Settings/Pages/GeneralSettingsPage.cs
+index c9fe448..99f31c6 100644
+--- a/Settings/Pages/GeneralSettingsPage.cs
++++ b/Settings/Pages/GeneralSettingsPage.cs
+@@ -115,6 +115,8 @@ public sealed class GeneralSettingsPage : UserControl
+         {
+             var scope = RepoScope.Resolve(_config);
+             var message = scope.Message;
++            if (!string.IsNullOrWhiteSpace(scope.GitTopLevel))
++                message += $" (GitTopLevel={scope.GitTopLevel})";
+             if (_trace != null)
+                 _trace.Emit(message);
+             else
+diff --git a/Workflow/ClarificationQuestionBank.cs b/Workflow/ClarificationQuestionBank.cs
+index f8c972b..d0cd8a2 100644
+--- a/Workflow/ClarificationQuestionBank.cs
++++ b/Workflow/ClarificationQuestionBank.cs
+@@ -22,7 +22,7 @@ public static class ClarificationQuestionBank
+         {
+             if (Map.TryGetValue(m.ToLowerInvariant(), out var q) && !list.Contains(q))
+                 list.Add(q);
+-            if (list.Count >= max) break;
++            if (list.Count >= Math.Max(1, max)) break;
+         }
+ 
+         if (list.Count == 0)
+@@ -31,4 +31,3 @@ public static class ClarificationQuestionBank
+         return list;
+     }
+ }
+-
+diff --git a/Workflow/RepoScope.cs b/Workflow/RepoScope.cs
+index 86083d6..b2d7e87 100644
+--- a/Workflow/RepoScope.cs
++++ b/Workflow/RepoScope.cs
+@@ -1,6 +1,7 @@
+ #nullable enable
+ using System;
+ using System.IO;
++using System.Diagnostics;
+ using RahBuilder.Settings;
+ using RahOllamaOnly.Tracing;
+ 
+@@ -8,21 +9,29 @@ namespace RahBuilder.Workflow;
+ 
+ public static class RepoScope
+ {
+-    public sealed record Result(bool Ok, string RepoRoot, string Message);
++    public sealed record Result(bool Ok, string RepoRoot, string GitTopLevel, string Message);
+     public sealed record GitInfo(bool HasGit, string Message);
+ 
+     public static Result Resolve(AppConfig cfg)
+     {
+         if (cfg == null) throw new ArgumentNullException(nameof(cfg));
+ 
+-        var root = (cfg.General?.RepoRoot ?? "").Trim();
++        var root = PickRoot(cfg);
++        var gitTop = ResolveGitTopLevel(root);
++
+         if (string.IsNullOrWhiteSpace(root))
+-            return new Result(false, "", "[repo:error] RepoRoot is empty. Set Settings -> General.RepoRoot.");
++            return new Result(false, "", gitTop, "[repo:error] RepoRoot is empty. Set Settings -> General.RepoRoot.");
+ 
+         if (!Directory.Exists(root))
+-            return new Result(false, root, $"[repo:error] RepoRoot not found: {root}");
++            return new Result(false, root, gitTop, $"[repo:error] RepoRoot not found: {root}");
++
++        if (!string.IsNullOrWhiteSpace(gitTop) &&
++            !string.Equals(Path.GetFullPath(gitTop), Path.GetFullPath(root), StringComparison.OrdinalIgnoreCase))
++        {
++            return new Result(false, root, gitTop, $"[repo:error] RepoRoot {root} != git toplevel {gitTop}");
++        }
+ 
+-        return new Result(true, root, $"[repo:ok] RepoRoot={root}");
++        return new Result(true, root, gitTop, $"[repo:ok] RepoRoot={root} GitTopLevel={(string.IsNullOrWhiteSpace(gitTop) ? "n/a" : gitTop)}");
+     }
+ 
+     public static GitInfo CheckGit(Result scope, RunTrace? trace = null)
+@@ -46,5 +55,52 @@ public static class RepoScope
+         trace?.Emit(okMsg);
+         return new GitInfo(true, okMsg);
+     }
+-}
+ 
++    private static string PickRoot(AppConfig cfg)
++    {
++        var root = (cfg.General?.RepoRoot ?? "").Trim();
++        if (!string.IsNullOrWhiteSpace(root) && Directory.Exists(root))
++            return root;
++
++        var envRoot = Environment.GetEnvironmentVariable("REPO_ROOT") ?? "";
++        if (!string.IsNullOrWhiteSpace(envRoot) && Directory.Exists(envRoot))
++            return envRoot.Trim();
++
++        var envRah = Environment.GetEnvironmentVariable("RAH_REPO_DIR") ?? "";
++        if (!string.IsNullOrWhiteSpace(envRah) && Directory.Exists(envRah))
++            return envRah.Trim();
++
++        var gitTop = ResolveGitTopLevel("");
++        if (!string.IsNullOrWhiteSpace(gitTop))
++            return gitTop;
++
++        return root;
++    }
++
++    private static string ResolveGitTopLevel(string rootHint)
++    {
++        try
++        {
++            var startInfo = new ProcessStartInfo("git", "rev-parse --show-toplevel")
++            {
++                RedirectStandardOutput = true,
++                RedirectStandardError = true,
++                UseShellExecute = false,
++                CreateNoWindow = true
++            };
++            if (!string.IsNullOrWhiteSpace(rootHint) && Directory.Exists(rootHint))
++                startInfo.WorkingDirectory = rootHint;
++
++            using var p = Process.Start(startInfo);
++            if (p == null) return "";
++            var output = p.StandardOutput.ReadToEnd().Trim();
++            p.WaitForExit(2000);
++            if (p.ExitCode != 0) return "";
++            return output;
++        }
++        catch
++        {
++            return "";
++        }
++    }
++}
+diff --git a/Workflow/WaitUserGate.cs b/Workflow/WaitUserGate.cs
+index 704551b..c493c4e 100644
+--- a/Workflow/WaitUserGate.cs
++++ b/Workflow/WaitUserGate.cs
+@@ -2,6 +2,7 @@
+ using System;
+ using System.Globalization;
+ using System.Text.RegularExpressions;
++using RahBuilder.Settings;
+ 
+ namespace RahBuilder.Workflow;
+ 
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index fb56b24..3e20430 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -32,19 +32,21 @@ public sealed class WorkflowFacade
+ 
+     public event Action<string>? UserFacingMessage;
+ 
+-    public WorkflowFacade(RunTrace trace)
+-    {
+-        _trace = trace ?? throw new ArgumentNullException(nameof(trace));
+-        _cfg = ConfigStore.Load();
+-        SyncGraphToHub(_cfg);
+-    }
+-
+-    public WorkflowFacade(AppConfig cfg, RunTrace trace)
+-    {
+-        _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
+-        _trace = trace ?? throw new ArgumentNullException(nameof(trace));
+-        SyncGraphToHub(_cfg);
+-    }
++    public WorkflowFacade(RunTrace trace)
++    {
++        _trace = trace ?? throw new ArgumentNullException(nameof(trace));
++        _cfg = ConfigStore.Load();
++        SyncGraphToHub(_cfg);
++        LogRepoBanner();
++    }
++
++    public WorkflowFacade(AppConfig cfg, RunTrace trace)
++    {
++        _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
++        _trace = trace ?? throw new ArgumentNullException(nameof(trace));
++        SyncGraphToHub(_cfg);
++        LogRepoBanner();
++    }
+ 
+     public void RefreshTooling(AppConfig cfg)
+     {
+@@ -143,6 +145,7 @@ public sealed class WorkflowFacade
+             }
+             else if (action.Action is ReplyActionType.ApproveNextStep or ReplyActionType.ApproveAllSteps)
+             {
++                _state.AutoApproveAll = approvedAll;
+                 await ExecuteCurrentStepAsync(ct, approvedAll).ConfigureAwait(true);
+                 return;
+             }
+@@ -156,6 +159,7 @@ public sealed class WorkflowFacade
+         if (action.Action == ReplyActionType.AnswerClarification && !string.IsNullOrWhiteSpace(action.Payload))
+         {
+             _state.ClarificationAnswers.Add(action.Payload);
++            _state.PendingQuestion = null;
+             text = $"{_state.PendingUserRequest}\n\nAdditional detail: {string.Join("\n", _state.ClarificationAnswers)}";
+             _trace.Emit("[clarify] received answer, re-running digest.");
+         }
+@@ -163,6 +167,7 @@ public sealed class WorkflowFacade
+         {
+             _state.PendingUserRequest = text;
+             _state.ClearClarifications();
++            _state.PendingQuestion = null;
+         }
+ 
+         var repoScope = RepoScope.Resolve(_cfg);
+@@ -199,6 +204,7 @@ public sealed class WorkflowFacade
+             if (IsWindowsDesktopProject())
+             {
+                 _trace.Emit("[env:error] WinForms build requires WindowsDesktop SDK. Switch ExecutionTarget to WindowsHost.");
++                _trace.Emit("[build:skip] WinForms requires WindowsHost; skipping build/run in container.");
+                 EmitWaitUser("WinForms build requires WindowsDesktop SDK. Switch ExecutionTarget to WindowsHost.");
+                 return;
+             }
+@@ -224,10 +230,11 @@ public sealed class WorkflowFacade
+             // Normal WAIT_USER (missing real fields)
+             _forceEditBecauseInvalidJson = false;
+ 
+-            var qs = ClarificationQuestionBank.PickQuestions(missing);
++            var qs = ClarificationQuestionBank.PickQuestions(missing, 1);
+             _state.PendingQuestions = qs;
++            _state.PendingQuestion = qs.FirstOrDefault();
+             _trace.Emit("[route:wait_user] JobSpec incomplete; asking clarifications.");
+-            EmitWaitUser(string.Join(" ", qs));
++            EmitWaitUser(_state.PendingQuestion ?? "Could you share a bit more detail?");
+             return;
+         }
+ 
+@@ -446,6 +453,25 @@ public sealed class WorkflowFacade
+         return list;
+     }
+ 
++    private void LogRepoBanner()
++    {
++        var scope = RepoScope.Resolve(_cfg);
++        _trace.Emit(scope.Message);
++        if (!string.IsNullOrWhiteSpace(scope.GitTopLevel))
++            _trace.Emit($"[repo] GitTopLevel={scope.GitTopLevel}");
++    }
++
++    private static string DescribeStep(ToolPlanStep step)
++    {
++        var name = step.ToolId.ToLowerInvariant();
++        var stored = step.Inputs.TryGetValue("storedName", out var s) ? s : "";
++        if (name == "file.read.text")
++            return $"read the file {stored}";
++        if (name == "vision.describe.image")
++            return $"describe the image {stored}";
++        return $"{step.ToolId} ({stored})";
++    }
++
+     private sealed class AttachmentBlueprintInfo
+     {
+         public string TemplatePath { get; init; } = "";
+@@ -466,6 +492,10 @@ public sealed class WorkflowFacade
+ 
+         var blueprint = LoadAttachmentBlueprint();
+         var sb = new StringBuilder();
++        sb.AppendLine("SCHEMA: tool_plan.v1 (mode,tweakFirst,steps[id,toolId,inputs{storedName},why])");
++        sb.AppendLine("ALLOWED_TOOLS: file.read.text, vision.describe.image");
++        sb.AppendLine("STRICT: JSON only, no markdown, no prose, no invented tools.");
++        sb.AppendLine();
+         sb.AppendLine("USER REQUEST:");
+         sb.AppendLine(userText ?? "");
+         sb.AppendLine();
+@@ -542,6 +572,7 @@ public sealed class WorkflowFacade
+         _state.ToolOutputs = new List<System.Text.Json.JsonElement>();
+         _state.LastJobSpecJson = jobSpecJson;
+         _state.OriginalUserText = userText;
++        _state.PendingQuestion = null;
+         return true;
+     }
+ 
+@@ -588,17 +619,32 @@ public sealed class WorkflowFacade
+             return;
+         }
+ 
+-        var sb = new StringBuilder();
+-        sb.AppendLine("ToolPlan Steps:");
+-        for (int i = 0; i < _state.PendingToolPlan.Steps.Count; i++)
++        var mode = _cfg.General.ConversationMode;
++        string msg;
++
++        if (mode == ConversationMode.Strict)
++        {
++            var sb = new StringBuilder();
++            sb.AppendLine("ToolPlan Steps:");
++            for (int i = 0; i < _state.PendingToolPlan.Steps.Count; i++)
++            {
++                var step = _state.PendingToolPlan.Steps[i];
++                var prefix = i == _state.PendingStepIndex ? "->" : "  ";
++                sb.AppendLine($"{prefix} Step {i + 1}: {step.ToolId} ({step.Id}) inputs: {string.Join(", ", step.Inputs.Select(kv => $"{kv.Key}={kv.Value}"))} why: {step.Why}");
++            }
++            msg = WaitUserGate.GateMessage("Approve tool plan to continue.", sb.ToString().TrimEnd(), mode);
++        }
++        else
+         {
+-            var step = _state.PendingToolPlan.Steps[i];
+-            var prefix = i == _state.PendingStepIndex ? "->" : "  ";
+-            sb.AppendLine($"{prefix} Step {i + 1}: {step.ToolId} ({step.Id}) inputs: {string.Join(", ", step.Inputs.Select(kv => $"{kv.Key}={kv.Value}"))} why: {step.Why}");
++            var remaining = _state.PendingToolPlan.Steps.Skip(_state.PendingStepIndex).ToList();
++            var summary = string.Join(", then ", remaining.Select(DescribeStep));
++            var question = string.IsNullOrWhiteSpace(summary)
++                ? "Ready to proceed with the next step?"
++                : $"I can {summary}. Want me to proceed?";
++            msg = WaitUserGate.GateMessage(question, null, mode);
+         }
+ 
+-        var msg = WaitUserGate.GateMessage("Approve tool plan to continue.", sb.ToString().TrimEnd());
+-        _state.PendingQuestion = msg;
++        _state.PendingQuestion = null;
+         _trace.Emit(msg);
+         UserFacingMessage?.Invoke(msg);
+     }
+@@ -637,8 +683,9 @@ public sealed class WorkflowFacade
+             return;
+         }
+ 
+-        if (approveAll)
++        if (approveAll || _state.AutoApproveAll)
+         {
++            _trace.Emit("[plan:auto] proceeding to next approved step.");
+             await ExecuteCurrentStepAsync(ct, true).ConfigureAwait(false);
+             return;
+         }
+diff --git a/Workflow/WorkflowState.cs b/Workflow/WorkflowState.cs
+index 919204a..914b795 100644
+--- a/Workflow/WorkflowState.cs
++++ b/Workflow/WorkflowState.cs
+@@ -16,6 +16,7 @@ public sealed class WorkflowState
+     public string PendingUserRequest { get; set; } = "";
+     public List<string> ClarificationAnswers { get; set; } = new();
+     public List<string> PendingQuestions { get; set; } = new();
++    public bool AutoApproveAll { get; set; }
+ 
+     public void ClearPlan()
+     {
+@@ -25,6 +26,7 @@ public sealed class WorkflowState
+         ToolOutputs = new List<JsonElement>();
+         LastJobSpecJson = null;
+         OriginalUserText = null;
++        AutoApproveAll = false;
+     }
+ 
+     public void ClearClarifications()
