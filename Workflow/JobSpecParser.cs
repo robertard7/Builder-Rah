@@ -58,9 +58,9 @@ public static class JobSpecParser
             return false;
 
         var mode = ReadString(doc.RootElement, "mode", "jobspec.v2");
-        var goal = ReadString(doc.RootElement, "goal", "");
+        var goal = ReadString(doc.RootElement, "goal", "").Trim();
         var context = ReadString(doc.RootElement, "context", "");
-        var actions = ReadStringArray(doc.RootElement, "actions");
+        var actions = ReadStringArray(doc.RootElement, "actions").Select(a => a.Trim()).Where(a => a.Length > 0).ToList();
         var constraints = ReadStringArray(doc.RootElement, "constraints");
         var clarification = ReadString(doc.RootElement, "clarification", "");
 
@@ -122,6 +122,12 @@ public static class JobSpecParser
             var tools = ReadStringArray(item, "tools");
             if (tools.Count == 0)
                 tools = ReadStringArray(item, "requiredTools");
+            if (tools.Count == 0)
+            {
+                var suggested = SuggestTools(kind);
+                if (suggested.Count > 0)
+                    tools = suggested;
+            }
 
             list.Add(new JobSpecAttachment(stored, kind, status, summary, tags, tools));
         }
@@ -213,5 +219,13 @@ public static class JobSpecParser
             "pending" => "pending",
             _ => "present"
         };
+    }
+
+    private static List<string> SuggestTools(string kind)
+    {
+        var k = NormalizeKind(kind);
+        if (k == "image") return new List<string> { "vision.describe.image" };
+        if (k == "document" || k == "code") return new List<string> { "file.read.text" };
+        return new List<string>();
     }
 }

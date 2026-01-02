@@ -272,6 +272,7 @@ public sealed class WorkflowFacade
         // Run digest.
         var userTextWithAttachments = AppendAttachmentMetadata(text);
         var spec = await RunJobSpecDigestAsync(userTextWithAttachments, ct).ConfigureAwait(true);
+        spec = ValidateJobSpec(spec);
 
         if (!spec.IsComplete)
         {
@@ -597,15 +598,19 @@ public sealed class WorkflowFacade
             var idx = Math.Max(0, _state.PendingStepIndex);
             var count = _state.PendingToolPlan.Steps.Count;
             if (idx >= count)
-                return "Tool plan complete";
-            return $"Tool step {idx + 1}/{count}";
+                return "Done";
+            if (idx == 0 && _state.ToolOutputs.Count == 0)
+                return "Planning";
+            if (_state.AutoApproveAll || _state.ToolOutputs.Count > 0)
+                return "Executing tools";
+            return "Waiting user action";
         }
 
         if (!string.IsNullOrWhiteSpace(_state.PendingQuestion))
-            return "Waiting clarification";
+            return "Clarifying";
 
         if (!string.IsNullOrWhiteSpace(_state.PendingUserRequest))
-            return "Digesting";
+            return "Digesting intent";
 
         return "Idle";
     }
@@ -1123,6 +1128,60 @@ public sealed class WorkflowFacade
         return "Tweak";
     }
 
+    private JobSpec ValidateJobSpec(JobSpec spec)
+    {
+        if (spec == null) return JobSpec.Invalid("invalid_spec");
+
+        var missing = spec.GetMissingFields();
+        var goal = (spec.Goal ?? "").Trim();
+        var context = spec.Context ?? "";
+        var actions = spec.Actions?.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList() ?? new List<string>();
+        var constraints = spec.Constraints?.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim()).ToList() ?? new List<string>();
+        var attachments = spec.Attachments?.Where(a => a != null && !string.IsNullOrWhiteSpace(a.StoredName)).ToList() ?? new List<JobSpecAttachment>();
+
+        if (string.IsNullOrWhiteSpace(goal))
+            AddMissing("goal", missing);
+        if (actions.Count == 0)
+            AddMissing("actions", missing);
+        if (attachments.Count == 0)
+            AddMissing("attachments", missing);
+
+        foreach (var att in attachments)
+        {
+            var kind = NormalizeAttachmentKind(att.Kind);
+            if (string.IsNullOrWhiteSpace(att.StoredName) || string.IsNullOrWhiteSpace(kind))
+            {
+                AddMissing("attachments", missing);
+                continue;
+            }
+
+            var expectedTool = SuggestToolForKind(kind);
+            if (string.IsNullOrWhiteSpace(expectedTool))
+                AddMissing("attachments", missing);
+        }
+
+        var ready = spec.Ready && missing.Count == 0;
+
+        return JobSpec.FromJson(
+            spec.Raw,
+            string.IsNullOrWhiteSpace(spec.Mode) ? "jobspec.v2" : spec.Mode,
+            goal,
+            context,
+            actions,
+            constraints,
+            attachments,
+            spec.Clarification,
+            ready,
+            missing);
+    }
+
+    private static void AddMissing(string field, List<string> missing)
+    {
+        if (missing == null) return;
+        if (missing.Contains(field, StringComparer.OrdinalIgnoreCase)) return;
+        missing.Add(field);
+    }
+
     private string BuildPlanSummary(ToolPlan plan, int currentStepIndex)
     {
         if (plan == null || plan.Steps == null || plan.Steps.Count == 0)
@@ -1158,6 +1217,7 @@ public sealed class WorkflowFacade
                 sb.AppendLine($"Name: {name}");
                 sb.AppendLine("Preview:");
                 sb.AppendLine(preview);
+                sb.AppendLine("Tap Run Next to continue or Edit Plan to change steps.");
                 UserFacingMessage?.Invoke(sb.ToString().TrimEnd());
             }
             else if (toolId.Equals("vision.describe.image", StringComparison.OrdinalIgnoreCase))
@@ -1174,6 +1234,7 @@ public sealed class WorkflowFacade
                     sb.AppendLine("Caption: " + caption);
                 if (!string.IsNullOrWhiteSpace(tags))
                     sb.AppendLine("Tags: " + tags);
+                sb.AppendLine("Tap Run Next to continue or Edit Plan to change steps.");
                 UserFacingMessage?.Invoke(sb.ToString().TrimEnd());
             }
         }
