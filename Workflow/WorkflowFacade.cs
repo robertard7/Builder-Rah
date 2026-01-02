@@ -1287,10 +1287,16 @@ public sealed class WorkflowFacade
         for (int i = 0; i < plan.Steps.Count; i++)
         {
             var marker = i == currentStepIndex ? "->" : "-";
-            sb.AppendLine($"{marker} Step {i + 1}: {DescribeStep(plan.Steps[i])}");
+            sb.AppendLine($"{marker} {StepPhrase(i, plan.Steps[i])}");
         }
-        sb.AppendLine("Use Run Next to continue, Stop to cancel, or Edit Plan to change it.");
+        sb.AppendLine("Use Run All to execute, Run Next for one step, Modify Plan to edit, or Stop to cancel.");
         return sb.ToString().TrimEnd();
+    }
+
+    private static string StepPhrase(int index, ToolPlanStep step)
+    {
+        var action = DescribeStep(step);
+        return $"Step {index + 1}: {action}";
     }
 
     private void SendChatStepSummary(ToolRunResult result)
