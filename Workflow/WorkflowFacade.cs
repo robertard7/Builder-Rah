@@ -46,7 +46,20 @@ public sealed class WorkflowFacade
             new(false, 0, "", "", "", Array.Empty<string>(), string.IsNullOrWhiteSpace(detail) ? error : $"{error}: {detail}");
     }
 
+    public sealed record WorkflowStatusSnapshot(
+        string Mode,
+        string Repo,
+        int AttachmentsTotal,
+        int AttachmentsActive,
+        string Workflow,
+        int StepIndex,
+        int StepCount);
+
     public event Action<string>? UserFacingMessage;
+    public event Action<WorkflowStatusSnapshot>? StatusChanged;
+    public event Action<string?>? PendingQuestionChanged;
+    public event Action<string?, bool>? PendingStepChanged;
+    public event Action? TraceAttentionRequested;
 
     public WorkflowFacade(RunTrace trace)
     {
@@ -71,9 +84,27 @@ public sealed class WorkflowFacade
         RefreshTooling();
     }
 
+    public Task ApproveNextStepAsync(CancellationToken ct) => ExecuteCurrentStepAsync(ct);
+
+    public void StopPlan()
+    {
+        _state.ClearPlan();
+        PendingStepChanged?.Invoke("", false);
+        NotifyStatus();
+    }
+
+    public void RequestPlanEdit()
+    {
+        _state.ClearPlan();
+        PendingStepChanged?.Invoke("", false);
+        EmitWaitUser("Plan cleared. Tell me what you’d like instead.");
+        NotifyStatus();
+    }
+
     public void SetAttachments(IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments)
     {
-        _attachments = attachments ?? Array.Empty<AttachmentInbox.AttachmentEntry>();
+        _attachments = (attachments ?? Array.Empty<AttachmentInbox.AttachmentEntry>()).ToList();
+        NotifyStatus();
     }
 
     public void RefreshTooling()
@@ -119,6 +150,7 @@ public sealed class WorkflowFacade
         _trace.Emit($"[chat] {text}");
 
         var action = UserReplyInterpreter.Interpret(_cfg, _state, text);
+        NotifyStatus("Processing");
 
         // If last attempt produced invalid_json, DO NOT spin. Only accept "edit ...".
         if (_forceEditBecauseInvalidJson)
@@ -150,12 +182,16 @@ public sealed class WorkflowFacade
 
                 _trace.Emit("[plan:edit] user provided new text, clearing pending tool plan.");
                 _state.ClearPlan();
+                PendingStepChanged?.Invoke("", false);
+                NotifyStatus();
                 text = edited;
             }
             else if (action.Action == ReplyActionType.RejectPlan)
             {
                 _trace.Emit("[plan:reject] user rejected pending tool plan.");
                 _state.ClearPlan();
+                PendingStepChanged?.Invoke("", false);
+                NotifyStatus();
                 EmitWaitUser("Okay, I’ll stop. Tell me what you’d like instead.");
                 return;
             }
@@ -176,6 +212,7 @@ public sealed class WorkflowFacade
         {
             _state.ClarificationAnswers.Add(action.Payload);
             _state.PendingQuestion = null;
+            PendingQuestionChanged?.Invoke(null);
             text = $"{_state.PendingUserRequest}\n\nAdditional detail: {string.Join("\n", _state.ClarificationAnswers)}";
             _trace.Emit("[clarify] received answer, re-running digest.");
         }
@@ -184,6 +221,7 @@ public sealed class WorkflowFacade
             _state.PendingUserRequest = text;
             _state.ClearClarifications();
             _state.PendingQuestion = null;
+            PendingQuestionChanged?.Invoke(null);
         }
 
         var repoScope = RepoScope.Resolve(_cfg);
@@ -191,6 +229,7 @@ public sealed class WorkflowFacade
         if (!repoScope.Ok)
         {
             EmitWaitUser("Set RepoRoot in Settings -> General.RepoRoot, then retry.");
+            NotifyStatus("Repo invalid");
             return;
         }
 
@@ -215,6 +254,7 @@ public sealed class WorkflowFacade
         {
             _trace.Emit($"[route:error] Invalid Mermaid workflow graph: {gv.Message}");
             _trace.Emit("[route:halt] Fix Workflow Graph settings page content, then retry.");
+            NotifyStatus("Graph invalid");
             return;
         }
 
@@ -252,8 +292,10 @@ public sealed class WorkflowFacade
             var qs = ClarificationQuestionBank.PickQuestions(missing, 1);
             _state.PendingQuestions = qs;
             _state.PendingQuestion = qs.FirstOrDefault();
+            PendingQuestionChanged?.Invoke(_state.PendingQuestion);
             _trace.Emit("[route:wait_user] JobSpec incomplete; asking clarifications.");
             EmitWaitUser(_state.PendingQuestion ?? "Could you share a bit more detail?", _state.PendingQuestion ?? "Could you share a bit more detail?");
+            NotifyStatus("Waiting clarification");
             return;
         }
 
@@ -272,18 +314,21 @@ public sealed class WorkflowFacade
         if (!string.IsNullOrWhiteSpace(rawJson))
             _trace.Emit("[jobspec] " + Trunc(rawJson, 800));
 
-        if (_attachments == null || _attachments.Count == 0)
+        var activeAttachments = GetActiveAttachments();
+        if (activeAttachments.Count == 0)
         {
             _trace.Emit("[attachments:none] Add at least one attachment to proceed to tool plan.");
             EmitWaitUser("Attach at least one file or image so I can help.");
+            NotifyStatus("Waiting attachments");
             return;
         }
 
-        var docAttachments = _attachments.Where(a => string.Equals(a.Kind, "document", StringComparison.OrdinalIgnoreCase)).ToList();
+        var docAttachments = activeAttachments.Where(a => string.Equals(a.Kind, "document", StringComparison.OrdinalIgnoreCase)).ToList();
         if (docAttachments.Count > 1 && string.IsNullOrWhiteSpace(_state.PendingQuestion) && _state.PendingToolPlan == null && _state.ClarificationAnswers.Count == 0)
         {
             var names = string.Join(", ", docAttachments.Select(a => a.StoredName));
             _state.PendingQuestion = "Which file should I start with? " + names;
+            PendingQuestionChanged?.Invoke(_state.PendingQuestion);
             EmitWaitUser("Which file should I start with? " + names);
             return;
         }
@@ -324,6 +369,7 @@ public sealed class WorkflowFacade
 
         if (!await client.DispatchAsync("windows-runner-build.yml", "main", ct).ConfigureAwait(false))
             return RunnerBuildSummary.Failed("dispatch_failed");
+        NotifyStatus("Running build");
 
         var since = DateTimeOffset.UtcNow.AddMinutes(-1);
         WorkflowRunInfo? run = null;
@@ -367,6 +413,9 @@ public sealed class WorkflowFacade
                 ? string.Join(Environment.NewLine, errorLines.Take(5))
                 : $"Build failed: status={run.Status} conclusion={run.Conclusion}");
 
+        NotifyStatus(ok ? "Build succeeded" : "Build failed");
+        if (!ok)
+            TraceAttentionRequested?.Invoke();
         return new RunnerBuildSummary(ok, run.Id, run.Status, run.Conclusion, run.HtmlUrl, logs, errorMsg);
     }
 
@@ -462,21 +511,74 @@ public sealed class WorkflowFacade
 
     private static bool IsWindowsDesktopProject() => true; // RahBuilder.csproj uses Microsoft.NET.Sdk.WindowsDesktop
 
+    private List<AttachmentInbox.AttachmentEntry> GetActiveAttachments()
+    {
+        return (_attachments ?? Array.Empty<AttachmentInbox.AttachmentEntry>())
+            .Where(a => a?.Active != false)
+            .Select(a => a!)
+            .ToList();
+    }
+
+    private void NotifyStatus(string? phaseOverride = null)
+    {
+        try
+        {
+            var active = GetActiveAttachments();
+            var total = _attachments?.Count ?? 0;
+            var stepIndex = _state.PendingStepIndex + 1;
+            var stepCount = _state.PendingToolPlan?.Steps?.Count ?? 0;
+            var phase = phaseOverride ?? ComputeWorkflowPhase();
+            var repo = ShortRepo(_cfg.General.RepoRoot);
+            var mode = _cfg.General.ConversationMode.ToString();
+            StatusChanged?.Invoke(new WorkflowStatusSnapshot(mode, repo, total, active.Count, phase, stepIndex, stepCount));
+        }
+        catch { }
+    }
+
+    private string ComputeWorkflowPhase()
+    {
+        if (_state.PendingToolPlan != null)
+        {
+            var idx = Math.Max(0, _state.PendingStepIndex);
+            var count = _state.PendingToolPlan.Steps.Count;
+            if (idx >= count)
+                return "Tool plan complete";
+            return $"Tool step {idx + 1}/{count}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(_state.PendingQuestion))
+            return "Waiting clarification";
+
+        if (!string.IsNullOrWhiteSpace(_state.PendingUserRequest))
+            return "Digesting";
+
+        return "Idle";
+    }
+
+    private static string ShortRepo(string repoRoot)
+    {
+        if (string.IsNullOrWhiteSpace(repoRoot)) return "n/a";
+        var trimmed = repoRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var name = Path.GetFileName(trimmed);
+        return string.IsNullOrWhiteSpace(name) ? repoRoot : name;
+    }
+
     private string AppendAttachmentMetadata(string userText)
     {
-        if (_attachments == null || _attachments.Count == 0)
+        var activeAttachments = GetActiveAttachments();
+        if (activeAttachments.Count == 0)
             return userText ?? "";
 
         var sb = new StringBuilder();
         sb.AppendLine("ATTACHMENTS:");
-        foreach (var a in _attachments)
+        foreach (var a in activeAttachments)
         {
             sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}");
         }
         sb.AppendLine();
         sb.Append(userText ?? "");
 
-        _trace.Emit($"[digest:attachments] {_attachments.Count} attached");
+        _trace.Emit($"[digest:attachments] {activeAttachments.Count} attached (active)");
         return sb.ToString();
     }
 
@@ -668,6 +770,7 @@ public sealed class WorkflowFacade
         }
 
         var blueprint = LoadAttachmentBlueprint();
+        var activeAttachments = GetActiveAttachments();
         var sb = new StringBuilder();
         sb.AppendLine("SCHEMA: tool_plan.v1 (mode,tweakFirst,steps[id,toolId,inputs{storedName},why])");
         sb.AppendLine("ALLOWED_TOOLS: file.read.text, vision.describe.image");
@@ -681,7 +784,7 @@ public sealed class WorkflowFacade
         sb.AppendLine(jobSpecJson ?? "");
         sb.AppendLine();
         sb.AppendLine("ATTACHMENTS:");
-        foreach (var a in _attachments)
+        foreach (var a in activeAttachments)
         {
             sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}");
         }
@@ -751,6 +854,7 @@ public sealed class WorkflowFacade
         _state.LastJobSpecJson = jobSpecJson;
         _state.OriginalUserText = userText;
         _state.PendingQuestion = null;
+        NotifyStatus("Tool plan pending");
         return true;
     }
 
@@ -759,6 +863,7 @@ public sealed class WorkflowFacade
         if (plan == null || plan.Steps == null || plan.Steps.Count == 0)
             return false;
 
+        var activeAttachments = GetActiveAttachments();
         foreach (var step in plan.Steps)
         {
             if (!_toolManifest.Has(step.ToolId))
@@ -778,7 +883,7 @@ public sealed class WorkflowFacade
                 return false;
             }
 
-            var att = _attachments.FirstOrDefault(a => string.Equals(a.StoredName, stored, StringComparison.OrdinalIgnoreCase));
+            var att = activeAttachments.FirstOrDefault(a => string.Equals(a.StoredName, stored, StringComparison.OrdinalIgnoreCase));
             if (att == null)
             {
                 _trace.Emit($"[toolplan:error] attachment not found for storedName: {stored}");
@@ -799,6 +904,7 @@ public sealed class WorkflowFacade
 
         var mode = _cfg.General.ConversationMode;
         string msg;
+        string stepSummary = "";
 
         if (mode == ConversationMode.Strict)
         {
@@ -808,6 +914,8 @@ public sealed class WorkflowFacade
             {
                 var step = _state.PendingToolPlan.Steps[i];
                 var prefix = i == _state.PendingStepIndex ? "->" : "  ";
+                if (i == _state.PendingStepIndex)
+                    stepSummary = $"Step {i + 1}/{_state.PendingToolPlan.Steps.Count}: {step.ToolId}";
                 sb.AppendLine($"{prefix} Step {i + 1}: {step.ToolId} ({step.Id}) inputs: {string.Join(", ", step.Inputs.Select(kv => $"{kv.Key}={kv.Value}"))} why: {step.Why}");
             }
             EmitWaitUser("Approve tool plan to continue.", "Ready to proceed with the plan?", sb.ToString().TrimEnd());
@@ -816,6 +924,8 @@ public sealed class WorkflowFacade
         {
             var remaining = _state.PendingToolPlan.Steps.Skip(_state.PendingStepIndex).ToList();
             var summary = string.Join(", then ", remaining.Select(DescribeStep));
+            if (remaining.Count > 0)
+                stepSummary = $"Step {_state.PendingStepIndex + 1}/{_state.PendingToolPlan.Steps.Count}: {DescribeStep(remaining[0])}";
             var question = string.IsNullOrWhiteSpace(summary)
                 ? "Ready to proceed with the next step?"
                 : $"I can {summary}. Want me to proceed?";
@@ -823,6 +933,9 @@ public sealed class WorkflowFacade
         }
 
         _state.PendingQuestion = null;
+        if (!string.IsNullOrWhiteSpace(stepSummary))
+            PendingStepChanged?.Invoke(stepSummary, true);
+        NotifyStatus("Tool plan pending");
     }
 
     private async Task ExecuteCurrentStepAsync(CancellationToken ct, bool approveAll = false)
@@ -830,6 +943,7 @@ public sealed class WorkflowFacade
         if (_state.PendingToolPlan == null)
         {
             EmitWaitUser("No tool plan to execute.");
+            NotifyStatus();
             return;
         }
 
@@ -837,6 +951,8 @@ public sealed class WorkflowFacade
         {
             EmitWaitUser("Tool plan step index invalid.");
             _state.ClearPlan();
+            NotifyStatus();
+            PendingStepChanged?.Invoke("", false);
             return;
         }
 
@@ -845,6 +961,8 @@ public sealed class WorkflowFacade
         if (!result.Ok)
         {
             EmitWaitUser(result.Message, "Something went wrong. Want me to retry this step?");
+            NotifyStatus("Tool step failed");
+            TraceAttentionRequested?.Invoke();
             return;
         }
 
@@ -857,9 +975,12 @@ public sealed class WorkflowFacade
         {
             await ProduceFinalResponseAsync(ct).ConfigureAwait(false);
             _state.ClearPlan();
+            NotifyStatus();
+            PendingStepChanged?.Invoke("", false);
             return;
         }
 
+        NotifyStatus();
         EmitToolPlanWait();
     }
 
@@ -881,7 +1002,8 @@ public sealed class WorkflowFacade
         sb.AppendLine(_state.LastJobSpecJson ?? "");
         sb.AppendLine();
         sb.AppendLine("ATTACHMENTS:");
-        foreach (var a in _attachments)
+        var activeAttachments = GetActiveAttachments();
+        foreach (var a in activeAttachments)
         {
             sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}");
         }

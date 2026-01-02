@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Drawing;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -26,6 +27,19 @@ public sealed class MainForm : Form
     private readonly WorkflowFacade _workflow;
 
     private readonly ChatComposerControl _composer;
+    private readonly StatusStrip _statusStrip;
+    private readonly ToolStripStatusLabel _modeStatus;
+    private readonly ToolStripStatusLabel _repoStatus;
+    private readonly ToolStripStatusLabel _attachmentsStatus;
+    private readonly ToolStripStatusLabel _workflowStatus;
+    private readonly Panel _stepPanel;
+    private readonly Label _stepLabel;
+    private readonly Button _runNextButton;
+    private readonly Button _stopButton;
+    private readonly Button _editPlanButton;
+    private readonly Panel _clarifyPanel;
+    private readonly Label _clarifyLabel;
+    private readonly SplitContainer _chatSplit;
 
     public MainForm()
     {
@@ -41,15 +55,20 @@ public sealed class MainForm : Form
 
         _workflow = new WorkflowFacade(_trace);
         _workflow.UserFacingMessage += s => AppendChat(s + "\n");
+        _workflow.StatusChanged += UpdateStatus;
+        _workflow.PendingQuestionChanged += UpdateClarify;
+        _workflow.PendingStepChanged += UpdateStepPanel;
+        _workflow.TraceAttentionRequested += ShowTracePane;
 
         var tabs = new TabControl { Dock = DockStyle.Fill };
 
         // Chat tab layout
-        var chatRoot = new SplitContainer
+        _chatSplit = new SplitContainer
         {
             Dock = DockStyle.Fill,
             Orientation = Orientation.Vertical,
-            SplitterDistance = 820
+            SplitterDistance = 820,
+            Panel2Collapsed = true
         };
 
         // Left side: transcript + composer
@@ -73,8 +92,70 @@ public sealed class MainForm : Form
         _composer.AttachmentsChanged += att => _workflow.SetAttachments(att);
         _workflow.SetAttachments(_inbox.List());
 
+        var topButtons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            Padding = new Padding(4)
+        };
+
+        var toggleTrace = new Button { Text = "Trace", AutoSize = true };
+        toggleTrace.Click += (_, _) => ToggleTracePane();
+
+        var demoAttachments = new Button { Text = "Demo Attachments", AutoSize = true };
+        demoAttachments.Click += (_, _) => CreateDemoAttachments();
+
+        var demoRequest = new Button { Text = "Demo Request", AutoSize = true };
+        demoRequest.Click += async (_, _) => await SendNowAsync("Read the note and describe the picture.").ConfigureAwait(true);
+
+        topButtons.Controls.Add(toggleTrace);
+        topButtons.Controls.Add(demoAttachments);
+        topButtons.Controls.Add(demoRequest);
+
+        _clarifyPanel = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 40,
+            Padding = new Padding(6),
+            BackColor = Color.FromArgb(255, 250, 230),
+            Visible = false
+        };
+        _clarifyLabel = new Label { AutoSize = true, Dock = DockStyle.Fill };
+        _clarifyPanel.Controls.Add(_clarifyLabel);
+
+        _stepPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            Padding = new Padding(6),
+            Visible = false,
+            BackColor = Color.FromArgb(235, 242, 255)
+        };
+        _stepLabel = new Label { AutoSize = true, Padding = new Padding(0, 4, 8, 0) };
+        _runNextButton = new Button { Text = "Run Next", AutoSize = true };
+        _runNextButton.Click += async (_, _) => await RunNextStepAsync().ConfigureAwait(true);
+        _stopButton = new Button { Text = "Stop", AutoSize = true };
+        _stopButton.Click += (_, _) => StopPlan();
+        _editPlanButton = new Button { Text = "Edit Plan", AutoSize = true };
+        _editPlanButton.Click += (_, _) => EditPlan();
+
+        _stepPanel.Controls.Add(_stepLabel);
+        _stepPanel.Controls.Add(_runNextButton);
+        _stepPanel.Controls.Add(_stopButton);
+        _stepPanel.Controls.Add(_editPlanButton);
+
         leftPanel.Controls.Add(_chatView);
         leftPanel.Controls.Add(_composer);
+        leftPanel.Controls.Add(_stepPanel);
+        leftPanel.Controls.Add(_clarifyPanel);
+        leftPanel.Controls.Add(topButtons);
+        _composer.BringToFront();
+        _chatView.SendToBack();
+        _stepPanel.BringToFront();
+        _clarifyPanel.BringToFront();
+        topButtons.BringToFront();
 
         // Right side: trace
         _traceBox = new TextBox
@@ -99,10 +180,10 @@ public sealed class MainForm : Form
             }));
         };
 
-        chatRoot.Panel1.Controls.Add(leftPanel);
-        chatRoot.Panel2.Controls.Add(_traceBox);
+        _chatSplit.Panel1.Controls.Add(leftPanel);
+        _chatSplit.Panel2.Controls.Add(_traceBox);
 
-        tabs.TabPages.Add(new TabPage("Chat") { Controls = { chatRoot } });
+        tabs.TabPages.Add(new TabPage("Chat") { Controls = { _chatSplit } });
 
         // Settings tab
         tabs.TabPages.Add(new TabPage("Settings")
@@ -115,13 +196,30 @@ public sealed class MainForm : Form
 
         Controls.Add(tabs);
 
+        _statusStrip = new StatusStrip { Dock = DockStyle.Bottom };
+        _modeStatus = new ToolStripStatusLabel("Mode: -");
+        _repoStatus = new ToolStripStatusLabel("Repo: -");
+        _attachmentsStatus = new ToolStripStatusLabel("Attachments: 0/0");
+        _workflowStatus = new ToolStripStatusLabel("Workflow: Idle");
+        _statusStrip.Items.AddRange(new ToolStripItem[] { _modeStatus, _repoStatus, _attachmentsStatus, _workflowStatus });
+        Controls.Add(_statusStrip);
+
         PublishConfigToRuntime();
 
         if (_config.General.EnableGlobalClipboardShortcuts)
             ClipboardPolicy.Apply(this);
 
         Shown += (_, _) => _composer.FocusInput();
-        FormClosed += (_, _) => _workflow.UserFacingMessage -= OnUserFacingMessage;
+        FormClosed += (_, _) =>
+        {
+            _workflow.UserFacingMessage -= OnUserFacingMessage;
+            _workflow.StatusChanged -= UpdateStatus;
+            _workflow.PendingQuestionChanged -= UpdateClarify;
+            _workflow.PendingStepChanged -= UpdateStepPanel;
+            _workflow.TraceAttentionRequested -= ShowTracePane;
+        };
+
+        UpdateStatus(null);
     }
 
     private void OnUserFacingMessage(string s)
@@ -179,5 +277,136 @@ public sealed class MainForm : Form
         _chatView.AppendText(s);
         _chatView.SelectionStart = _chatView.TextLength;
         _chatView.ScrollToCaret();
+    }
+
+    private void UpdateStatus(WorkflowFacade.WorkflowStatusSnapshot? snapshot)
+    {
+        if (snapshot == null)
+        {
+            _modeStatus.Text = "Mode: -";
+            _repoStatus.Text = "Repo: -";
+            _attachmentsStatus.Text = "Attachments: 0/0";
+            _workflowStatus.Text = "Workflow: Idle";
+            return;
+        }
+
+        _modeStatus.Text = $"Mode: {snapshot.Mode}";
+        _repoStatus.Text = $"Repo: {snapshot.Repo}";
+        _attachmentsStatus.Text = $"Attachments: {snapshot.AttachmentsActive}/{snapshot.AttachmentsTotal}";
+        _workflowStatus.Text = $"Workflow: {snapshot.Workflow}";
+    }
+
+    private void UpdateClarify(string? question)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action<string?>(UpdateClarify), question);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            _clarifyPanel.Visible = false;
+            _clarifyLabel.Text = "";
+            return;
+        }
+
+        _clarifyLabel.Text = question;
+        _clarifyPanel.Visible = true;
+    }
+
+    private void UpdateStepPanel(string? summary, bool hasPlan)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action<string?, bool>(UpdateStepPanel), summary, hasPlan);
+            return;
+        }
+
+        _stepPanel.Visible = hasPlan && !string.IsNullOrWhiteSpace(summary);
+        _stepLabel.Text = summary ?? "";
+    }
+
+    private void ToggleTracePane()
+    {
+        _chatSplit.Panel2Collapsed = !_chatSplit.Panel2Collapsed;
+        if (_chatSplit.Panel2Collapsed)
+        {
+            _composer.FocusInput();
+        }
+        else
+        {
+            _traceBox.Focus();
+        }
+    }
+
+    private void ShowTracePane()
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(ShowTracePane));
+            return;
+        }
+        _chatSplit.Panel2Collapsed = false;
+        _traceBox.Focus();
+    }
+
+    private async Task RunNextStepAsync()
+    {
+        try
+        {
+            await _workflow.ApproveNextStepAsync(CancellationToken.None).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            AppendChat("[error] " + ex.Message + "\n");
+            ShowTracePane();
+        }
+    }
+
+    private void StopPlan()
+    {
+        _workflow.StopPlan();
+        UpdateStepPanel(null, false);
+    }
+
+    private void EditPlan()
+    {
+        _workflow.RequestPlanEdit();
+        UpdateStepPanel(null, false);
+    }
+
+    private void CreateDemoAttachments()
+    {
+        try
+        {
+            Directory.CreateDirectory(_inbox.InboxPath);
+            var notePath = Path.Combine(_inbox.InboxPath, "demo_note.txt");
+            var imgPath = Path.Combine(_inbox.InboxPath, "demo_image.png");
+            File.WriteAllText(notePath, "This is a short demo note.\nIt proves the attachment pipeline works.");
+
+            using (var bmp = new Bitmap(64, 64))
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.LightSteelBlue);
+                g.FillEllipse(Brushes.DarkSlateBlue, 10, 10, 44, 44);
+                bmp.Save(imgPath, System.Drawing.Imaging.ImageFormat.Png);
+            }
+
+            var result = _inbox.AddFiles(new[] { notePath, imgPath });
+            if (!result.Ok)
+            {
+                AppendChat("[error] " + result.Message + "\n");
+                return;
+            }
+
+            _composer.ReloadAttachments(_inbox.List());
+            _workflow.SetAttachments(_inbox.List());
+            AppendChat("Demo attachments added.\n");
+        }
+        catch (Exception ex)
+        {
+            AppendChat("[error] " + ex.Message + "\n");
+        }
     }
 }
