@@ -1,0 +1,233 @@
+diff --git a/MainForm.cs b/MainForm.cs
+index d75174e..650cd0f 100644
+--- a/MainForm.cs
++++ b/MainForm.cs
+@@
+     private readonly ToolStripStatusLabel _attachmentsStatus;
+     private readonly ToolStripStatusLabel _workflowStatus;
+     private readonly TableLayoutPanel _stepPanel;
+     private readonly Label _planSummaryLabel;
+     private readonly Label _stepLabel;
++    private readonly Button _runAllButton;
+     private readonly Button _runNextButton;
+     private readonly Button _stopButton;
+     private readonly Button _editPlanButton;
+@@
+         var buttonRow = new FlowLayoutPanel
+         {
+             Dock = DockStyle.Top,
+             AutoSize = true,
+             FlowDirection = FlowDirection.LeftToRight
+         };
+         _stepLabel = new Label { AutoSize = true, Padding = new Padding(0, 4, 8, 0) };
++        _runAllButton = new Button { Text = "Run All", AutoSize = true };
++        _runAllButton.Click += async (_, _) => await RunAllStepsAsync().ConfigureAwait(true);
+         _runNextButton = new Button { Text = "Run Next", AutoSize = true };
+         _runNextButton.Click += async (_, _) => await RunNextStepAsync().ConfigureAwait(true);
+         _stopButton = new Button { Text = "Stop", AutoSize = true };
+         _stopButton.Click += (_, _) => StopPlan();
+-        _editPlanButton = new Button { Text = "Edit Plan", AutoSize = true };
++        _editPlanButton = new Button { Text = "Modify Plan", AutoSize = true };
+         _editPlanButton.Click += (_, _) => EditPlan();
+ 
+         buttonRow.Controls.Add(_stepLabel);
++        buttonRow.Controls.Add(_runAllButton);
+         buttonRow.Controls.Add(_runNextButton);
+         buttonRow.Controls.Add(_stopButton);
+         buttonRow.Controls.Add(_editPlanButton);
+         _stepPanel.Controls.Add(_planSummaryLabel, 0, 0);
+         _stepPanel.Controls.Add(buttonRow, 0, 1);
+@@
+     private async Task RunNextStepAsync()
+     {
+         try
+         {
+             await _workflow.ApproveNextStepAsync(CancellationToken.None).ConfigureAwait(true);
+@@
+     private void StopPlan()
+     {
+         _workflow.StopPlan();
+         UpdateStepPanel(null, false);
+     }
+ 
++    private async Task RunAllStepsAsync()
++    {
++        try
++        {
++            await _workflow.ApproveAllStepsAsync(CancellationToken.None).ConfigureAwait(true);
++        }
++        catch (Exception ex)
++        {
++            AppendChat("[error] " + ex.Message + "\n");
++            ShowTracePane();
++        }
++    }
+ }
+diff --git a/Workflow/JobSpecParser.cs b/Workflow/JobSpecParser.cs
+index d82d943..7bd7f86 100644
+--- a/Workflow/JobSpecParser.cs
++++ b/Workflow/JobSpecParser.cs
+@@
+         var goal = ReadString(doc.RootElement, "goal", "").Trim();
+         var context = ReadString(doc.RootElement, "context", "");
+         var actions = ReadStringArray(doc.RootElement, "actions").Select(a => a.Trim()).Where(a => a.Length > 0).ToList();
+         var constraints = ReadStringArray(doc.RootElement, "constraints");
+         var clarification = ReadString(doc.RootElement, "clarification", "");
+ 
+         var missing = NormalizeMissing(ReadStringArray(state, "missing"));
+         var attachments = ParseAttachments(doc.RootElement, missing);
+ 
+         if (string.IsNullOrWhiteSpace(clarification))
+             clarification = ReadString(state, "clarify", "");
+ 
++        if (!HasProperty(doc.RootElement, "context"))
++            AddMissing("context", missing);
++        if (!HasProperty(doc.RootElement, "constraints"))
++            AddMissing("constraints", missing);
++        if (!HasProperty(doc.RootElement, "clarification"))
++            AddMissing("clarification", missing);
++        if (!HasProperty(doc.RootElement, "actions"))
++            AddMissing("actions", missing);
++        if (!HasProperty(doc.RootElement, "attachments"))
++            AddMissing("attachments", missing);
++
+         AddMissingIfEmpty(request, "request", missing);
+         AddMissingIfEmpty(goal, "goal", missing);
+         AddMissingIfEmpty(actions, "actions", missing);
+         AddMissingIfEmpty(attachments, "attachments", missing);
+@@
+     private static void AddMissingIfEmpty(string value, string field, List<string> missing)
+     {
+         if (string.IsNullOrWhiteSpace(value))
+             AddMissing(field, missing);
+     }
+ 
+@@
+     private static List<string> SuggestTools(string kind)
+     {
+         var k = NormalizeKind(kind);
+         if (k == "image") return new List<string> { "vision.describe.image" };
+         if (k == "document" || k == "code") return new List<string> { "file.read.text" };
+         return new List<string>();
+     }
+ 
++    private static bool HasProperty(JsonElement obj, string property)
++    {
++        return obj.ValueKind == JsonValueKind.Object && obj.TryGetProperty(property, out _);
++    }
+ }
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 45c26b9..989a9ad 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@
+     public void RefreshTooling(AppConfig cfg)
+     {
+         if (cfg != null) _cfg = cfg;
+         SyncGraphToHub(_cfg);
+         RefreshTooling();
+     }
+ 
+     public Task ApproveNextStepAsync(CancellationToken ct) => ExecuteCurrentStepAsync(ct);
++    public Task ApproveAllStepsAsync(CancellationToken ct)
++    {
++        _state.AutoApproveAll = true;
++        return ExecuteCurrentStepAsync(ct, true);
++    }
+@@
+     private static List<string> BuildAttachmentTags(AttachmentInbox.AttachmentEntry att)
+     {
+         var tags = new List<string>();
+         var kind = NormalizeAttachmentKind(att.Kind);
+         if (!string.IsNullOrWhiteSpace(kind))
+             tags.Add(kind);
+ 
+         var stem = Path.GetFileNameWithoutExtension(att.OriginalName) ?? "";
+         foreach (var token in stem.Split(new[] { ' ', '_', '-', '.', '/' }, StringSplitOptions.RemoveEmptyEntries))
+         {
+             var t = token.Trim();
+             if (t.Length > 0 && !tags.Contains(t, StringComparer.OrdinalIgnoreCase))
+                 tags.Add(t);
+         }
+ 
++        foreach (var t in SplitCamel(stem))
++        {
++            if (t.Length > 0 && !tags.Contains(t, StringComparer.OrdinalIgnoreCase))
++                tags.Add(t);
++        }
++
++        var ext = Path.GetExtension(att.OriginalName);
++        if (!string.IsNullOrWhiteSpace(ext))
++        {
++            var cleaned = ext.Trim('.').ToLowerInvariant();
++            if (cleaned.Length > 0 && !tags.Contains(cleaned, StringComparer.OrdinalIgnoreCase))
++                tags.Add(cleaned);
++        }
++
+         if (!string.IsNullOrWhiteSpace(att.StoredName) && tags.Count == 0)
+             tags.Add(att.StoredName);
+ 
+         return tags;
+     }
+@@
+     private void SendChatStepSummary(ToolRunResult result)
+     {
+         if (!result.Output.HasValue) return;
+         try
+         {
+             var root = result.Output.Value;
+             if (!root.TryGetProperty("toolId", out var toolEl) || toolEl.ValueKind != JsonValueKind.String)
+                 return;
+             var toolId = toolEl.GetString() ?? "";
+             if (toolId.Equals("file.read.text", StringComparison.OrdinalIgnoreCase))
+             {
+                 var name = root.TryGetProperty("storedName", out var n) ? n.GetString() : "";
+                 var content = root.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
+                 var preview = content.Length <= 240 ? content : content.Substring(0, 240) + "...";
+                 var full = content.Length > 1200 ? content.Substring(0, 1200) + "…" : content;
++                var bullets = content.Replace("\r", "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).Take(3).Select(l => "- " + l).ToList();
+                 var card = new StringBuilder();
+                 card.AppendLine("┌─ File result");
+                 card.AppendLine($"│ Name: {name}");
+                 card.AppendLine($"│ Characters: {content.Length}");
++                if (bullets.Count > 0)
++                {
++                    card.AppendLine("├─ Summary");
++                    foreach (var b in bullets)
++                        card.AppendLine("│ " + b);
++                }
+                 card.AppendLine("├─ Preview");
+                 card.AppendLine(IndentMultiline(preview, "│ "));
+                 card.AppendLine("├─ Full content");
+@@
+     private static string IndentMultiline(string text, string prefix)
+     {
+         var lines = (text ?? "").Replace("\r", "").Split('\n');
+         var sb = new StringBuilder();
+         foreach (var line in lines)
+             sb.AppendLine(prefix + line);
+         return sb.ToString().TrimEnd();
+     }
++
++    private static List<string> SplitCamel(string text)
++    {
++        var list = new List<string>();
++        if (string.IsNullOrWhiteSpace(text)) return list;
++
++        var sb = new StringBuilder();
++        foreach (var ch in text)
++        {
++            if (char.IsUpper(ch) && sb.Length > 0)
++            {
++                list.Add(sb.ToString());
++                sb.Clear();
++            }
++            sb.Append(ch);
++        }
++
++        if (sb.Length > 0)
++            list.Add(sb.ToString());
++
++        return list;
++    }
+ }

@@ -1,0 +1,63 @@
+diff --git a/MainForm.cs b/MainForm.cs
+index ae6ea9e..d75174e 100644
+--- a/MainForm.cs
++++ b/MainForm.cs
+@@ -112,11 +112,14 @@ public sealed class MainForm : Form
+ 
+         var demoIntent = new Button { Text = "Intent Demo Flow", AutoSize = true };
+         demoIntent.Click += async (_, _) => await RunIntentDemoAsync().ConfigureAwait(true);
++        var demoEdgeCase = new Button { Text = "Intent Edge Case", AutoSize = true };
++        demoEdgeCase.Click += async (_, _) => await RunEdgeCaseAsync().ConfigureAwait(true);
+ 
+         topButtons.Controls.Add(toggleTrace);
+         topButtons.Controls.Add(demoAttachments);
+         topButtons.Controls.Add(demoRequest);
+         topButtons.Controls.Add(demoIntent);
++        topButtons.Controls.Add(demoEdgeCase);
+ 
+         _clarifyPanel = new Panel
+         {
+@@ -438,6 +441,13 @@ public sealed class MainForm : Form
+         await SendNowAsync("Describe this image and document and combine results.").ConfigureAwait(true);
+     }
+ 
++    private async Task RunEdgeCaseAsync()
++    {
++        _composer.ReloadAttachments(Array.Empty<AttachmentInbox.AttachmentEntry>());
++        _workflow.SetAttachments(Array.Empty<AttachmentInbox.AttachmentEntry>());
++        await SendNowAsync("Summarize the attached file and image.").ConfigureAwait(true);
++    }
++
+     private static string ExtractNextStep(string? summary)
+     {
+         if (string.IsNullOrWhiteSpace(summary)) return "";
+diff --git a/Settings/AppConfig.cs b/Settings/AppConfig.cs
+index 82f3706..58e25b4 100644
+--- a/Settings/AppConfig.cs
++++ b/Settings/AppConfig.cs
+@@ -72,6 +72,7 @@ Rules:
+ - ALWAYS emit valid JSON; no markdown or comments.
+ - Always include an attachments array (can be empty).
+ - Use the ATTACHMENTS section to pre-fill storedName, kind, status (default present), summary, tags (keywords from filename/description), and tools (vision.describe.image for images; file.read.text for documents/code).
++- Base actions on attachments and intent: e.g., describe images, read/summarize documents/code, then combine results when requested.
+ - If any required field is missing/ambiguous, set state.ready=false and list the missing concepts in state.missing. Otherwise, set ready=true and missing=[].
+ - Ask at most ONE clarifying question in ""clarification"" when ready=false; leave it empty when ready=true.
+ - Do NOT invent tools beyond vision.describe.image or file.read.text.";
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 59fcf87..45c26b9 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -302,6 +302,13 @@ public sealed class WorkflowFacade
+             foreach (var m in unanswered)
+                 _state.AskedMissingFields.Add(m);
+ 
++            if (unanswered.Count == 0)
++            {
++                _trace.Emit("[route:wait_user] JobSpec incomplete; awaiting answers for: " + string.Join(",", missing));
++                NotifyStatus("Waiting clarification");
++                return;
++            }
++
+             var targets = unanswered.Count > 0 ? unanswered : missing;
+             var question = spec.Clarification;
+             if (string.IsNullOrWhiteSpace(question) && unanswered.Count > 0)
