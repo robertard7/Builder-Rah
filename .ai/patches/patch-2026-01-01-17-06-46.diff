@@ -1,0 +1,173 @@
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 3e20430..6037a6c 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -109,7 +109,7 @@ public sealed class WorkflowFacade
+         {
+             if (action.Action != ReplyActionType.NewRequest && action.Action != ReplyActionType.EditPlan)
+             {
+-                EmitWaitUser("Model output was not valid JSON. Please restate your request.");
++                EmitWaitUser("I didn’t catch that. Please restate what you want.");
+                 return;
+             }
+ 
+@@ -140,7 +140,7 @@ public sealed class WorkflowFacade
+             {
+                 _trace.Emit("[plan:reject] user rejected pending tool plan.");
+                 _state.ClearPlan();
+-                EmitWaitUser("Tool plan rejected. Provide a new request.");
++                EmitWaitUser("Okay, I’ll stop. Tell me what you’d like instead.");
+                 return;
+             }
+             else if (action.Action is ReplyActionType.ApproveNextStep or ReplyActionType.ApproveAllSteps)
+@@ -234,7 +234,7 @@ public sealed class WorkflowFacade
+             _state.PendingQuestions = qs;
+             _state.PendingQuestion = qs.FirstOrDefault();
+             _trace.Emit("[route:wait_user] JobSpec incomplete; asking clarifications.");
+-            EmitWaitUser(_state.PendingQuestion ?? "Could you share a bit more detail?");
++            EmitWaitUser(_state.PendingQuestion ?? "Could you share a bit more detail?", _state.PendingQuestion ?? "Could you share a bit more detail?");
+             return;
+         }
+ 
+@@ -256,7 +256,16 @@ public sealed class WorkflowFacade
+         if (_attachments == null || _attachments.Count == 0)
+         {
+             _trace.Emit("[attachments:none] Add at least one attachment to proceed to tool plan.");
+-            EmitWaitUser("Attach at least one file, then reply with: accept (after plan appears).");
++            EmitWaitUser("Attach at least one file or image so I can help.");
++            return;
++        }
++
++        var docAttachments = _attachments.Where(a => string.Equals(a.Kind, "document", StringComparison.OrdinalIgnoreCase)).ToList();
++        if (docAttachments.Count > 1 && string.IsNullOrWhiteSpace(_state.PendingQuestion) && _state.PendingToolPlan == null && _state.ClarificationAnswers.Count == 0)
++        {
++            var names = string.Join(", ", docAttachments.Select(a => a.StoredName));
++            _state.PendingQuestion = "Which file should I start with? " + names;
++            EmitWaitUser("Which file should I start with? " + names);
+             return;
+         }
+ 
+@@ -313,11 +322,13 @@ public sealed class WorkflowFacade
+         }
+     }
+ 
+-    private void EmitWaitUser(string reason)
++    private void EmitWaitUser(string reason, string? friendly = null, string? preview = null)
+     {
+-        var msg = WaitUserGate.GateMessage(reason, mode: _cfg.General.ConversationMode);
++        var msg = WaitUserGate.GateMessage(reason, preview, _cfg.General.ConversationMode);
+         _trace.Emit(msg);
+-        UserFacingMessage?.Invoke(msg);
++        var chat = friendly ?? reason;
++        if (!string.IsNullOrWhiteSpace(chat))
++            UserFacingMessage?.Invoke(chat);
+     }
+ 
+     private void SyncGraphToHub(AppConfig cfg)
+@@ -495,6 +506,7 @@ public sealed class WorkflowFacade
+         sb.AppendLine("SCHEMA: tool_plan.v1 (mode,tweakFirst,steps[id,toolId,inputs{storedName},why])");
+         sb.AppendLine("ALLOWED_TOOLS: file.read.text, vision.describe.image");
+         sb.AppendLine("STRICT: JSON only, no markdown, no prose, no invented tools.");
++        sb.AppendLine("CHANGE_STRATEGY: " + ComputeChangeStrategy(_state.PendingUserRequest));
+         sb.AppendLine();
+         sb.AppendLine("USER REQUEST:");
+         sb.AppendLine(userText ?? "");
+@@ -632,7 +644,7 @@ public sealed class WorkflowFacade
+                 var prefix = i == _state.PendingStepIndex ? "->" : "  ";
+                 sb.AppendLine($"{prefix} Step {i + 1}: {step.ToolId} ({step.Id}) inputs: {string.Join(", ", step.Inputs.Select(kv => $"{kv.Key}={kv.Value}"))} why: {step.Why}");
+             }
+-            msg = WaitUserGate.GateMessage("Approve tool plan to continue.", sb.ToString().TrimEnd(), mode);
++            EmitWaitUser("Approve tool plan to continue.", "Ready to proceed with the plan?", sb.ToString().TrimEnd());
+         }
+         else
+         {
+@@ -641,12 +653,10 @@ public sealed class WorkflowFacade
+             var question = string.IsNullOrWhiteSpace(summary)
+                 ? "Ready to proceed with the next step?"
+                 : $"I can {summary}. Want me to proceed?";
+-            msg = WaitUserGate.GateMessage(question, null, mode);
++            EmitWaitUser(question, question);
+         }
+ 
+         _state.PendingQuestion = null;
+-        _trace.Emit(msg);
+-        UserFacingMessage?.Invoke(msg);
+     }
+ 
+     private async Task ExecuteCurrentStepAsync(CancellationToken ct, bool approveAll = false)
+@@ -668,12 +678,13 @@ public sealed class WorkflowFacade
+         var result = await ToolStepRunner.RunAsync(step, _cfg, _trace, _attachments, _toolManifest, _toolPrompts, ct).ConfigureAwait(false);
+         if (!result.Ok)
+         {
+-            EmitWaitUser(result.Message);
++            EmitWaitUser(result.Message, "Something went wrong. Want me to retry this step?");
+             return;
+         }
+ 
+         if (result.Output.HasValue)
+             _state.ToolOutputs.Add(result.Output.Value);
++        SendChatStepSummary(result);
+ 
+         _state.PendingStepIndex++;
+         if (_state.PendingStepIndex >= _state.PendingToolPlan.Steps.Count)
+@@ -683,13 +694,6 @@ public sealed class WorkflowFacade
+             return;
+         }
+ 
+-        if (approveAll || _state.AutoApproveAll)
+-        {
+-            _trace.Emit("[plan:auto] proceeding to next approved step.");
+-            await ExecuteCurrentStepAsync(ct, true).ConfigureAwait(false);
+-            return;
+-        }
+-
+         EmitToolPlanWait();
+     }
+ 
+@@ -734,4 +738,46 @@ public sealed class WorkflowFacade
+         _trace.Emit("[final] " + Trunc(resp, 1200));
+         UserFacingMessage?.Invoke(resp);
+     }
++
++    private static string ComputeChangeStrategy(string text)
++    {
++        var t = (text ?? "").ToLowerInvariant();
++        if (t.Contains("rebuild") || t.Contains("rewrite everything"))
++            return "Rebuild";
++        if (t.Contains("patch") || t.Contains("fix"))
++            return "Patch";
++        return "Tweak";
++    }
++
++    private void SendChatStepSummary(ToolRunResult result)
++    {
++        if (!result.Output.HasValue) return;
++        try
++        {
++            var root = result.Output.Value;
++            if (!root.TryGetProperty("toolId", out var toolEl) || toolEl.ValueKind != JsonValueKind.String)
++                return;
++            var toolId = toolEl.GetString() ?? "";
++            if (toolId.Equals("file.read.text", StringComparison.OrdinalIgnoreCase))
++            {
++                var name = root.TryGetProperty("storedName", out var n) ? n.GetString() : "";
++                var content = root.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
++                var preview = content.Length <= 200 ? content : content.Substring(0, 200) + "...";
++                UserFacingMessage?.Invoke($"I read {name}. Quick take: {preview}");
++            }
++            else if (toolId.Equals("vision.describe.image", StringComparison.OrdinalIgnoreCase))
++            {
++                var name = root.TryGetProperty("storedName", out var n) ? n.GetString() : "";
++                var caption = root.TryGetProperty("caption", out var cap) ? cap.GetString() : "";
++                var tags = root.TryGetProperty("tags", out var tagsEl) && tagsEl.ValueKind == JsonValueKind.Array
++                    ? string.Join(", ", tagsEl.EnumerateArray().Where(t => t.ValueKind == JsonValueKind.String).Select(t => t.GetString()).Where(s => !string.IsNullOrWhiteSpace(s)))
++                    : "";
++                var msg = $"I described {name}: {caption}";
++                if (!string.IsNullOrWhiteSpace(tags))
++                    msg += $" (tags: {tags})";
++                UserFacingMessage?.Invoke(msg);
++            }
++        }
++        catch { }
++    }
+ }

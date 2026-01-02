@@ -4,16 +4,20 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
+using RahBuilder.Workflow;
+using RahOllamaOnly.Tracing;
 
 namespace RahBuilder.Settings.Pages;
 
 public sealed class GeneralSettingsPage : UserControl
 {
     private readonly AppConfig _config;
+    private readonly RunTrace? _trace;
 
-    public GeneralSettingsPage(AppConfig config)
+    public GeneralSettingsPage(AppConfig config, RunTrace? trace = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        _trace = trace;
 
         var grid = new TableLayoutPanel
         {
@@ -74,10 +78,80 @@ public sealed class GeneralSettingsPage : UserControl
             row++;
         }
 
-        AddRow("Repo Root", () => _config.General.RepoRoot, v => _config.General.RepoRoot = v);
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var repoLabel = new Label { Text = "Repo Root", AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 10, 0) };
+        var repoPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
+        var repoBox = new TextBox { Width = 420, Text = _config.General.RepoRoot ?? "" };
+        repoBox.TextChanged += (_, _) => { _config.General.RepoRoot = repoBox.Text; AutoSave.Touch(); };
+        var browseBtn = new Button { Text = "Browse…", AutoSize = true, Margin = new Padding(6, 0, 0, 0) };
+        browseBtn.Click += (_, _) =>
+        {
+            using var dlg = new FolderBrowserDialog { Description = "Select Repo Root" };
+            try
+            {
+                var current = _config.General.RepoRoot ?? "";
+                if (!string.IsNullOrWhiteSpace(current) && Directory.Exists(current))
+                    dlg.SelectedPath = current;
+            }
+            catch { }
+
+            if (dlg.ShowDialog() == DialogResult.OK)
+                repoBox.Text = dlg.SelectedPath;
+        };
+        var openRepoBtn = new Button { Text = "Open Folder", AutoSize = true, Margin = new Padding(6, 0, 0, 0) };
+        openRepoBtn.Click += (_, _) =>
+        {
+            var path = (_config.General.RepoRoot ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(path)) return;
+            try
+            {
+                Directory.CreateDirectory(path);
+                Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+            }
+            catch { }
+        };
+        var validateBtn = new Button { Text = "Validate RepoRoot", AutoSize = true, Margin = new Padding(6, 0, 0, 0) };
+        validateBtn.Click += (_, _) =>
+        {
+            var scope = RepoScope.Resolve(_config);
+            var message = scope.Message;
+            if (!string.IsNullOrWhiteSpace(scope.GitTopLevel))
+                message += $" (GitTopLevel={scope.GitTopLevel})";
+            if (_trace != null)
+                _trace.Emit(message);
+            else
+                Debug.WriteLine(message);
+
+            MessageBox.Show(message, "RepoRoot", MessageBoxButtons.OK, scope.Ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+        };
+        repoPanel.Controls.Add(repoBox);
+        repoPanel.Controls.Add(browseBtn);
+        repoPanel.Controls.Add(openRepoBtn);
+        repoPanel.Controls.Add(validateBtn);
+        grid.Controls.Add(repoLabel, 0, row);
+        grid.Controls.Add(repoPanel, 1, row);
+        row++;
+
         AddRow("Sandbox Host Path", () => _config.General.SandboxHostPath, v => _config.General.SandboxHostPath = v);
         AddRow("Sandbox Container Path", () => _config.General.SandboxContainerPath, v => _config.General.SandboxContainerPath = v);
 
+        AddBool("TweakFirst mode (avoid rebuilds)", () => _config.General.TweakFirstMode, v => _config.General.TweakFirstMode = v);
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var convoLabel = new Label { Text = "Conversation Mode", AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 10, 0) };
+        var convoCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left };
+        convoCombo.Items.AddRange(Enum.GetNames(typeof(ConversationMode)));
+        convoCombo.SelectedItem = _config.General.ConversationMode.ToString();
+        convoCombo.SelectedIndexChanged += (_, _) =>
+        {
+            if (Enum.TryParse<ConversationMode>(convoCombo.SelectedItem?.ToString(), out var mode))
+            {
+                _config.General.ConversationMode = mode;
+                AutoSave.Touch();
+            }
+        };
+        grid.Controls.Add(convoLabel, 0, row);
+        grid.Controls.Add(convoCombo, 1, row);
+        row++;
         AddRow("Tools Manifest Path (tools.json)", () => _config.General.ToolsPath, v => _config.General.ToolsPath = v);
         AddRow("Tool Prompts Folder (Tools/Prompt)", () => _config.General.ToolPromptsPath, v => _config.General.ToolPromptsPath = v);
         AddRow("BlueprintTemplates Folder", () => _config.General.BlueprintTemplatesPath, v => _config.General.BlueprintTemplatesPath = v);
@@ -151,6 +225,20 @@ public sealed class GeneralSettingsPage : UserControl
             () => _config.General.JobSpecDigestPrompt,
             v => _config.General.JobSpecDigestPrompt = v,
             height: 220
+        );
+
+        AddMultiline(
+            "Tool Plan Prompt (tool_plan.v1 only)",
+            () => _config.General.ToolPlanPrompt,
+            v => _config.General.ToolPlanPrompt = v,
+            height: 200
+        );
+
+        AddMultiline(
+            "Final Answer Prompt",
+            () => _config.General.FinalAnswerPrompt,
+            v => _config.General.FinalAnswerPrompt = v,
+            height: 160
         );
 
         Controls.Add(grid);

@@ -23,6 +23,8 @@ public sealed class MemorySettings { }
 public sealed class GeneralSettings
 {
     public string RepoRoot { get; set; } = "";
+    public bool TweakFirstMode { get; set; } = true;
+    public ConversationMode ConversationMode { get; set; } = ConversationMode.Conversational;
     public string SandboxHostPath { get; set; } = "";
     public string SandboxContainerPath { get; set; } = "";
     public string InboxHostPath { get; set; } = DefaultInboxPath();
@@ -30,6 +32,8 @@ public sealed class GeneralSettings
     public string ToolsPath { get; set; } = "";                 // tools.json
     public string ToolPromptsPath { get; set; } = "";           // folder: Tools/Prompt (files named by toolId)
     public string BlueprintTemplatesPath { get; set; } = "";    // folder: BlueprintTemplates (prompt library)
+    public string ToolPlanPrompt { get; set; } = DefaultToolPlanPrompt();
+    public string FinalAnswerPrompt { get; set; } = DefaultFinalAnswerPrompt();
     public string AcceptedAttachmentExtensions { get; set; } = ".txt,.md,.json,.png,.jpg,.jpeg,.pdf,.zip";
     public long MaxAttachmentBytes { get; set; } = 50 * 1024 * 1024;
     public long MaxTotalInboxBytes { get; set; } = 500 * 1024 * 1024;
@@ -74,6 +78,15 @@ Rules:
 
         if (string.IsNullOrWhiteSpace(ExecutionTarget))
             ExecutionTarget = OperatingSystem.IsWindows() ? "WindowsHost" : "LinuxContainer";
+
+        if (string.IsNullOrWhiteSpace(ToolPlanPrompt))
+            ToolPlanPrompt = DefaultToolPlanPrompt();
+
+        if (string.IsNullOrWhiteSpace(FinalAnswerPrompt))
+            FinalAnswerPrompt = DefaultFinalAnswerPrompt();
+
+        if (!Enum.IsDefined(typeof(ConversationMode), ConversationMode))
+            ConversationMode = ConversationMode.Conversational;
     }
 
     private static string DefaultInboxPath()
@@ -84,6 +97,36 @@ Rules:
 
         return Path.Combine(basePath, "RahBuilder", "inbox");
     }
+
+    private static string DefaultToolPlanPrompt() =>
+        @"You are the Tool Planner. Output ONLY valid JSON for mode ""tool_plan.v1"" with shape:
+{
+  ""mode"": ""tool_plan.v1"",
+  ""tweakFirst"": true,
+  ""steps"": [
+    { ""id"": ""step1"", ""toolId"": ""file.read.text"" or ""vision.describe.image"", ""inputs"": { ""storedName"": ""<storedName>"" }, ""why"": ""<reason>"" }
+  ]
+}
+Rules:
+- Allowed tools ONLY: file.read.text, vision.describe.image.
+- Use storedName exactly as provided in attachments.
+- Always set tweakFirst=true.
+- Prefer the smallest steps; NEVER suggest rebuild/rewrite/reinitialize.
+- Use one step per attachment type needed to satisfy the request.
+- Do NOT output prose or markdown; ONLY JSON.";
+
+    private static string DefaultFinalAnswerPrompt() =>
+        @"You are the Final Responder. Use the TOOL_OUTPUTS JSON plus attachments metadata to answer the user's request in natural, concise language.
+Rules:
+- Do not mention internal systems or planner details.
+- Reference content and captions from TOOL_OUTPUTS explicitly.
+- Keep it brief and helpful.";
+}
+
+public enum ConversationMode
+{
+    Conversational,
+    Strict
 }
 
 public sealed class ProvidersSettings

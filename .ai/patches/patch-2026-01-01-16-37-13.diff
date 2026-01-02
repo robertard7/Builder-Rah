@@ -1,0 +1,415 @@
+diff --git a/Settings/AppConfig.cs b/Settings/AppConfig.cs
+index 083c1f0..7809716 100644
+--- a/Settings/AppConfig.cs
++++ b/Settings/AppConfig.cs
+@@ -24,6 +24,7 @@ public sealed class GeneralSettings
+ {
+     public string RepoRoot { get; set; } = "";
+     public bool TweakFirstMode { get; set; } = true;
++    public ConversationMode ConversationMode { get; set; } = ConversationMode.Conversational;
+     public string SandboxHostPath { get; set; } = "";
+     public string SandboxContainerPath { get; set; } = "";
+     public string InboxHostPath { get; set; } = DefaultInboxPath();
+@@ -83,6 +84,9 @@ Rules:
+ 
+         if (string.IsNullOrWhiteSpace(FinalAnswerPrompt))
+             FinalAnswerPrompt = DefaultFinalAnswerPrompt();
++
++        if (!Enum.IsDefined(typeof(ConversationMode), ConversationMode))
++            ConversationMode = ConversationMode.Conversational;
+     }
+ 
+     private static string DefaultInboxPath()
+@@ -103,6 +107,12 @@ Rules:
+     { ""id"": ""step1"", ""toolId"": ""file.read.text"" or ""vision.describe.image"", ""inputs"": { ""storedName"": ""<storedName>"" }, ""why"": ""<reason>"" }
+   ]
+ }
++
++public enum ConversationMode
++{
++    Conversational,
++    Strict
++}
+ Rules:
+ - Allowed tools ONLY: file.read.text, vision.describe.image.
+ - Use storedName exactly as provided in attachments.
+diff --git a/Settings/Pages/GeneralSettingsPage.cs b/Settings/Pages/GeneralSettingsPage.cs
+index 1e3ae43..c9fe448 100644
+--- a/Settings/Pages/GeneralSettingsPage.cs
++++ b/Settings/Pages/GeneralSettingsPage.cs
+@@ -134,6 +134,22 @@ public sealed class GeneralSettingsPage : UserControl
+         AddRow("Sandbox Container Path", () => _config.General.SandboxContainerPath, v => _config.General.SandboxContainerPath = v);
+ 
+         AddBool("TweakFirst mode (avoid rebuilds)", () => _config.General.TweakFirstMode, v => _config.General.TweakFirstMode = v);
++        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
++        var convoLabel = new Label { Text = "Conversation Mode", AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 10, 0) };
++        var convoCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Anchor = AnchorStyles.Left };
++        convoCombo.Items.AddRange(Enum.GetNames(typeof(ConversationMode)));
++        convoCombo.SelectedItem = _config.General.ConversationMode.ToString();
++        convoCombo.SelectedIndexChanged += (_, _) =>
++        {
++            if (Enum.TryParse<ConversationMode>(convoCombo.SelectedItem?.ToString(), out var mode))
++            {
++                _config.General.ConversationMode = mode;
++                AutoSave.Touch();
++            }
++        };
++        grid.Controls.Add(convoLabel, 0, row);
++        grid.Controls.Add(convoCombo, 1, row);
++        row++;
+         AddRow("Tools Manifest Path (tools.json)", () => _config.General.ToolsPath, v => _config.General.ToolsPath = v);
+         AddRow("Tool Prompts Folder (Tools/Prompt)", () => _config.General.ToolPromptsPath, v => _config.General.ToolPromptsPath = v);
+         AddRow("BlueprintTemplates Folder", () => _config.General.BlueprintTemplatesPath, v => _config.General.BlueprintTemplatesPath = v);
+diff --git a/Workflow/WaitUserGate.cs b/Workflow/WaitUserGate.cs
+index 537e824..704551b 100644
+--- a/Workflow/WaitUserGate.cs
++++ b/Workflow/WaitUserGate.cs
+@@ -45,13 +45,22 @@ public static class WaitUserGate
+         return new WaitUserResponse(WaitUserAction.None);
+     }
+ 
+-    public static string GateMessage(string pendingQuestion, string? toolPlanPreview = null)
++    public static string GateMessage(string pendingQuestion, string? toolPlanPreview = null, ConversationMode mode = ConversationMode.Conversational)
+     {
+         var preview = string.IsNullOrWhiteSpace(toolPlanPreview) ? "" : $"{toolPlanPreview}\n";
++        if (mode == ConversationMode.Strict)
++        {
++            return
++                "WAIT_USER\n" +
++                preview +
++                $"Pending: {pendingQuestion}\n" +
++                "Allowed replies: accept | reject | edit <rewrite> | accept step <n>";
++        }
++
+         return
+             "WAIT_USER\n" +
+             preview +
+-            $"Pending: {pendingQuestion}\n" +
+-            "Allowed replies: accept | reject | edit <rewrite> | accept step <n>";
++            $"{pendingQuestion}\n" +
++            "(You can say things like 'go ahead', 'run all', 'stop', or 'change it to <...>')";
+     }
+ }
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 94208db..fb56b24 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -93,43 +93,37 @@ public sealed class WorkflowFacade
+ 
+     public Task RouteUserInput(string text, CancellationToken ct) => RouteUserInput(_cfg, text, ct);
+ 
+-    public async Task RouteUserInput(AppConfig cfg, string text, CancellationToken ct)
+-    {
+-        if (cfg != null) _cfg = cfg;
++    public async Task RouteUserInput(AppConfig cfg, string text, CancellationToken ct)
++    {
++        if (cfg != null) _cfg = cfg;
+         text ??= "";
+ 
+         _trace.Emit($"[chat] {text}");
+ 
++        var action = UserReplyInterpreter.Interpret(_cfg, _state, text);
++
+         // If last attempt produced invalid_json, DO NOT spin. Only accept "edit ...".
+-        if (_forceEditBecauseInvalidJson)
+-        {
+-            var t = text.Trim();
+-            if (!t.StartsWith("edit", StringComparison.OrdinalIgnoreCase))
+-            {
+-                EmitWaitUser("Model output was not valid JSON. Reply with: edit <rewrite your request>");
+-                return;
+-            }
+-
+-            var edited = t.Length > 4 ? t[4..].Trim() : "";
+-            if (edited.Length == 0)
+-            {
+-                EmitWaitUser("Reply with: edit <rewrite your request>");
+-                return;
+-            }
+-
+-            text = edited;
+-            _trace.Emit($"[chat:edit] {text}");
+-
+-            // We have new input, try digest again.
++        if (_forceEditBecauseInvalidJson)
++        {
++            if (action.Action != ReplyActionType.NewRequest && action.Action != ReplyActionType.EditPlan)
++            {
++                EmitWaitUser("Model output was not valid JSON. Please restate your request.");
++                return;
++            }
++
++            if (!string.IsNullOrWhiteSpace(action.Payload))
++                text = action.Payload;
++
++            _trace.Emit($"[chat:edit] {text}");
+             _forceEditBecauseInvalidJson = false;
+         }
+ 
+         if (_state.PendingToolPlan != null)
+         {
+-            var resp = WaitUserGate.ParseResponse(text);
+-            if (resp.Action == WaitUserAction.Edit)
++            var approvedAll = action.Action == ReplyActionType.ApproveAllSteps;
++            if (action.Action == ReplyActionType.EditPlan)
+             {
+-                var edited = resp.EditText ?? "";
++                var edited = action.Payload;
+                 if (string.IsNullOrWhiteSpace(edited))
+                 {
+                     EmitToolPlanWait();
+@@ -140,24 +134,16 @@ public sealed class WorkflowFacade
+                 _state.ClearPlan();
+                 text = edited;
+             }
+-            else if (resp.Action == WaitUserAction.Reject)
++            else if (action.Action == ReplyActionType.RejectPlan)
+             {
+                 _trace.Emit("[plan:reject] user rejected pending tool plan.");
+                 _state.ClearPlan();
+                 EmitWaitUser("Tool plan rejected. Provide a new request.");
+                 return;
+             }
+-            else if (resp.Action is WaitUserAction.Accept or WaitUserAction.AcceptStep)
++            else if (action.Action is ReplyActionType.ApproveNextStep or ReplyActionType.ApproveAllSteps)
+             {
+-                var expected = _state.PendingStepIndex;
+-                var requested = resp.StepIndex ?? expected;
+-                if (requested != expected)
+-                {
+-                    EmitWaitUser($"Next step is {expected + 1}. Reply with: accept step {expected + 1}");
+-                    return;
+-                }
+-
+-                await ExecuteCurrentStepAsync(ct).ConfigureAwait(true);
++                await ExecuteCurrentStepAsync(ct, approvedAll).ConfigureAwait(true);
+                 return;
+             }
+             else
+@@ -167,6 +153,18 @@ public sealed class WorkflowFacade
+             }
+         }
+ 
++        if (action.Action == ReplyActionType.AnswerClarification && !string.IsNullOrWhiteSpace(action.Payload))
++        {
++            _state.ClarificationAnswers.Add(action.Payload);
++            text = $"{_state.PendingUserRequest}\n\nAdditional detail: {string.Join("\n", _state.ClarificationAnswers)}";
++            _trace.Emit("[clarify] received answer, re-running digest.");
++        }
++        else
++        {
++            _state.PendingUserRequest = text;
++            _state.ClearClarifications();
++        }
++
+         var repoScope = RepoScope.Resolve(_cfg);
+         _trace.Emit(repoScope.Message);
+         if (!repoScope.Ok)
+@@ -213,24 +211,25 @@ public sealed class WorkflowFacade
+         if (!spec.IsComplete)
+         {
+             var missing = spec.GetMissingFields();
+-
+-            // Special invalid_json case.
++
++            // Special invalid_json case.
+             if (missing.Count == 1 && string.Equals(missing[0], "invalid_json", StringComparison.OrdinalIgnoreCase))
+             {
+                 _forceEditBecauseInvalidJson = true;
+ 
+-                EmitWaitUser("Model output was not valid JSON. Reply with: edit <rewrite your request>");
++                EmitWaitUser("I had trouble reading the model output. Please restate what you want.");
+                 return;
+             }
+-
+-            // Normal WAIT_USER (missing real fields)
+-            _forceEditBecauseInvalidJson = false;
+-
+-            var joined = missing.Count == 0 ? "unknown" : string.Join(", ", missing);
+-            _trace.Emit("[route:wait_user] JobSpec incomplete.");
+-            EmitWaitUser($"Missing fields: {joined}");
+-            return;
+-        }
++
++            // Normal WAIT_USER (missing real fields)
++            _forceEditBecauseInvalidJson = false;
++
++            var qs = ClarificationQuestionBank.PickQuestions(missing);
++            _state.PendingQuestions = qs;
++            _trace.Emit("[route:wait_user] JobSpec incomplete; asking clarifications.");
++            EmitWaitUser(string.Join(" ", qs));
++            return;
++        }
+ 
+         _forceEditBecauseInvalidJson = false;
+ 
+@@ -261,50 +260,58 @@ public sealed class WorkflowFacade
+ 
+     private async Task<JobSpec> RunJobSpecDigestAsync(string userText, CancellationToken ct)
+     {
+-        var prompt = (_cfg.General.JobSpecDigestPrompt ?? "").Trim();
+-        if (prompt.Length == 0)
+-        {
+-            _trace.Emit("[digest:error] JobSpecDigestPrompt is empty (General Settings).");
+-            return JobSpec.Invalid("job_spec_prompt_missing");
+-        }
+-
+-        _trace.Emit("[digest] running Job Spec Digest");
+-
+-        try
+-        {
+-            var result = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, userText, ct).ConfigureAwait(false);
+-
+-            if (string.IsNullOrWhiteSpace(result))
+-            {
+-                _trace.Emit("[digest:error] Digest returned empty response.");
+-                return JobSpec.Invalid("empty_digest_response");
+-            }
+-
+-            // ALWAYS log raw BEFORE parsing. This is non-negotiable.
+-            _trace.Emit("[digest:raw] " + Trunc(result, 1200));
+-
+-            var spec = JobSpecParser.TryParse(result);
+-            if (spec == null)
+-            {
+-                _trace.Emit("[digest:error] Digest did not return valid JSON.");
+-                return JobSpec.Invalid("invalid_json");
+-            }
+-
+-            return spec;
+-        }
+-        catch (Exception ex)
++        var prompt = (_cfg.General.JobSpecDigestPrompt ?? "").Trim();
++        if (prompt.Length == 0)
++        {
++            _trace.Emit("[digest:error] JobSpecDigestPrompt is empty (General Settings).");
++            return JobSpec.Invalid("job_spec_prompt_missing");
++        }
++
++        _trace.Emit("[digest] running Job Spec Digest");
++
++        try
++        {
++            var result = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, userText, ct).ConfigureAwait(false);
++
++            if (string.IsNullOrWhiteSpace(result))
++            {
++                _trace.Emit("[digest:error] Digest returned empty response.");
++                return JobSpec.Invalid("empty_digest_response");
++            }
++
++            // ALWAYS log raw BEFORE parsing. This is non-negotiable.
++            _trace.Emit("[digest:raw] " + Trunc(result, 1200));
++
++            var spec = JobSpecParser.TryParse(result);
++            if (spec == null)
++            {
++                _trace.Emit("[digest:retry] Digest invalid JSON; requesting repair.");
++                var retryPrompt = prompt + "\n\nYou returned invalid JSON. Output ONLY valid JSON for the schema.";
++                result = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", retryPrompt, userText, ct).ConfigureAwait(false);
++                _trace.Emit("[digest:raw] " + Trunc(result, 1200));
++                spec = JobSpecParser.TryParse(result);
++                if (spec == null)
++                {
++                    _trace.Emit("[digest:error] Digest did not return valid JSON.");
++                    return JobSpec.Invalid("invalid_json");
++                }
++            }
++
++            return spec;
++        }
++        catch (Exception ex)
+         {
+             _trace.Emit("[digest:error] Digest invocation failed: " + ex.Message);
+             return JobSpec.Invalid("digest_invoke_failed");
+         }
+     }
+ 
+-    private void EmitWaitUser(string reason)
+-    {
+-        var msg = WaitUserGate.GateMessage(reason);
+-        _trace.Emit(msg);
+-        UserFacingMessage?.Invoke(msg);
+-    }
++    private void EmitWaitUser(string reason)
++    {
++        var msg = WaitUserGate.GateMessage(reason, mode: _cfg.General.ConversationMode);
++        _trace.Emit(msg);
++        UserFacingMessage?.Invoke(msg);
++    }
+ 
+     private void SyncGraphToHub(AppConfig cfg)
+     {
+@@ -496,8 +503,23 @@ public sealed class WorkflowFacade
+         var plan = ToolPlanParser.TryParse(toolPlanText);
+         if (plan == null)
+         {
+-            _forceEditBecauseInvalidJson = true;
+-            EmitWaitUser("Model output was not valid JSON. Reply with: edit <rewrite your request>");
++            _trace.Emit("[toolplan:retry] invalid JSON, requesting repair.");
++            try
++            {
++                var repairPrompt = prompt + "\n\nYou returned invalid JSON. Output ONLY valid tool_plan.v1 JSON.";
++                toolPlanText = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", repairPrompt, sb.ToString(), ct).ConfigureAwait(false);
++                _trace.Emit("[toolplan:raw] " + Trunc(toolPlanText, 1200));
++                plan = ToolPlanParser.TryParse(toolPlanText);
++            }
++            catch (Exception ex)
++            {
++                _trace.Emit("[toolplan:error] retry failed: " + ex.Message);
++            }
++        }
++
++        if (plan == null)
++        {
++            EmitWaitUser("I couldn't build a tool plan. Could you restate what you want?");
+             return false;
+         }
+ 
+@@ -581,7 +603,7 @@ public sealed class WorkflowFacade
+         UserFacingMessage?.Invoke(msg);
+     }
+ 
+-    private async Task ExecuteCurrentStepAsync(CancellationToken ct)
++    private async Task ExecuteCurrentStepAsync(CancellationToken ct, bool approveAll = false)
+     {
+         if (_state.PendingToolPlan == null)
+         {
+@@ -615,6 +637,12 @@ public sealed class WorkflowFacade
+             return;
+         }
+ 
++        if (approveAll)
++        {
++            await ExecuteCurrentStepAsync(ct, true).ConfigureAwait(false);
++            return;
++        }
++
+         EmitToolPlanWait();
+     }
+ 
+diff --git a/Workflow/WorkflowState.cs b/Workflow/WorkflowState.cs
+index 0afaf84..919204a 100644
+--- a/Workflow/WorkflowState.cs
++++ b/Workflow/WorkflowState.cs
+@@ -13,6 +13,9 @@ public sealed class WorkflowState
+     public List<JsonElement> ToolOutputs { get; set; } = new();
+     public string? LastJobSpecJson { get; set; }
+     public string? OriginalUserText { get; set; }
++    public string PendingUserRequest { get; set; } = "";
++    public List<string> ClarificationAnswers { get; set; } = new();
++    public List<string> PendingQuestions { get; set; } = new();
+ 
+     public void ClearPlan()
+     {
+@@ -23,4 +26,10 @@ public sealed class WorkflowState
+         LastJobSpecJson = null;
+         OriginalUserText = null;
+     }
++
++    public void ClearClarifications()
++    {
++        ClarificationAnswers = new List<string>();
++        PendingQuestions = new List<string>();
++    }
+ }
