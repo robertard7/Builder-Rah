@@ -6,9 +6,16 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-runner-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    runs-on: [self-hosted, windows, x64, Builder-Rah] # add/remove labels as you actually have them
+    runs-on: [self-hosted, Windows, X64, Builder-Rah]
     defaults:
       run:
         shell: pwsh
