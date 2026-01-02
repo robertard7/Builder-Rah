@@ -27,15 +27,23 @@ public sealed class OutputCard
     public string FullContent { get; init; } = "";
     public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
     public string RelatedAttachment { get; init; } = "";
+    public string ToolId { get; init; } = "";
+    public DateTimeOffset CreatedUtc { get; init; } = DateTimeOffset.UtcNow;
+    public string Metadata { get; init; } = "";
 
     public string ToDisplayText()
     {
         var sb = new StringBuilder();
         sb.AppendLine($"[{Kind}] {Title}");
+        if (!string.IsNullOrWhiteSpace(ToolId))
+            sb.AppendLine("Tool: " + ToolId);
+        sb.AppendLine("Timestamp: " + CreatedUtc.ToString("O"));
         if (!string.IsNullOrWhiteSpace(RelatedAttachment))
             sb.AppendLine($"Attachment: {RelatedAttachment}");
         if (Tags.Count > 0)
             sb.AppendLine("Tags: " + string.Join(", ", Tags));
+        if (!string.IsNullOrWhiteSpace(Metadata))
+            sb.AppendLine("Meta: " + Metadata);
         if (!string.IsNullOrWhiteSpace(Summary))
             sb.AppendLine("Summary: " + Summary);
         if (!string.IsNullOrWhiteSpace(Preview))
@@ -62,6 +70,9 @@ public sealed class OutputCard
             Summary = card.Summary,
             RelatedAttachment = card.RelatedAttachment,
             Tags = card.Tags,
+            ToolId = card.ToolId,
+            CreatedUtc = card.CreatedUtc,
+            Metadata = card.Metadata,
             Preview = Trim(card.Preview, maxPreview),
             FullContent = Trim(card.FullContent, maxContent)
         };
