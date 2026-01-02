@@ -71,6 +71,17 @@ public static class JobSpecParser
         if (string.IsNullOrWhiteSpace(clarification))
             clarification = ReadString(state, "clarify", "");
 
+        if (!HasProperty(doc.RootElement, "context"))
+            AddMissing("context", missing);
+        if (!HasProperty(doc.RootElement, "constraints"))
+            AddMissing("constraints", missing);
+        if (!HasProperty(doc.RootElement, "clarification"))
+            AddMissing("clarification", missing);
+        if (!HasProperty(doc.RootElement, "actions"))
+            AddMissing("actions", missing);
+        if (!HasProperty(doc.RootElement, "attachments"))
+            AddMissing("attachments", missing);
+
         AddMissingIfEmpty(request, "request", missing);
         AddMissingIfEmpty(goal, "goal", missing);
         AddMissingIfEmpty(actions, "actions", missing);
@@ -254,5 +265,10 @@ public static class JobSpecParser
         if (k == "image") return new List<string> { "vision.describe.image" };
         if (k == "document" || k == "code") return new List<string> { "file.read.text" };
         return new List<string>();
+    }
+
+    private static bool HasProperty(JsonElement obj, string property)
+    {
+        return obj.ValueKind == JsonValueKind.Object && obj.TryGetProperty(property, out _);
     }
 }

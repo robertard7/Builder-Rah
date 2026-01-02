@@ -35,6 +35,7 @@ public sealed class MainForm : Form
     private readonly TableLayoutPanel _stepPanel;
     private readonly Label _planSummaryLabel;
     private readonly Label _stepLabel;
+    private readonly Button _runAllButton;
     private readonly Button _runNextButton;
     private readonly Button _stopButton;
     private readonly Button _editPlanButton;
@@ -156,14 +157,17 @@ public sealed class MainForm : Form
             FlowDirection = FlowDirection.LeftToRight
         };
         _stepLabel = new Label { AutoSize = true, Padding = new Padding(0, 4, 8, 0) };
+        _runAllButton = new Button { Text = "Run All", AutoSize = true };
+        _runAllButton.Click += async (_, _) => await RunAllStepsAsync().ConfigureAwait(true);
         _runNextButton = new Button { Text = "Run Next", AutoSize = true };
         _runNextButton.Click += async (_, _) => await RunNextStepAsync().ConfigureAwait(true);
         _stopButton = new Button { Text = "Stop", AutoSize = true };
         _stopButton.Click += (_, _) => StopPlan();
-        _editPlanButton = new Button { Text = "Edit Plan", AutoSize = true };
+        _editPlanButton = new Button { Text = "Modify Plan", AutoSize = true };
         _editPlanButton.Click += (_, _) => EditPlan();
 
         buttonRow.Controls.Add(_stepLabel);
+        buttonRow.Controls.Add(_runAllButton);
         buttonRow.Controls.Add(_runNextButton);
         buttonRow.Controls.Add(_stopButton);
         buttonRow.Controls.Add(_editPlanButton);
@@ -393,6 +397,19 @@ public sealed class MainForm : Form
     {
         _workflow.StopPlan();
         UpdateStepPanel(null, false);
+    }
+
+    private async Task RunAllStepsAsync()
+    {
+        try
+        {
+            await _workflow.ApproveAllStepsAsync(CancellationToken.None).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            AppendChat("[error] " + ex.Message + "\n");
+            ShowTracePane();
+        }
     }
 
     private void EditPlan()

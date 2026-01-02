@@ -86,6 +86,11 @@ public sealed class WorkflowFacade
     }
 
     public Task ApproveNextStepAsync(CancellationToken ct) => ExecuteCurrentStepAsync(ct);
+    public Task ApproveAllStepsAsync(CancellationToken ct)
+    {
+        _state.AutoApproveAll = true;
+        return ExecuteCurrentStepAsync(ct, true);
+    }
 
     public void StopPlan()
     {
@@ -664,6 +669,20 @@ public sealed class WorkflowFacade
             var t = token.Trim();
             if (t.Length > 0 && !tags.Contains(t, StringComparer.OrdinalIgnoreCase))
                 tags.Add(t);
+        }
+
+        foreach (var t in SplitCamel(stem))
+        {
+            if (t.Length > 0 && !tags.Contains(t, StringComparer.OrdinalIgnoreCase))
+                tags.Add(t);
+        }
+
+        var ext = Path.GetExtension(att.OriginalName);
+        if (!string.IsNullOrWhiteSpace(ext))
+        {
+            var cleaned = ext.Trim('.').ToLowerInvariant();
+            if (cleaned.Length > 0 && !tags.Contains(cleaned, StringComparer.OrdinalIgnoreCase))
+                tags.Add(cleaned);
         }
 
         if (!string.IsNullOrWhiteSpace(att.StoredName) && tags.Count == 0)
@@ -1286,10 +1305,17 @@ public sealed class WorkflowFacade
                 var content = root.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
                 var preview = content.Length <= 240 ? content : content.Substring(0, 240) + "...";
                 var full = content.Length > 1200 ? content.Substring(0, 1200) + "…" : content;
+                var bullets = content.Replace("\r", "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).Take(3).Select(l => "- " + l).ToList();
                 var card = new StringBuilder();
                 card.AppendLine("┌─ File result");
                 card.AppendLine($"│ Name: {name}");
                 card.AppendLine($"│ Characters: {content.Length}");
+                if (bullets.Count > 0)
+                {
+                    card.AppendLine("├─ Summary");
+                    foreach (var b in bullets)
+                        card.AppendLine("│ " + b);
+                }
                 card.AppendLine("├─ Preview");
                 card.AppendLine(IndentMultiline(preview, "│ "));
                 card.AppendLine("├─ Full content");
@@ -1325,5 +1351,27 @@ public sealed class WorkflowFacade
         foreach (var line in lines)
             sb.AppendLine(prefix + line);
         return sb.ToString().TrimEnd();
+    }
+
+    private static List<string> SplitCamel(string text)
+    {
+        var list = new List<string>();
+        if (string.IsNullOrWhiteSpace(text)) return list;
+
+        var sb = new StringBuilder();
+        foreach (var ch in text)
+        {
+            if (char.IsUpper(ch) && sb.Length > 0)
+            {
+                list.Add(sb.ToString());
+                sb.Clear();
+            }
+            sb.Append(ch);
+        }
+
+        if (sb.Length > 0)
+            list.Add(sb.ToString());
+
+        return list;
     }
 }
