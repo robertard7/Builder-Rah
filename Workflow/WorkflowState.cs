@@ -12,13 +12,20 @@ public sealed class WorkflowState
     public ToolPlan? PendingToolPlan { get; set; }
     public int PendingStepIndex { get; set; }
     public List<JsonElement> ToolOutputs { get; set; } = new();
+    public List<OutputCard> OutputCards { get; set; } = new();
     public string? LastJobSpecJson { get; set; }
     public string? OriginalUserText { get; set; }
     public string PendingUserRequest { get; set; } = "";
     public List<string> ClarificationAnswers { get; set; } = new();
     public List<string> PendingQuestions { get; set; } = new();
     public bool AutoApproveAll { get; set; }
+    public bool PlanPaused { get; set; }
+    public IntentExtraction? LastIntent { get; set; }
+    public ChatMemory Memory { get; } = new();
+    public HashSet<string> ConfirmedFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> ClarificationAsked { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> AskedMissingFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public bool GenerateArtifacts { get; set; }
 
     public void ClearPlan()
     {
@@ -26,9 +33,12 @@ public sealed class WorkflowState
         PendingToolPlan = null;
         PendingStepIndex = 0;
         ToolOutputs = new List<JsonElement>();
+        OutputCards = new List<OutputCard>();
         LastJobSpecJson = null;
         OriginalUserText = null;
         AutoApproveAll = false;
+        PlanPaused = false;
+        GenerateArtifacts = false;
     }
 
     public void ClearClarifications()
@@ -36,5 +46,7 @@ public sealed class WorkflowState
         ClarificationAnswers = new List<string>();
         PendingQuestions = new List<string>();
         AskedMissingFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        ClarificationAsked = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        ConfirmedFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 }
