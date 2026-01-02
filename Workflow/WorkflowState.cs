@@ -28,6 +28,7 @@ public sealed class WorkflowState
     public bool GenerateArtifacts { get; set; }
     public string SessionToken { get; set; } = Guid.NewGuid().ToString("N");
     public List<string> ArtifactPackages { get; set; } = new();
+    public bool PlanConfirmed { get; set; }
 
     public void ClearPlan()
     {
@@ -42,6 +43,7 @@ public sealed class WorkflowState
         PlanPaused = false;
         GenerateArtifacts = false;
         ArtifactPackages = new List<string>();
+        PlanConfirmed = false;
     }
 
     public void ClearClarifications()
@@ -51,5 +53,6 @@ public sealed class WorkflowState
         AskedMissingFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         ClarificationAsked = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         ConfirmedFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        PlanConfirmed = false;
     }
 }

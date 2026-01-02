@@ -66,6 +66,7 @@ public sealed class WorkflowFacade
     public event Action<string?, bool>? PendingStepChanged;
     public event Action? TraceAttentionRequested;
     public event Action<OutputCard>? OutputCardProduced;
+    public event Action<PlanDefinition>? PlanReady;
 
     public WorkflowFacade(RunTrace trace)
     {
@@ -184,7 +185,14 @@ public sealed class WorkflowFacade
         _executor.ResetPlan(plan, planJson, _state.LastJobSpecJson ?? "", _state.PendingUserRequest);
         _state.PendingQuestion = null;
         _state.PendingStepIndex = 0;
+        _state.PlanConfirmed = true;
         PendingStepChanged?.Invoke("", true);
+        EmitToolPlanWait();
+    }
+
+    public void ConfirmPlan()
+    {
+        _state.PlanConfirmed = true;
         EmitToolPlanWait();
     }
 
@@ -324,6 +332,7 @@ public sealed class WorkflowFacade
         SyncGraphToHub(_cfg);
 
         await RunIntentExtractionAsync(text, ct).ConfigureAwait(true);
+        await RunSemanticIntentAsync(text, ct).ConfigureAwait(true);
 
         // No silent fallbacks.
         if (!_cfg.General.GraphDriven)
@@ -454,7 +463,10 @@ public sealed class WorkflowFacade
 
         var planOk = await BuildToolPlanAsync(text, rawJson, ct).ConfigureAwait(true);
         if (planOk)
+        {
+            _state.PlanConfirmed = false;
             EmitToolPlanWait();
+        }
     }
 
     public async Task<RunnerBuildSummary> RunFromCodexAsync(string userText, CancellationToken ct)
@@ -648,6 +660,24 @@ public sealed class WorkflowFacade
         {
             _trace.Emit("[intent:error] " + ex.Message);
             return null;
+        }
+    }
+
+    private async Task<SemanticIntent> RunSemanticIntentAsync(string userText, CancellationToken ct)
+    {
+        try
+        {
+            var semantic = await SemanticIntentParser.ParseAsync(_cfg, userText, GetActiveAttachments(), _state.Memory, ct).ConfigureAwait(false);
+            if (semantic.Ready && semantic.OrderedActions.Count > 0)
+            {
+                _state.LastIntent = new IntentExtraction("intent.v1", userText, semantic.Goal, semantic.Context, semantic.OrderedActions.ToList(), semantic.Constraints.ToList(), semantic.Clarification, new List<string>(), true);
+            }
+            return semantic;
+        }
+        catch (Exception ex)
+        {
+            _trace.Emit("[intent:error] " + ex.Message);
+            return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", ex.Message, false);
         }
     }
 
@@ -1157,6 +1187,8 @@ public sealed class WorkflowFacade
         _state.OriginalUserText = userText;
         _state.GenerateArtifacts = _planNeedsArtifacts;
         _state.PendingQuestion = null;
+        _state.PlanConfirmed = false;
+        PlanReady?.Invoke(PlanDefinition.FromToolPlan(_state.SessionToken, plan));
         NotifyStatus("Planning");
         return true;
     }
@@ -1272,6 +1304,11 @@ public sealed class WorkflowFacade
         {
             EmitWaitUser("No tool plan to execute.");
             NotifyStatus();
+            return;
+        }
+        if (!_state.PlanConfirmed)
+        {
+            EmitWaitUser("Please confirm the plan before execution.");
             return;
         }
 

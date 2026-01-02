@@ -41,6 +41,7 @@ public sealed class MainForm : Form
     private readonly Button _runNextButton;
     private readonly Button _stopButton;
     private readonly Button _editPlanButton;
+    private readonly Button _previewPlanButton;
     private readonly Panel _clarifyPanel;
     private readonly Label _clarifyLabel;
     private readonly SplitContainer _chatSplit;
@@ -66,6 +67,7 @@ public sealed class MainForm : Form
         _workflow.PendingStepChanged += UpdateStepPanel;
         _workflow.OutputCardProduced += OnOutputCardProduced;
         _workflow.TraceAttentionRequested += ShowTracePane;
+        _workflow.PlanReady += OnPlanReady;
 
         var tabs = new TabControl { Dock = DockStyle.Fill };
 
@@ -170,12 +172,15 @@ public sealed class MainForm : Form
         _stopButton.Click += (_, _) => StopPlan();
         _editPlanButton = new Button { Text = "Modify Plan", AutoSize = true };
         _editPlanButton.Click += (_, _) => EditPlan();
+        _previewPlanButton = new Button { Text = "Preview Plan", AutoSize = true };
+        _previewPlanButton.Click += (_, _) => PreviewPlan();
 
         buttonRow.Controls.Add(_stepLabel);
         buttonRow.Controls.Add(_runAllButton);
         buttonRow.Controls.Add(_runNextButton);
         buttonRow.Controls.Add(_stopButton);
         buttonRow.Controls.Add(_editPlanButton);
+        buttonRow.Controls.Add(_previewPlanButton);
         _stepPanel.Controls.Add(_planSummaryLabel, 0, 0);
         _stepPanel.Controls.Add(buttonRow, 0, 1);
 
@@ -282,6 +287,7 @@ public sealed class MainForm : Form
             _workflow.PendingStepChanged -= UpdateStepPanel;
             _workflow.OutputCardProduced -= OnOutputCardProduced;
             _workflow.TraceAttentionRequested -= ShowTracePane;
+            _workflow.PlanReady -= OnPlanReady;
         };
 
         UpdateStatus(null);
@@ -487,6 +493,34 @@ public sealed class MainForm : Form
         {
             _workflow.ApplyEditedPlan(editor.Result);
         }
+    }
+
+    private void PreviewPlan()
+    {
+        var plan = _workflow.GetPendingPlan();
+        if (plan == null) return;
+
+        var definition = PlanDefinition.FromToolPlan("", plan);
+        using var preview = new PlanPreviewForm(definition);
+        if (preview.ShowDialog(this) == DialogResult.OK && preview.Result != null)
+        {
+            _workflow.ApplyEditedPlan(preview.Result.ToToolPlan());
+            _workflow.ConfirmPlan();
+        }
+    }
+
+    private void OnPlanReady(PlanDefinition def)
+    {
+        if (!IsHandleCreated) return;
+        BeginInvoke(new Action(() =>
+        {
+            using var preview = new PlanPreviewForm(def);
+            if (preview.ShowDialog(this) == DialogResult.OK && preview.Result != null)
+            {
+                _workflow.ApplyEditedPlan(preview.Result.ToToolPlan());
+                _workflow.ConfirmPlan();
+            }
+        }));
     }
 
     private void CreateDemoAttachments()

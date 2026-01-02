@@ -181,7 +181,7 @@ internal static class IntentExtractionParser
             ready);
     }
 
-    private static List<string> SplitByConnectors(string text)
+    internal static List<string> SplitByConnectors(string text)
     {
         var list = new List<string>();
         if (string.IsNullOrWhiteSpace(text))
@@ -207,7 +207,7 @@ internal static class IntentExtractionParser
         return list;
     }
 
-    private static string MapAction(string raw)
+    internal static string MapAction(string raw)
     {
         var text = (raw ?? "").Trim();
         var lower = text.ToLowerInvariant();
