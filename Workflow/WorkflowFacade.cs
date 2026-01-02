@@ -309,7 +309,12 @@ public sealed class WorkflowFacade
 
             if (unanswered.Count == 0)
             {
-                _trace.Emit("[route:wait_user] JobSpec incomplete; awaiting answers for: " + string.Join(",", missing));
+                var reminder = _state.PendingQuestion;
+                if (string.IsNullOrWhiteSpace(reminder))
+                    reminder = "I’m waiting on your answer so I can finish the plan.";
+
+                _trace.Emit("[route:wait_user] JobSpec incomplete; awaiting prior answers for: " + string.Join(",", missing));
+                EmitWaitUser(reminder, reminder);
                 NotifyStatus("Waiting clarification");
                 return;
             }
