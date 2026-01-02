@@ -32,7 +32,8 @@ public sealed class MainForm : Form
     private readonly ToolStripStatusLabel _repoStatus;
     private readonly ToolStripStatusLabel _attachmentsStatus;
     private readonly ToolStripStatusLabel _workflowStatus;
-    private readonly Panel _stepPanel;
+    private readonly TableLayoutPanel _stepPanel;
+    private readonly Label _planSummaryLabel;
     private readonly Label _stepLabel;
     private readonly Button _runNextButton;
     private readonly Button _stopButton;
@@ -109,8 +110,8 @@ public sealed class MainForm : Form
         var demoRequest = new Button { Text = "Demo Request", AutoSize = true };
         demoRequest.Click += async (_, _) => await SendNowAsync("Read the note and describe the picture.").ConfigureAwait(true);
 
-        var demoIntent = new Button { Text = "Demo Intent Test", AutoSize = true };
-        demoIntent.Click += async (_, _) => await SendNowAsync("Describe this image and text file and then combine results.").ConfigureAwait(true);
+        var demoIntent = new Button { Text = "Intent Demo Flow", AutoSize = true };
+        demoIntent.Click += async (_, _) => await RunIntentDemoAsync().ConfigureAwait(true);
 
         topButtons.Controls.Add(toggleTrace);
         topButtons.Controls.Add(demoAttachments);
@@ -128,14 +129,28 @@ public sealed class MainForm : Form
         _clarifyLabel = new Label { AutoSize = true, Dock = DockStyle.Fill };
         _clarifyPanel.Controls.Add(_clarifyLabel);
 
-        _stepPanel = new FlowLayoutPanel
+        _stepPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
             AutoSize = true,
-            FlowDirection = FlowDirection.LeftToRight,
+            ColumnCount = 1,
+            RowCount = 2,
             Padding = new Padding(6),
             Visible = false,
             BackColor = Color.FromArgb(235, 242, 255)
+        };
+        _stepPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        _planSummaryLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(900, 0),
+            Padding = new Padding(0, 0, 0, 6)
+        };
+        var buttonRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight
         };
         _stepLabel = new Label { AutoSize = true, Padding = new Padding(0, 4, 8, 0) };
         _runNextButton = new Button { Text = "Run Next", AutoSize = true };
@@ -145,10 +160,12 @@ public sealed class MainForm : Form
         _editPlanButton = new Button { Text = "Edit Plan", AutoSize = true };
         _editPlanButton.Click += (_, _) => EditPlan();
 
-        _stepPanel.Controls.Add(_stepLabel);
-        _stepPanel.Controls.Add(_runNextButton);
-        _stepPanel.Controls.Add(_stopButton);
-        _stepPanel.Controls.Add(_editPlanButton);
+        buttonRow.Controls.Add(_stepLabel);
+        buttonRow.Controls.Add(_runNextButton);
+        buttonRow.Controls.Add(_stopButton);
+        buttonRow.Controls.Add(_editPlanButton);
+        _stepPanel.Controls.Add(_planSummaryLabel, 0, 0);
+        _stepPanel.Controls.Add(buttonRow, 0, 1);
 
         leftPanel.Controls.Add(_chatView);
         leftPanel.Controls.Add(_composer);
@@ -327,8 +344,9 @@ public sealed class MainForm : Form
             return;
         }
 
+        _planSummaryLabel.Text = summary ?? "";
+        _stepLabel.Text = ExtractNextStep(summary);
         _stepPanel.Visible = hasPlan && !string.IsNullOrWhiteSpace(summary);
-        _stepLabel.Text = summary ?? "";
     }
 
     private void ToggleTracePane()
@@ -412,5 +430,26 @@ public sealed class MainForm : Form
         {
             AppendChat("[error] " + ex.Message + "\n");
         }
+    }
+
+    private async Task RunIntentDemoAsync()
+    {
+        CreateDemoAttachments();
+        await SendNowAsync("Describe this image and document and combine results.").ConfigureAwait(true);
+    }
+
+    private static string ExtractNextStep(string? summary)
+    {
+        if (string.IsNullOrWhiteSpace(summary)) return "";
+
+        var lines = summary.Replace("\r", "").Split('\n');
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("->", StringComparison.OrdinalIgnoreCase))
+                return "Next: " + trimmed.TrimStart('-', '>').Trim();
+        }
+
+        return "";
     }
 }

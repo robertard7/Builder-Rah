@@ -58,6 +58,7 @@ public static class JobSpecParser
             return false;
 
         var mode = ReadString(doc.RootElement, "mode", "jobspec.v2");
+        var request = ReadString(doc.RootElement, "request", "");
         var goal = ReadString(doc.RootElement, "goal", "").Trim();
         var context = ReadString(doc.RootElement, "context", "");
         var actions = ReadStringArray(doc.RootElement, "actions").Select(a => a.Trim()).Where(a => a.Length > 0).ToList();
@@ -70,6 +71,7 @@ public static class JobSpecParser
         if (string.IsNullOrWhiteSpace(clarification))
             clarification = ReadString(state, "clarify", "");
 
+        AddMissingIfEmpty(request, "request", missing);
         AddMissingIfEmpty(goal, "goal", missing);
         AddMissingIfEmpty(actions, "actions", missing);
         AddMissingIfEmpty(attachments, "attachments", missing);
@@ -79,6 +81,7 @@ public static class JobSpecParser
         spec = JobSpec.FromJson(
             doc,
             mode,
+            request,
             goal,
             context,
             actions,
@@ -116,7 +119,7 @@ public static class JobSpecParser
 
             var kind = NormalizeKind(ReadString(item, "kind", "other"));
             var status = NormalizeStatus(ReadString(item, "status", "present"));
-            var summary = ReadString(item, "summary", "");
+            var summary = ReadString(item, "summary", "").Trim();
             var tags = ReadStringArray(item, "tags");
 
             var tools = ReadStringArray(item, "tools");
