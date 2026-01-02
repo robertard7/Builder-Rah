@@ -1,7 +1,6 @@
 name: Windows Runner Build
 
 on:
-  pull_request:
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -41,6 +40,43 @@ jobs:
           New-Item -ItemType Directory -Force -Path .\artifacts | Out-Null
           dotnet build .\RahBuilder.csproj -c Release --no-restore 2>&1 | Tee-Object -FilePath .\artifacts\build.log
           exit $LASTEXITCODE
+
+      - name: Annotate build failures
+        if: always()
+        shell: pwsh
+        run: |
+          $logPath = Join-Path $PWD 'artifacts\build.log'
+          if (-not (Test-Path $logPath)) {
+            Write-Output "::warning title=Build log missing::artifacts/build.log not found"
+            exit 0
+          }
+
+          $lines = Get-Content $logPath
+          $pattern = ':\s*error\s*([A-Z0-9]+:)?'
+          $matches = @()
+
+          for ($i = 0; $i -lt $lines.Length; $i++) {
+            if ($lines[$i] -match $pattern) {
+              $matches += [PSCustomObject]@{
+                Line = $i + 1
+                Text = $lines[$i]
+              }
+            }
+          }
+
+          if ($matches.Count -eq 0) {
+            Write-Output "::notice title=Build::No errors found in artifacts/build.log"
+            exit 0
+          }
+
+          $top = $matches | Select-Object -First 10
+          foreach ($m in $top) {
+            $msg = $m.Text -replace '::','`::' -replace '%','`%'
+            Write-Output "::error file=artifacts/build.log,line=$($m.Line)::$msg"
+          }
+
+          $summary = ($top | ForEach-Object { "`$($_.Line): $($_.Text)" }) -join "`n"
+          "## Build errors`n`n$summary" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding UTF8
 
       - name: Upload build logs
         if: always()

@@ -30,6 +30,22 @@ public sealed class WorkflowFacade
     // If true, the ONLY allowed reply is: "edit <rewrite>"
     private bool _forceEditBecauseInvalidJson = false;
 
+    public sealed record RunnerBuildSummary(
+        bool Ok,
+        long RunId,
+        string Status,
+        string Conclusion,
+        string HtmlUrl,
+        IReadOnlyList<string> Logs,
+        string Error)
+    {
+        public static RunnerBuildSummary Success(long runId, string status, string conclusion, string htmlUrl, IReadOnlyList<string> logs) =>
+            new(true, runId, status, conclusion, htmlUrl, logs, "");
+
+        public static RunnerBuildSummary Failed(string error, string detail = "") =>
+            new(false, 0, "", "", "", Array.Empty<string>(), string.IsNullOrWhiteSpace(detail) ? error : $"{error}: {detail}");
+    }
+
     public event Action<string>? UserFacingMessage;
 
     public WorkflowFacade(RunTrace trace)
@@ -178,6 +194,9 @@ public sealed class WorkflowFacade
             return;
         }
 
+        if (!EnsureProvidersConfigured() || !EnsureToolPromptsReady())
+            return;
+
         RepoScope.CheckGit(repoScope, _trace);
 
         SyncGraphToHub(_cfg);
@@ -272,6 +291,65 @@ public sealed class WorkflowFacade
         var planOk = await BuildToolPlanAsync(text, rawJson, ct).ConfigureAwait(true);
         if (planOk)
             EmitToolPlanWait();
+    }
+
+    public async Task<RunnerBuildSummary> RunFromCodexAsync(CancellationToken ct)
+    {
+        var repoScope = RepoScope.Resolve(_cfg);
+        _trace.Emit(repoScope.Message);
+        if (!repoScope.Ok)
+            return RunnerBuildSummary.Failed("repo_invalid", repoScope.Message);
+
+        if (!EnsureProvidersConfigured() || !EnsureToolPromptsReady())
+            return RunnerBuildSummary.Failed("validation_failed");
+
+        var repo = Environment.GetEnvironmentVariable("GITHUB_REPOSITORY") ?? "";
+        if (string.IsNullOrWhiteSpace(repo))
+            return RunnerBuildSummary.Failed("missing_repository", "Set GITHUB_REPOSITORY=owner/repo");
+
+        var token = Environment.GetEnvironmentVariable("GITHUB_TOKEN") ?? Environment.GetEnvironmentVariable("GH_TOKEN") ?? "";
+        if (string.IsNullOrWhiteSpace(token))
+            return RunnerBuildSummary.Failed("missing_token", "Set GITHUB_TOKEN or GH_TOKEN for workflow_dispatch.");
+
+        var client = new GitHubActionsClient(repo, token, _trace);
+
+        if (!await client.DispatchAsync("windows-runner-build.yml", "main", ct).ConfigureAwait(false))
+            return RunnerBuildSummary.Failed("dispatch_failed");
+
+        var since = DateTimeOffset.UtcNow.AddMinutes(-1);
+        WorkflowRunInfo? run = null;
+        for (var attempt = 0; attempt < 12 && run == null; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            run = await client.FindLatestRunAsync("windows-runner-build.yml", since, ct).ConfigureAwait(false);
+            if (run == null)
+                await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
+        }
+
+        if (run == null)
+            return RunnerBuildSummary.Failed("run_not_found");
+
+        _trace.Emit($"[gh:run] tracking run {run.Id} ({run.HtmlUrl})");
+
+        while (!run.IsCompleted)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(10), ct).ConfigureAwait(false);
+            run = await client.GetRunAsync(run.Id, ct).ConfigureAwait(false) ?? run;
+        }
+
+        _trace.Emit($"[gh:run:done] status={run.Status} conclusion={run.Conclusion}");
+
+        IReadOnlyList<string> logs = Array.Empty<string>();
+        try
+        {
+            logs = await client.DownloadLogsAsync(run.Id, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _trace.Emit("[gh:logs:warn] " + ex.Message);
+        }
+
+        return RunnerBuildSummary.Success(run.Id, run.Status, run.Conclusion, run.HtmlUrl, logs);
     }
 
     private async Task<JobSpec> RunJobSpecDigestAsync(string userText, CancellationToken ct)
@@ -440,6 +518,52 @@ public sealed class WorkflowFacade
             return f;
 
         return Path.Combine(blueprintTemplatesFolder, f.Replace('/', Path.DirectorySeparatorChar));
+    }
+
+    private bool EnsureProvidersConfigured()
+    {
+        var missing = new List<string>();
+        var roles = _cfg.Orchestrator?.Roles ?? new List<OrchestratorRoleConfig>();
+
+        foreach (var role in roles)
+        {
+            var name = role?.Role ?? "(unknown)";
+            if (string.IsNullOrWhiteSpace(role?.Provider) || string.IsNullOrWhiteSpace(role?.Model))
+                missing.Add(name);
+        }
+
+        if (missing.Count == 0)
+            return true;
+
+        var msg = "Missing provider/model for roles: " + string.Join(", ", missing);
+        _trace.Emit("[providers:error] " + msg);
+        EmitWaitUser(msg, "Update provider/model settings and retry.");
+        return false;
+    }
+
+    private bool EnsureToolPromptsReady()
+    {
+        if (_toolManifest == null || _toolManifest.ToolsById.Count == 0)
+        {
+            _trace.Emit("[tooling:error] Tools manifest is empty or failed to load.");
+            EmitWaitUser("Tools manifest not loaded. Set ToolsPath in Settings.");
+            return false;
+        }
+
+        var missingPrompts = new List<string>();
+        foreach (var id in _toolManifest.ToolsById.Keys)
+        {
+            if (!_toolPrompts.Has(id))
+                missingPrompts.Add(id);
+        }
+
+        if (missingPrompts.Count == 0)
+            return true;
+
+        var msg = "Missing tool prompts: " + string.Join(", ", missingPrompts);
+        _trace.Emit("[tooling:error] " + msg);
+        EmitWaitUser(msg, "Add prompt files for missing tools.");
+        return false;
     }
 
     private static List<string> ReadStringArray(JsonElement obj, string property)
