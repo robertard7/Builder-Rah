@@ -162,6 +162,12 @@ internal static class IntentExtractionParser
                 actions.Add(mapped);
         }
 
+        foreach (var inferred in InferSemanticActions(userText))
+        {
+            if (!actions.Contains(inferred, StringComparer.OrdinalIgnoreCase))
+                actions.Add(inferred);
+        }
+
         var ready = extraction.Ready && (extraction.Missing?.Count ?? 0) == 0 && actions.Count > 0 && extraction.Goal.Trim().Length > 0;
         return new IntentExtraction(
             extraction.Mode,
@@ -207,15 +213,46 @@ internal static class IntentExtractionParser
         var lower = text.ToLowerInvariant();
         if (lower.Contains("describe") && lower.Contains("image"))
             return "vision.describe.image";
+        if (lower.Contains("caption"))
+            return "vision.describe.image";
         if (lower.Contains("web") && lower.Contains("server"))
             return "code.generate.webserver";
+        if (lower.Contains("rest") && lower.Contains("api"))
+            return "code.generate.api";
+        if (lower.Contains("api") && lower.Contains("tests"))
+            return "code.test.generate";
         if (lower.Contains("test"))
             return "code.generate.tests";
         if (lower.Contains("auth"))
             return "code.generate.auth";
+        if (lower.Contains("login"))
+            return "code.generate.auth";
         if (lower.Contains("read") && (lower.Contains("file") || lower.Contains("document")))
             return "file.read.text";
+        if (lower.Contains("code") && lower.Contains("generate"))
+            return "code.generate";
+        if (lower.Contains("build") && lower.Contains("app"))
+            return "code.generate.app";
+        if (lower.Contains("doc") || lower.Contains("readme"))
+            return "code.generate.docs";
         return text;
+    }
+
+    private static IEnumerable<string> InferSemanticActions(string text)
+    {
+        var lower = (text ?? "").ToLowerInvariant();
+        if (lower.Contains("write tests") || lower.Contains("add tests") || lower.Contains("unit test"))
+            yield return "code.generate.tests";
+        if (lower.Contains("include auth") || lower.Contains("authentication") || lower.Contains("login"))
+            yield return "code.generate.auth";
+        if (lower.Contains("rest api") || lower.Contains("api endpoints"))
+            yield return "code.generate.api";
+        if (lower.Contains("database") || lower.Contains("sqlite") || lower.Contains("db"))
+            yield return "code.generate.database";
+        if (lower.Contains("docs") || lower.Contains("documentation") || lower.Contains("readme"))
+            yield return "code.generate.docs";
+        if (lower.Contains("package") || lower.Contains("zip"))
+            yield return "code.package";
     }
 
     private static string ReadString(JsonElement obj, string name, string fallback)

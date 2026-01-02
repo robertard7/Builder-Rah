@@ -1274,6 +1274,19 @@ public sealed class WorkflowFacade
             var result = await _executor.RunNextAsync(_cfg, _attachments, _toolManifest, _toolPrompts, ct).ConfigureAwait(false);
             if (!result.Ok)
             {
+                var errorCard = new OutputCard
+                {
+                    Kind = OutputCardKind.Error,
+                    Title = "Step failed",
+                    Summary = result.Message,
+                    Preview = result.Message,
+                    FullContent = result.Message,
+                    Tags = new[] { "error" },
+                    ToolId = step.ToolId,
+                    CreatedUtc = DateTimeOffset.UtcNow
+                };
+                _state.OutputCards.Add(errorCard);
+                OutputCardProduced?.Invoke(errorCard);
                 EmitWaitUser(result.Message, "Something went wrong. Want me to retry this step?");
                 NotifyStatus("Tool execution");
                 TraceAttentionRequested?.Invoke();
@@ -1412,15 +1425,21 @@ public sealed class WorkflowFacade
             return;
         }
 
+        if (!string.IsNullOrWhiteSpace(result.ZipPath))
+            _state.ArtifactPackages.Add(result.ZipPath);
+
         var previewLines = result.Files.Take(5).Select(f => $"- {f.Path}");
+        var tree = ProgramArtifactGenerator.BuildTreePreview(result.Files);
         var card = new OutputCard
         {
             Kind = OutputCardKind.Program,
             Title = "Program artifacts",
             Summary = $"Generated {result.Files.Count} files",
             Preview = string.Join("\n", previewLines),
-            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}",
-            Tags = new[] { "program", "artifact" }
+            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}\n\nFiles:\n{tree}",
+            Tags = new[] { "program", "artifact" },
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Metadata = result.ZipPath
         };
 
         _state.OutputCards.Add(card);
@@ -1486,6 +1505,12 @@ public sealed class WorkflowFacade
         var request = (spec.Request ?? intent?.Request ?? "").Trim();
         var goal = (spec.Goal ?? intent?.Goal ?? "").Trim();
         var context = string.IsNullOrWhiteSpace(spec.Context) ? intent?.Context ?? "" : spec.Context;
+        if (string.IsNullOrWhiteSpace(context))
+        {
+            var mem = _state.Memory.Summarize(4);
+            if (!string.IsNullOrWhiteSpace(mem))
+                context = mem;
+        }
         var actions = spec.Actions?.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList() ?? new List<string>();
         if (actions.Count == 0 && intent?.Actions != null)
             actions = intent.Actions.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList();
