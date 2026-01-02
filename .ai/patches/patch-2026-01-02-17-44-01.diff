@@ -1,0 +1,232 @@
+diff --git a/MainForm.cs b/MainForm.cs
+index dca8a9b..5133071 100644
+--- a/MainForm.cs
++++ b/MainForm.cs
+@@ -6,7 +6,7 @@ using System.IO;
+ using System.Threading;
+ using System.Threading.Tasks;
+ using System.Windows.Forms;
+-using RahBuilder.Settings;
++using RahBuilder.Settings;
+ using RahBuilder.Workflow;
+ using RahBuilder.Ui;
+ using RahOllamaOnly.Tracing;
+@@ -41,6 +41,7 @@ public sealed class MainForm : Form
+     private readonly Button _runNextButton;
+     private readonly Button _stopButton;
+     private readonly Button _editPlanButton;
++    private readonly Button _previewPlanButton;
+     private readonly Panel _clarifyPanel;
+     private readonly Label _clarifyLabel;
+     private readonly SplitContainer _chatSplit;
+@@ -66,6 +67,7 @@ public sealed class MainForm : Form
+         _workflow.PendingStepChanged += UpdateStepPanel;
+         _workflow.OutputCardProduced += OnOutputCardProduced;
+         _workflow.TraceAttentionRequested += ShowTracePane;
++        _workflow.PlanReady += OnPlanReady;
+ 
+         var tabs = new TabControl { Dock = DockStyle.Fill };
+ 
+@@ -170,12 +172,15 @@ public sealed class MainForm : Form
+         _stopButton.Click += (_, _) => StopPlan();
+         _editPlanButton = new Button { Text = "Modify Plan", AutoSize = true };
+         _editPlanButton.Click += (_, _) => EditPlan();
++        _previewPlanButton = new Button { Text = "Preview Plan", AutoSize = true };
++        _previewPlanButton.Click += (_, _) => PreviewPlan();
+ 
+         buttonRow.Controls.Add(_stepLabel);
+         buttonRow.Controls.Add(_runAllButton);
+         buttonRow.Controls.Add(_runNextButton);
+         buttonRow.Controls.Add(_stopButton);
+         buttonRow.Controls.Add(_editPlanButton);
++        buttonRow.Controls.Add(_previewPlanButton);
+         _stepPanel.Controls.Add(_planSummaryLabel, 0, 0);
+         _stepPanel.Controls.Add(buttonRow, 0, 1);
+ 
+@@ -282,6 +287,7 @@ public sealed class MainForm : Form
+             _workflow.PendingStepChanged -= UpdateStepPanel;
+             _workflow.OutputCardProduced -= OnOutputCardProduced;
+             _workflow.TraceAttentionRequested -= ShowTracePane;
++            _workflow.PlanReady -= OnPlanReady;
+         };
+ 
+         UpdateStatus(null);
+@@ -489,6 +495,34 @@ public sealed class MainForm : Form
+         }
+     }
+ 
++    private void PreviewPlan()
++    {
++        var plan = _workflow.GetPendingPlan();
++        if (plan == null) return;
++
++        var definition = PlanDefinition.FromToolPlan("", plan);
++        using var preview = new PlanPreviewForm(definition);
++        if (preview.ShowDialog(this) == DialogResult.OK && preview.Result != null)
++        {
++            _workflow.ApplyEditedPlan(preview.Result.ToToolPlan());
++            _workflow.ConfirmPlan();
++        }
++    }
++
++    private void OnPlanReady(PlanDefinition def)
++    {
++        if (!IsHandleCreated) return;
++        BeginInvoke(new Action(() =>
++        {
++            using var preview = new PlanPreviewForm(def);
++            if (preview.ShowDialog(this) == DialogResult.OK && preview.Result != null)
++            {
++                _workflow.ApplyEditedPlan(preview.Result.ToToolPlan());
++                _workflow.ConfirmPlan();
++            }
++        }));
++    }
++
+     private void CreateDemoAttachments()
+     {
+         try
+diff --git a/Workflow/IntentExtractor.cs b/Workflow/IntentExtractor.cs
+index 7d7c578..f8f789c 100644
+--- a/Workflow/IntentExtractor.cs
++++ b/Workflow/IntentExtractor.cs
+@@ -181,7 +181,7 @@ internal static class IntentExtractionParser
+             ready);
+     }
+ 
+-    private static List<string> SplitByConnectors(string text)
++    internal static List<string> SplitByConnectors(string text)
+     {
+         var list = new List<string>();
+         if (string.IsNullOrWhiteSpace(text))
+@@ -207,7 +207,7 @@ internal static class IntentExtractionParser
+         return list;
+     }
+ 
+-    private static string MapAction(string raw)
++    internal static string MapAction(string raw)
+     {
+         var text = (raw ?? "").Trim();
+         var lower = text.ToLowerInvariant();
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index db82c73..6fff151 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -66,6 +66,7 @@ public sealed class WorkflowFacade
+     public event Action<string?, bool>? PendingStepChanged;
+     public event Action? TraceAttentionRequested;
+     public event Action<OutputCard>? OutputCardProduced;
++    public event Action<PlanDefinition>? PlanReady;
+ 
+     public WorkflowFacade(RunTrace trace)
+     {
+@@ -184,10 +185,17 @@ public sealed class WorkflowFacade
+         _executor.ResetPlan(plan, planJson, _state.LastJobSpecJson ?? "", _state.PendingUserRequest);
+         _state.PendingQuestion = null;
+         _state.PendingStepIndex = 0;
++        _state.PlanConfirmed = true;
+         PendingStepChanged?.Invoke("", true);
+         EmitToolPlanWait();
+     }
+ 
++    public void ConfirmPlan()
++    {
++        _state.PlanConfirmed = true;
++        EmitToolPlanWait();
++    }
++
+     public void RefreshTooling()
+     {
+         var toolsPath = (_cfg.General.ToolsPath ?? "").Trim();
+@@ -324,6 +332,7 @@ public sealed class WorkflowFacade
+         SyncGraphToHub(_cfg);
+ 
+         await RunIntentExtractionAsync(text, ct).ConfigureAwait(true);
++        await RunSemanticIntentAsync(text, ct).ConfigureAwait(true);
+ 
+         // No silent fallbacks.
+         if (!_cfg.General.GraphDriven)
+@@ -454,7 +463,10 @@ public sealed class WorkflowFacade
+ 
+         var planOk = await BuildToolPlanAsync(text, rawJson, ct).ConfigureAwait(true);
+         if (planOk)
++        {
++            _state.PlanConfirmed = false;
+             EmitToolPlanWait();
++        }
+     }
+ 
+     public async Task<RunnerBuildSummary> RunFromCodexAsync(string userText, CancellationToken ct)
+@@ -651,6 +663,24 @@ public sealed class WorkflowFacade
+         }
+     }
+ 
++    private async Task<SemanticIntent> RunSemanticIntentAsync(string userText, CancellationToken ct)
++    {
++        try
++        {
++            var semantic = await SemanticIntentParser.ParseAsync(_cfg, userText, GetActiveAttachments(), _state.Memory, ct).ConfigureAwait(false);
++            if (semantic.Ready && semantic.OrderedActions.Count > 0)
++            {
++                _state.LastIntent = new IntentExtraction("intent.v1", userText, semantic.Goal, semantic.Context, semantic.OrderedActions.ToList(), semantic.Constraints.ToList(), semantic.Clarification, new List<string>(), true);
++            }
++            return semantic;
++        }
++        catch (Exception ex)
++        {
++            _trace.Emit("[intent:error] " + ex.Message);
++            return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", ex.Message, false);
++        }
++    }
++
+     private void RecordAssistantMessage(string? text)
+     {
+         if (string.IsNullOrWhiteSpace(text)) return;
+@@ -1157,6 +1187,8 @@ public sealed class WorkflowFacade
+         _state.OriginalUserText = userText;
+         _state.GenerateArtifacts = _planNeedsArtifacts;
+         _state.PendingQuestion = null;
++        _state.PlanConfirmed = false;
++        PlanReady?.Invoke(PlanDefinition.FromToolPlan(_state.SessionToken, plan));
+         NotifyStatus("Planning");
+         return true;
+     }
+@@ -1274,6 +1306,11 @@ public sealed class WorkflowFacade
+             NotifyStatus();
+             return;
+         }
++        if (!_state.PlanConfirmed)
++        {
++            EmitWaitUser("Please confirm the plan before execution.");
++            return;
++        }
+ 
+         _state.PlanPaused = false;
+         while (true)
+diff --git a/Workflow/WorkflowState.cs b/Workflow/WorkflowState.cs
+index 7895060..d12f258 100644
+--- a/Workflow/WorkflowState.cs
++++ b/Workflow/WorkflowState.cs
+@@ -28,6 +28,7 @@ public sealed class WorkflowState
+     public bool GenerateArtifacts { get; set; }
+     public string SessionToken { get; set; } = Guid.NewGuid().ToString("N");
+     public List<string> ArtifactPackages { get; set; } = new();
++    public bool PlanConfirmed { get; set; }
+ 
+     public void ClearPlan()
+     {
+@@ -42,6 +43,7 @@ public sealed class WorkflowState
+         PlanPaused = false;
+         GenerateArtifacts = false;
+         ArtifactPackages = new List<string>();
++        PlanConfirmed = false;
+     }
+ 
+     public void ClearClarifications()
+@@ -51,5 +53,6 @@ public sealed class WorkflowState
+         AskedMissingFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+         ClarificationAsked = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+         ConfirmedFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
++        PlanConfirmed = false;
+     }
+ }

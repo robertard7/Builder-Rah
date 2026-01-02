@@ -19,6 +19,9 @@ public sealed class WorkflowFacade
 {
     private readonly RunTrace _trace;
     private readonly WorkflowRouter _router = new();
+    private readonly ExecutionOrchestrator _executor;
+    private readonly ProgramArtifactGenerator _artifactGenerator = new();
+    private readonly ProviderApiHost _apiHost;
     private AppConfig _cfg;
     private IReadOnlyList<AttachmentInbox.AttachmentEntry> _attachments = Array.Empty<AttachmentInbox.AttachmentEntry>();
     private readonly WorkflowState _state = new();
@@ -30,6 +33,7 @@ public sealed class WorkflowFacade
 
     // If true, the ONLY allowed reply is: "edit <rewrite>"
     private bool _forceEditBecauseInvalidJson = false;
+    private bool _planNeedsArtifacts;
 
     public sealed record RunnerBuildSummary(
         bool Ok,
@@ -61,21 +65,54 @@ public sealed class WorkflowFacade
     public event Action<string?>? PendingQuestionChanged;
     public event Action<string?, bool>? PendingStepChanged;
     public event Action? TraceAttentionRequested;
+    public event Action<OutputCard>? OutputCardProduced;
+    public event Action<PlanDefinition>? PlanReady;
 
     public WorkflowFacade(RunTrace trace)
     {
         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
         _cfg = ConfigStore.Load();
+        _executor = new ExecutionOrchestrator(_state, _trace);
+        _executor.OutputCardProduced += card => OutputCardProduced?.Invoke(card);
+        _executor.UserFacingMessage += msg =>
+        {
+            RecordAssistantMessage(msg);
+            UserFacingMessage?.Invoke(msg);
+        };
+        _apiHost = new ProviderApiHost(this);
         SyncGraphToHub(_cfg);
         LogRepoBanner();
+        StartApiHostIfEnabled();
     }
 
     public WorkflowFacade(AppConfig cfg, RunTrace trace)
     {
         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
+        _executor = new ExecutionOrchestrator(_state, _trace);
+        _executor.OutputCardProduced += card => OutputCardProduced?.Invoke(card);
+        _executor.UserFacingMessage += msg =>
+        {
+            RecordAssistantMessage(msg);
+            UserFacingMessage?.Invoke(msg);
+        };
+        _apiHost = new ProviderApiHost(this);
         SyncGraphToHub(_cfg);
         LogRepoBanner();
+        StartApiHostIfEnabled();
+    }
+
+    private void StartApiHostIfEnabled()
+    {
+        try
+        {
+            if (_cfg.General.EnableProviderApi)
+                _apiHost.Start(_cfg.General.ProviderApiPort);
+        }
+        catch (Exception ex)
+        {
+            _trace.Emit("[api:warn] " + ex.Message);
+        }
     }
 
     public void RefreshTooling(AppConfig cfg)
@@ -100,6 +137,7 @@ public sealed class WorkflowFacade
         _state.ClearClarifications();
         PendingStepChanged?.Invoke("", false);
         NotifyStatus();
+        _planNeedsArtifacts = false;
     }
 
     public void RequestPlanEdit()
@@ -117,6 +155,45 @@ public sealed class WorkflowFacade
     {
         _attachments = (attachments ?? Array.Empty<AttachmentInbox.AttachmentEntry>()).ToList();
         NotifyStatus();
+    }
+
+    public ToolPlan? GetPendingPlan() => _state.PendingToolPlan;
+
+    public void ApplyEditedPlan(ToolPlan? plan)
+    {
+        if (plan == null)
+        {
+            EmitWaitUser("Plan edit cancelled.");
+            return;
+        }
+
+        if (!ValidateToolPlan(plan))
+        {
+            EmitWaitUser("Edited plan is invalid. Please adjust and try again.");
+            return;
+        }
+
+        var planJson = JsonSerializer.Serialize(new
+        {
+            mode = "tool_plan.v1",
+            tweakFirst = plan.TweakFirst,
+            steps = plan.Steps.Select(s => new { s.Id, s.ToolId, inputs = s.Inputs, s.Why })
+        });
+
+        _planNeedsArtifacts = ShouldGenerateArtifacts(_state.LastIntent);
+        _state.GenerateArtifacts = _planNeedsArtifacts;
+        _executor.ResetPlan(plan, planJson, _state.LastJobSpecJson ?? "", _state.PendingUserRequest);
+        _state.PendingQuestion = null;
+        _state.PendingStepIndex = 0;
+        _state.PlanConfirmed = true;
+        PendingStepChanged?.Invoke("", true);
+        EmitToolPlanWait();
+    }
+
+    public void ConfirmPlan()
+    {
+        _state.PlanConfirmed = true;
+        EmitToolPlanWait();
     }
 
     public void RefreshTooling()
@@ -160,6 +237,7 @@ public sealed class WorkflowFacade
         text ??= "";
 
         _trace.Emit($"[chat] {text}");
+        _state.Memory.Add("user", text);
         _recentlyCompleted = false;
 
         var action = UserReplyInterpreter.Interpret(_cfg, _state, text);
@@ -253,6 +331,9 @@ public sealed class WorkflowFacade
 
         SyncGraphToHub(_cfg);
 
+        await RunIntentExtractionAsync(text, ct).ConfigureAwait(true);
+        await RunSemanticIntentAsync(text, ct).ConfigureAwait(true);
+
         // No silent fallbacks.
         if (!_cfg.General.GraphDriven)
         {
@@ -290,6 +371,11 @@ public sealed class WorkflowFacade
         if (!spec.IsComplete)
         {
             var missing = spec.GetMissingFields();
+            missing = missing.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (_state.ClarificationAnswers.Count > 0)
+            {
+                missing.RemoveAll(m => string.Equals(m, "context", StringComparison.OrdinalIgnoreCase));
+            }
 
             // Special invalid_json case.
             if (missing.Count == 1 && string.Equals(missing[0], "invalid_json", StringComparison.OrdinalIgnoreCase))
@@ -303,10 +389,7 @@ public sealed class WorkflowFacade
             // Normal WAIT_USER (missing real fields)
             _forceEditBecauseInvalidJson = false;
 
-            var unanswered = missing.Where(m => !_state.AskedMissingFields.Contains(m)).ToList();
-            foreach (var m in unanswered)
-                _state.AskedMissingFields.Add(m);
-
+            var unanswered = missing.Where(m => !_state.ClarificationAsked.ContainsKey(m)).ToList();
             if (unanswered.Count == 0)
             {
                 var reminder = _state.PendingQuestion;
@@ -319,26 +402,19 @@ public sealed class WorkflowFacade
                 return;
             }
 
-            var targets = unanswered.Count > 0 ? unanswered : missing;
+            var nextConcept = unanswered[0];
             var question = spec.Clarification;
-            if (string.IsNullOrWhiteSpace(question) && unanswered.Count > 0)
+            if (string.IsNullOrWhiteSpace(question) || !_state.AskedMissingFields.Add(nextConcept))
             {
-                var qs = ClarificationQuestionBank.PickQuestions(targets, 1);
-                _state.PendingQuestions = qs;
+                var qs = ClarificationQuestionBank.PickQuestions(new List<string> { nextConcept }, 1);
                 question = qs.FirstOrDefault();
-            }
-            else
-            {
-                var qs = ClarificationQuestionBank.PickQuestions(missing, 1);
-                _state.PendingQuestions = string.IsNullOrWhiteSpace(question) ? qs : new List<string> { question };
-                if (string.IsNullOrWhiteSpace(question))
-                    question = qs.FirstOrDefault();
             }
 
             if (string.IsNullOrWhiteSpace(question))
                 question = "Could you share a bit more detail so I can finish the plan?";
 
             _state.PendingQuestions = new List<string> { question };
+            _state.ClarificationAsked[nextConcept] = question;
 
             _state.PendingQuestion = question;
             PendingQuestionChanged?.Invoke(_state.PendingQuestion);
@@ -366,6 +442,9 @@ public sealed class WorkflowFacade
         var activeAttachments = GetActiveAttachments();
         if (activeAttachments.Count == 0)
         {
+            if (_planNeedsArtifacts && await HandleProgramOnlyFlowAsync(text, rawJson, ct).ConfigureAwait(true))
+                return;
+
             _trace.Emit("[attachments:none] Add at least one attachment to proceed to tool plan.");
             EmitWaitUser("Attach at least one file or image so I can help.");
             NotifyStatus("Waiting attachments");
@@ -384,7 +463,10 @@ public sealed class WorkflowFacade
 
         var planOk = await BuildToolPlanAsync(text, rawJson, ct).ConfigureAwait(true);
         if (planOk)
+        {
+            _state.PlanConfirmed = false;
             EmitToolPlanWait();
+        }
     }
 
     public async Task<RunnerBuildSummary> RunFromCodexAsync(string userText, CancellationToken ct)
@@ -468,6 +550,48 @@ public sealed class WorkflowFacade
         return new RunnerBuildSummary(ok, run.Id, run.Status, run.Conclusion, run.HtmlUrl, logs, errorMsg);
     }
 
+    public IReadOnlyList<OutputCard> GetOutputCards()
+    {
+        return _state.OutputCards.Select(c => OutputCard.Truncate(c)).ToList();
+    }
+
+    public object GetPlanSnapshot()
+    {
+        var steps = _state.PendingToolPlan?.Steps?.Select(s => new
+        {
+            s.Id,
+            s.ToolId,
+            Inputs = s.Inputs,
+            s.Why
+        }).ToList() ?? new List<object>();
+
+        return new
+        {
+            session = _state.SessionToken,
+            steps,
+            ready = steps.Count > 0
+        };
+    }
+
+    public object GetPublicSnapshot()
+    {
+        return new
+        {
+            status = ComputeWorkflowPhase(),
+            stepIndex = _state.PendingStepIndex,
+            steps = _state.PendingToolPlan?.Steps?.Count ?? 0,
+            pendingQuestion = _state.PendingQuestion,
+            ready = _state.PendingToolPlan != null && _state.PendingStepIndex < (_state.PendingToolPlan?.Steps?.Count ?? 0),
+            session = _state.SessionToken
+        };
+    }
+
+    public void OverrideSession(string session)
+    {
+        if (string.IsNullOrWhiteSpace(session)) return;
+        _state.SessionToken = session.Trim();
+    }
+
     private async Task<JobSpec> RunJobSpecDigestAsync(string userText, CancellationToken ct)
     {
         var prompt = (_cfg.General.JobSpecDigestPrompt ?? "").Trim();
@@ -516,13 +640,63 @@ public sealed class WorkflowFacade
         }
     }
 
+    private async Task<IntentExtraction?> RunIntentExtractionAsync(string userText, CancellationToken ct)
+    {
+        try
+        {
+            var result = await IntentExtractor.ExtractAsync(_cfg, userText, GetActiveAttachments(), _state.Memory, ct).ConfigureAwait(false);
+            if (!result.Ok || result.Extraction == null)
+            {
+                _trace.Emit("[intent:error] " + result.Error);
+                return null;
+            }
+
+            _trace.Emit("[intent:raw] " + Trunc(result.Raw, 800));
+            _state.LastIntent = result.Extraction;
+            _planNeedsArtifacts = ShouldGenerateArtifacts(result.Extraction);
+            return result.Extraction;
+        }
+        catch (Exception ex)
+        {
+            _trace.Emit("[intent:error] " + ex.Message);
+            return null;
+        }
+    }
+
+    private async Task<SemanticIntent> RunSemanticIntentAsync(string userText, CancellationToken ct)
+    {
+        try
+        {
+            var semantic = await SemanticIntentParser.ParseAsync(_cfg, userText, GetActiveAttachments(), _state.Memory, ct).ConfigureAwait(false);
+            if (semantic.Ready && semantic.OrderedActions.Count > 0)
+            {
+                _state.LastIntent = new IntentExtraction("intent.v1", userText, semantic.Goal, semantic.Context, semantic.OrderedActions.ToList(), semantic.Constraints.ToList(), semantic.Clarification, new List<string>(), true);
+            }
+            return semantic;
+        }
+        catch (Exception ex)
+        {
+            _trace.Emit("[intent:error] " + ex.Message);
+            return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", ex.Message, false);
+        }
+    }
+
+    private void RecordAssistantMessage(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        _state.Memory.Add("assistant", text);
+    }
+
     private void EmitWaitUser(string reason, string? friendly = null, string? preview = null)
     {
         var msg = WaitUserGate.GateMessage(reason, preview, _cfg.General.ConversationMode);
         _trace.Emit(msg);
         var chat = friendly ?? reason;
         if (!string.IsNullOrWhiteSpace(chat))
+        {
+            RecordAssistantMessage(chat);
             UserFacingMessage?.Invoke(chat);
+        }
     }
 
     private void SyncGraphToHub(AppConfig cfg)
@@ -933,6 +1107,20 @@ public sealed class WorkflowFacade
             sb.AppendLine($"- storedName: {a.StoredName}, kind: {kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}, suggestedTool: {toolText}");
         }
 
+        var constraints = _state.LastIntent?.Constraints ?? new List<string>();
+        if (constraints.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("CONSTRAINTS:" + string.Join(" | ", constraints));
+        }
+
+        var orderedActions = _state.LastIntent?.Actions ?? new List<string>();
+        if (orderedActions.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("ORDERED_ACTIONS:" + string.Join(" -> ", orderedActions));
+        }
+
         if (blueprint != null)
         {
             sb.AppendLine();
@@ -997,7 +1185,10 @@ public sealed class WorkflowFacade
         _state.ToolOutputs = new List<System.Text.Json.JsonElement>();
         _state.LastJobSpecJson = jobSpecJson;
         _state.OriginalUserText = userText;
+        _state.GenerateArtifacts = _planNeedsArtifacts;
         _state.PendingQuestion = null;
+        _state.PlanConfirmed = false;
+        PlanReady?.Invoke(PlanDefinition.FromToolPlan(_state.SessionToken, plan));
         NotifyStatus("Planning");
         return true;
     }
@@ -1115,43 +1306,67 @@ public sealed class WorkflowFacade
             NotifyStatus();
             return;
         }
-
-        if (_state.PendingStepIndex < 0 || _state.PendingStepIndex >= _state.PendingToolPlan.Steps.Count)
+        if (!_state.PlanConfirmed)
         {
-            EmitWaitUser("Tool plan step index invalid.");
-            _state.ClearPlan();
-            NotifyStatus();
-            PendingStepChanged?.Invoke("", false);
+            EmitWaitUser("Please confirm the plan before execution.");
             return;
         }
 
-        var step = _state.PendingToolPlan.Steps[_state.PendingStepIndex];
-        NotifyStatus("Tool execution");
-        var result = await ToolStepRunner.RunAsync(step, _cfg, _trace, _attachments, _toolManifest, _toolPrompts, ct).ConfigureAwait(false);
-        if (!result.Ok)
+        _state.PlanPaused = false;
+        while (true)
         {
-            EmitWaitUser(result.Message, "Something went wrong. Want me to retry this step?");
+            if (_state.PendingStepIndex < 0 || _state.PendingStepIndex >= _state.PendingToolPlan.Steps.Count)
+            {
+                EmitWaitUser("Tool plan step index invalid.");
+                _state.ClearPlan();
+                NotifyStatus();
+                PendingStepChanged?.Invoke("", false);
+                return;
+            }
+
+            var step = _state.PendingToolPlan.Steps[_state.PendingStepIndex];
             NotifyStatus("Tool execution");
-            TraceAttentionRequested?.Invoke();
-            return;
+            var result = await _executor.RunNextAsync(_cfg, _attachments, _toolManifest, _toolPrompts, ct).ConfigureAwait(false);
+            if (!result.Ok)
+            {
+                var errorCard = new OutputCard
+                {
+                    Kind = OutputCardKind.Error,
+                    Title = "Step failed",
+                    Summary = result.Message,
+                    Preview = result.Message,
+                    FullContent = result.Message,
+                    Tags = new[] { "error" },
+                    ToolId = step.ToolId,
+                    CreatedUtc = DateTimeOffset.UtcNow
+                };
+                _state.OutputCards.Add(errorCard);
+                OutputCardProduced?.Invoke(errorCard);
+                EmitWaitUser(result.Message, "Something went wrong. Want me to retry this step?");
+                NotifyStatus("Tool execution");
+                TraceAttentionRequested?.Invoke();
+                return;
+            }
+
+            SendChatStepSummary(result);
+
+            if (_state.PendingToolPlan == null || _state.PendingStepIndex >= _state.PendingToolPlan.Steps.Count)
+            {
+                await ProduceFinalResponseAsync(ct).ConfigureAwait(false);
+                _state.ClearPlan();
+                _planNeedsArtifacts = false;
+                NotifyStatus();
+                PendingStepChanged?.Invoke("", false);
+                return;
+            }
+
+            if (!(approveAll || _state.AutoApproveAll))
+            {
+                NotifyStatus();
+                EmitToolPlanWait();
+                return;
+            }
         }
-
-        if (result.Output.HasValue)
-            _state.ToolOutputs.Add(result.Output.Value);
-        SendChatStepSummary(result);
-
-        _state.PendingStepIndex++;
-        if (_state.PendingStepIndex >= _state.PendingToolPlan.Steps.Count)
-        {
-            await ProduceFinalResponseAsync(ct).ConfigureAwait(false);
-            _state.ClearPlan();
-            NotifyStatus();
-            PendingStepChanged?.Invoke("", false);
-            return;
-        }
-
-        NotifyStatus();
-        EmitToolPlanWait();
     }
 
     private async Task ProduceFinalResponseAsync(CancellationToken ct)
@@ -1193,8 +1408,25 @@ public sealed class WorkflowFacade
             return;
         }
 
+        await MaybeGenerateArtifactsAsync(ct).ConfigureAwait(false);
+
+        resp = EnsureNarrative(resp);
         _trace.Emit("[final] " + Trunc(resp, 1200));
+        RecordAssistantMessage(resp);
         UserFacingMessage?.Invoke(resp);
+        var finalCard = new OutputCard
+        {
+            Kind = OutputCardKind.Final,
+            Title = "Final answer",
+            Summary = Trunc(resp, 200),
+            Preview = Trunc(resp, 600),
+            FullContent = resp,
+            Tags = new[] { "final" },
+            CreatedUtc = DateTimeOffset.UtcNow,
+            ToolId = "orchestrator"
+        };
+        _state.OutputCards.Add(finalCard);
+        OutputCardProduced?.Invoke(finalCard);
         _recentlyCompleted = true;
         _state.PendingUserRequest = "";
         _state.ClearClarifications();
@@ -1211,24 +1443,157 @@ public sealed class WorkflowFacade
         return "Tweak";
     }
 
+    private static bool ShouldGenerateArtifacts(IntentExtraction? intent)
+    {
+        if (intent == null) return false;
+        var goal = (intent.Goal ?? "").ToLowerInvariant();
+        if (goal.Contains("build") || goal.Contains("app") || goal.Contains("program"))
+            return true;
+
+        foreach (var action in intent.Actions ?? Array.Empty<string>())
+        {
+            var a = (action ?? "").ToLowerInvariant();
+            if (a.Contains("build") || a.Contains("create") || a.Contains("generate"))
+                return true;
+        }
+
+        return false;
+    }
+
+    private async Task MaybeGenerateArtifactsAsync(CancellationToken ct)
+    {
+        if (!_state.GenerateArtifacts) return;
+        _state.GenerateArtifacts = false;
+
+        var intent = _state.LastIntent ?? new IntentExtraction("program_artifacts.v1", _state.PendingUserRequest, _state.PendingUserRequest, "", new List<string>(), new List<string>(), "", new List<string>(), true);
+        var repo = RepoScope.Resolve(_cfg);
+        if (!repo.Ok)
+        {
+            _trace.Emit("[program:skip] repo invalid for artifact generation.");
+            return;
+        }
+
+        var result = await _artifactGenerator.GenerateAsync(_cfg, intent, GetActiveAttachments(), repo.RepoRoot, ct).ConfigureAwait(false);
+        if (!result.Ok)
+        {
+            _trace.Emit("[program:error] " + result.Message);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.ZipPath))
+            _state.ArtifactPackages.Add(result.ZipPath);
+
+        var previewLines = result.Files.Take(5).Select(f => $"- {f.Path}");
+        var tree = ProgramArtifactGenerator.BuildTreePreview(result.Files);
+        var card = new OutputCard
+        {
+            Kind = OutputCardKind.Program,
+            Title = "Program artifacts",
+            Summary = $"Generated {result.Files.Count} files",
+            Preview = string.Join("\n", previewLines),
+            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}\n\nFiles:\n{tree}",
+            Tags = new[] { "program", "artifact" },
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Metadata = result.ZipPath
+        };
+
+        _state.OutputCards.Add(card);
+        OutputCardProduced?.Invoke(card);
+        var msg = card.ToDisplayText();
+        RecordAssistantMessage(msg);
+        UserFacingMessage?.Invoke(msg);
+    }
+
+    private async Task<bool> HandleProgramOnlyFlowAsync(string userText, string jobSpecJson, CancellationToken ct)
+    {
+        if (!_planNeedsArtifacts)
+            return false;
+
+        _trace.Emit("[program] No attachments required; generating program artifacts.");
+        _state.LastJobSpecJson = jobSpecJson;
+        _state.OriginalUserText = userText;
+        _state.ToolOutputs = new List<JsonElement>();
+        _state.GenerateArtifacts = true;
+        await MaybeGenerateArtifactsAsync(ct).ConfigureAwait(false);
+        await ProduceFinalResponseAsync(ct).ConfigureAwait(false);
+        _state.ClearPlan();
+        _planNeedsArtifacts = false;
+        PendingStepChanged?.Invoke("", false);
+        NotifyStatus("Done");
+        return true;
+    }
+
+    private static string EnsureNarrative(string resp)
+    {
+        var text = (resp ?? "").Trim();
+        if (text.StartsWith("```"))
+        {
+            var trimmed = text.Trim('`', '\n', '\r');
+            text = trimmed;
+        }
+
+        if (text.StartsWith("{", StringComparison.Ordinal) && text.EndsWith("}", StringComparison.Ordinal))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(text);
+                var sb = new System.Text.StringBuilder();
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                    sb.AppendLine($"- {prop.Name}: {prop.Value.GetRawText()}");
+                text = sb.ToString().TrimEnd();
+            }
+            catch
+            {
+                // keep raw text
+            }
+        }
+
+        return text;
+    }
+
     private JobSpec ValidateJobSpec(JobSpec spec)
     {
         if (spec == null) return JobSpec.Invalid("invalid_spec");
 
+        var intent = _state.LastIntent;
         var missing = spec.GetMissingFields();
-        var request = (spec.Request ?? "").Trim();
-        var goal = (spec.Goal ?? "").Trim();
-        var context = spec.Context ?? "";
+        var request = (spec.Request ?? intent?.Request ?? "").Trim();
+        var goal = (spec.Goal ?? intent?.Goal ?? "").Trim();
+        var context = string.IsNullOrWhiteSpace(spec.Context) ? intent?.Context ?? "" : spec.Context;
+        if (string.IsNullOrWhiteSpace(context))
+        {
+            var mem = _state.Memory.Summarize(4);
+            if (!string.IsNullOrWhiteSpace(mem))
+                context = mem;
+        }
         var actions = spec.Actions?.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList() ?? new List<string>();
+        if (actions.Count == 0 && intent?.Actions != null)
+            actions = intent.Actions.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList();
         var constraints = spec.Constraints?.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim()).ToList() ?? new List<string>();
+        if (constraints.Count == 0 && intent?.Constraints != null)
+            constraints = intent.Constraints.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim()).ToList();
         var attachments = spec.Attachments?.Where(a => a != null && !string.IsNullOrWhiteSpace(a.StoredName)).ToList() ?? new List<JobSpecAttachment>();
 
         if (string.IsNullOrWhiteSpace(request))
             AddMissing("request", missing);
+        else
+            _state.ConfirmedFields.Add("request");
+
         if (string.IsNullOrWhiteSpace(goal))
             AddMissing("goal", missing);
+        else
+            _state.ConfirmedFields.Add("goal");
+
         if (actions.Count == 0)
             AddMissing("actions", missing);
+        else
+            _state.ConfirmedFields.Add("actions");
+
+        if (constraints.Count == 0)
+            AddMissing("constraints", missing);
+        else
+            _state.ConfirmedFields.Add("constraints");
+
         if (attachments.Count == 0)
             AddMissing("attachments", missing);
 
@@ -1330,7 +1695,9 @@ public sealed class WorkflowFacade
                 card.AppendLine("├─ Full content");
                 card.AppendLine(IndentMultiline(full, "│ "));
                 card.AppendLine("└ Use Run Next to continue or Edit Plan to adjust the plan.");
-                UserFacingMessage?.Invoke(card.ToString().TrimEnd());
+                var msg = card.ToString().TrimEnd();
+                RecordAssistantMessage(msg);
+                UserFacingMessage?.Invoke(msg);
             }
             else if (toolId.Equals("vision.describe.image", StringComparison.OrdinalIgnoreCase))
             {
@@ -1347,7 +1714,9 @@ public sealed class WorkflowFacade
                 if (!string.IsNullOrWhiteSpace(tags))
                     card.AppendLine("│ Tags: " + tags);
                 card.AppendLine("└ Use Run Next to continue or Edit Plan to adjust the plan.");
-                UserFacingMessage?.Invoke(card.ToString().TrimEnd());
+                var msg = card.ToString().TrimEnd();
+                RecordAssistantMessage(msg);
+                UserFacingMessage?.Invoke(msg);
             }
         }
         catch { }

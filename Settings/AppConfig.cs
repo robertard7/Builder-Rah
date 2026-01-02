@@ -33,7 +33,9 @@ public sealed class GeneralSettings
     public string ToolPromptsPath { get; set; } = "";           // folder: Tools/Prompt (files named by toolId)
     public string BlueprintTemplatesPath { get; set; } = "";    // folder: BlueprintTemplates (prompt library)
     public string ToolPlanPrompt { get; set; } = DefaultToolPlanPrompt();
+    public string IntentExtractorPrompt { get; set; } = DefaultIntentExtractorPrompt();
     public string FinalAnswerPrompt { get; set; } = DefaultFinalAnswerPrompt();
+    public string ProgramBuilderPrompt { get; set; } = DefaultProgramBuilderPrompt();
     public string AcceptedAttachmentExtensions { get; set; } = ".txt,.md,.json,.png,.jpg,.jpeg,.pdf,.zip";
     public long MaxAttachmentBytes { get; set; } = 50 * 1024 * 1024;
     public long MaxTotalInboxBytes { get; set; } = 500 * 1024 * 1024;
@@ -42,6 +44,8 @@ public sealed class GeneralSettings
     public bool ContainerOnly { get; set; } = true;
     public bool EnableGlobalClipboardShortcuts { get; set; } = true;
     public string ExecutionTarget { get; set; } = OperatingSystem.IsWindows() ? "WindowsHost" : "LinuxContainer";
+    public bool EnableProviderApi { get; set; } = true;
+    public int ProviderApiPort { get; set; } = 5050;
 
     // SAVE POINT: global digest prompt lives here (JSON-only, no tools)
     public string JobSpecDigestPrompt { get; set; } =
@@ -100,8 +104,17 @@ Rules:
         if (string.IsNullOrWhiteSpace(FinalAnswerPrompt))
             FinalAnswerPrompt = DefaultFinalAnswerPrompt();
 
+        if (string.IsNullOrWhiteSpace(IntentExtractorPrompt))
+            IntentExtractorPrompt = DefaultIntentExtractorPrompt();
+
+        if (string.IsNullOrWhiteSpace(ProgramBuilderPrompt))
+            ProgramBuilderPrompt = DefaultProgramBuilderPrompt();
+
         if (!Enum.IsDefined(typeof(ConversationMode), ConversationMode))
             ConversationMode = ConversationMode.Conversational;
+
+        if (ProviderApiPort <= 0)
+            ProviderApiPort = 5050;
     }
 
     private static string DefaultInboxPath()
@@ -130,12 +143,46 @@ Rules:
 - Use one step per attachment type needed to satisfy the request.
 - Do NOT output prose or markdown; ONLY JSON.";
 
+    private static string DefaultIntentExtractorPrompt() =>
+        @"You are the Intent Extractor. Produce ONE JSON object only (no prose).
+Shape:
+{
+  ""mode"": ""intent.v1"",
+  ""request"": ""<verbatim user text>"",
+  ""goal"": ""<plain goal>"",
+  ""context"": ""<important background>"",
+  ""actions"": [""action 1"", ""action 2""],
+  ""constraints"": [""constraint"", ""examples""],
+  ""clarification"": ""<one short question if needed else empty>"",
+  ""missing"": [""goal|actions|constraints|context|attachments""],
+  ""ready"": true|false
+}
+Rules:
+- Detect multi-step requests signaled by words like 'then', 'after', 'also', 'next'; split them into separate entries in actions.
+- Reflect attachments and history if provided.
+- Ask at most ONE clarification for a missing concept.
+- ready=true only when goal + actions are clear.";
+
     private static string DefaultFinalAnswerPrompt() =>
         @"You are the Final Responder. Use the TOOL_OUTPUTS JSON plus attachments metadata to answer the user's request in natural, concise language.
 Rules:
 - Do not mention internal systems or planner details.
 - Reference content and captions from TOOL_OUTPUTS explicitly.
 - Keep it brief and helpful.";
+
+    private static string DefaultProgramBuilderPrompt() =>
+        @"You are the Program Builder. Output JSON ONLY with shape:
+{
+  ""mode"": ""program_artifacts.v1"",
+  ""files"": [
+    { ""path"": ""README.md"", ""content"": ""..."", ""tags"": [""readme""] },
+    { ""path"": ""Tests/sample.test"", ""content"": ""..."", ""tags"": [""test""] }
+  ]
+}
+Rules:
+- Include README, at least one test file, and main source files.
+- Respect constraints like ""short summary"" or ""include code examples"".
+- Do not emit markdown fences; JSON only.";
 }
 
 public enum ConversationMode
