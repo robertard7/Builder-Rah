@@ -58,7 +58,7 @@ public static class IntentExtractor
                 sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, summary: {a.OriginalName}");
         }
         sb.AppendLine();
-        var history = memory.Summarize(6);
+        var history = memory.Summarize(8);
         if (!string.IsNullOrWhiteSpace(history))
         {
             sb.AppendLine("RECENT_MEMORY:");
@@ -157,8 +157,9 @@ internal static class IntentExtractionParser
         {
             var cleaned = token.Trim();
             if (cleaned.Length == 0) continue;
-            if (!actions.Contains(cleaned, StringComparer.OrdinalIgnoreCase))
-                actions.Add(cleaned);
+            var mapped = MapAction(cleaned);
+            if (!actions.Contains(mapped, StringComparer.OrdinalIgnoreCase))
+                actions.Add(mapped);
         }
 
         var ready = extraction.Ready && (extraction.Missing?.Count ?? 0) == 0 && actions.Count > 0 && extraction.Goal.Trim().Length > 0;
@@ -180,14 +181,13 @@ internal static class IntentExtractionParser
         if (string.IsNullOrWhiteSpace(text))
             return list;
 
-        var connectors = new[] { " then ", " after ", " also ", " next ", " and then " };
+        var connectors = new[] { " then ", " after ", " also ", " next ", " and then ", " followed by ", ";", "." };
         var lower = " " + text.ToLowerInvariant() + " ";
         foreach (var c in connectors)
         {
-            var idx = lower.IndexOf(c, StringComparison.Ordinal);
-            if (idx >= 0)
+            if (lower.Contains(c, StringComparison.Ordinal))
             {
-                var parts = text.Split(new[] { "then", "after", "also", "next" }, StringSplitOptions.RemoveEmptyEntries);
+                var parts = text.Split(new[] { "then", "after", "also", "next", "and then", "followed by", ";", "." }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var p in parts)
                 {
                     var s = p.Trim();
@@ -199,6 +199,23 @@ internal static class IntentExtractionParser
         }
 
         return list;
+    }
+
+    private static string MapAction(string raw)
+    {
+        var text = (raw ?? "").Trim();
+        var lower = text.ToLowerInvariant();
+        if (lower.Contains("describe") && lower.Contains("image"))
+            return "vision.describe.image";
+        if (lower.Contains("web") && lower.Contains("server"))
+            return "code.generate.webserver";
+        if (lower.Contains("test"))
+            return "code.generate.tests";
+        if (lower.Contains("auth"))
+            return "code.generate.auth";
+        if (lower.Contains("read") && (lower.Contains("file") || lower.Contains("document")))
+            return "file.read.text";
+        return text;
     }
 
     private static string ReadString(JsonElement obj, string name, string fallback)

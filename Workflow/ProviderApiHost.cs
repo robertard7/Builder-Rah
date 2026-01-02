@@ -89,6 +89,16 @@ public sealed class ProviderApiHost : IDisposable
                 return;
             }
 
+            if (path.EndsWith("/api/plan", StringComparison.OrdinalIgnoreCase))
+            {
+                await WriteJsonAsync(ctx, new
+                {
+                    plan = _workflow.GetPendingPlan(),
+                    session = Guid.NewGuid().ToString("N")
+                }).ConfigureAwait(false);
+                return;
+            }
+
             if (path.EndsWith("/api/jobs", StringComparison.OrdinalIgnoreCase) && ctx.Request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase))
             {
                 using var reader = new System.IO.StreamReader(ctx.Request.InputStream, ctx.Request.ContentEncoding);
@@ -97,6 +107,9 @@ public sealed class ProviderApiHost : IDisposable
                 {
                     var json = JsonDocument.Parse(body);
                     var text = json.RootElement.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? "" : "";
+                    var session = json.RootElement.TryGetProperty("session", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() ?? "" : "";
+                    if (!string.IsNullOrWhiteSpace(session))
+                        _workflow.OverrideSession(session);
                     _ = _workflow.RouteUserInput(text, CancellationToken.None);
                     await WriteJsonAsync(ctx, new { ok = true }).ConfigureAwait(false);
                 }

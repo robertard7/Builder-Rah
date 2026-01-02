@@ -1,0 +1,234 @@
+diff --git a/Workflow/ExecutionOrchestrator.cs b/Workflow/ExecutionOrchestrator.cs
+index 569d829..d75aaa0 100644
+--- a/Workflow/ExecutionOrchestrator.cs
++++ b/Workflow/ExecutionOrchestrator.cs
+@@ -97,7 +97,10 @@ public sealed class ExecutionOrchestrator
+                 Preview = preview,
+                 FullContent = full,
+                 RelatedAttachment = name,
+-                Tags = new[] { "file", "text" }
++                Tags = new[] { "file", "text" },
++                ToolId = toolId,
++                CreatedUtc = DateTimeOffset.UtcNow,
++                Metadata = "sha256=" + (root.TryGetProperty("sha256", out var sh) ? sh.GetString() ?? "" : "")
+             };
+         }
+ 
+@@ -120,7 +123,9 @@ public sealed class ExecutionOrchestrator
+                 Preview = caption,
+                 FullContent = caption,
+                 RelatedAttachment = name,
+-                Tags = tags
++                Tags = tags,
++                ToolId = toolId,
++                CreatedUtc = DateTimeOffset.UtcNow
+             };
+         }
+ 
+diff --git a/Workflow/IntentExtractor.cs b/Workflow/IntentExtractor.cs
+index 08d8534..79bb064 100644
+--- a/Workflow/IntentExtractor.cs
++++ b/Workflow/IntentExtractor.cs
+@@ -58,7 +58,7 @@ public static class IntentExtractor
+                 sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, summary: {a.OriginalName}");
+         }
+         sb.AppendLine();
+-        var history = memory.Summarize(6);
++        var history = memory.Summarize(8);
+         if (!string.IsNullOrWhiteSpace(history))
+         {
+             sb.AppendLine("RECENT_MEMORY:");
+@@ -157,8 +157,9 @@ internal static class IntentExtractionParser
+         {
+             var cleaned = token.Trim();
+             if (cleaned.Length == 0) continue;
+-            if (!actions.Contains(cleaned, StringComparer.OrdinalIgnoreCase))
+-                actions.Add(cleaned);
++            var mapped = MapAction(cleaned);
++            if (!actions.Contains(mapped, StringComparer.OrdinalIgnoreCase))
++                actions.Add(mapped);
+         }
+ 
+         var ready = extraction.Ready && (extraction.Missing?.Count ?? 0) == 0 && actions.Count > 0 && extraction.Goal.Trim().Length > 0;
+@@ -180,14 +181,13 @@ internal static class IntentExtractionParser
+         if (string.IsNullOrWhiteSpace(text))
+             return list;
+ 
+-        var connectors = new[] { " then ", " after ", " also ", " next ", " and then " };
++        var connectors = new[] { " then ", " after ", " also ", " next ", " and then ", " followed by ", ";", "." };
+         var lower = " " + text.ToLowerInvariant() + " ";
+         foreach (var c in connectors)
+         {
+-            var idx = lower.IndexOf(c, StringComparison.Ordinal);
+-            if (idx >= 0)
++            if (lower.Contains(c, StringComparison.Ordinal))
+             {
+-                var parts = text.Split(new[] { "then", "after", "also", "next" }, StringSplitOptions.RemoveEmptyEntries);
++                var parts = text.Split(new[] { "then", "after", "also", "next", "and then", "followed by", ";", "." }, StringSplitOptions.RemoveEmptyEntries);
+                 foreach (var p in parts)
+                 {
+                     var s = p.Trim();
+@@ -201,6 +201,23 @@ internal static class IntentExtractionParser
+         return list;
+     }
+ 
++    private static string MapAction(string raw)
++    {
++        var text = (raw ?? "").Trim();
++        var lower = text.ToLowerInvariant();
++        if (lower.Contains("describe") && lower.Contains("image"))
++            return "vision.describe.image";
++        if (lower.Contains("web") && lower.Contains("server"))
++            return "code.generate.webserver";
++        if (lower.Contains("test"))
++            return "code.generate.tests";
++        if (lower.Contains("auth"))
++            return "code.generate.auth";
++        if (lower.Contains("read") && (lower.Contains("file") || lower.Contains("document")))
++            return "file.read.text";
++        return text;
++    }
++
+     private static string ReadString(JsonElement obj, string name, string fallback)
+     {
+         if (obj.ValueKind != JsonValueKind.Object) return fallback;
+diff --git a/Workflow/OutputCard.cs b/Workflow/OutputCard.cs
+index 46086a1..4c92e00 100644
+--- a/Workflow/OutputCard.cs
++++ b/Workflow/OutputCard.cs
+@@ -27,15 +27,23 @@ public sealed class OutputCard
+     public string FullContent { get; init; } = "";
+     public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
+     public string RelatedAttachment { get; init; } = "";
++    public string ToolId { get; init; } = "";
++    public DateTimeOffset CreatedUtc { get; init; } = DateTimeOffset.UtcNow;
++    public string Metadata { get; init; } = "";
+ 
+     public string ToDisplayText()
+     {
+         var sb = new StringBuilder();
+         sb.AppendLine($"[{Kind}] {Title}");
++        if (!string.IsNullOrWhiteSpace(ToolId))
++            sb.AppendLine("Tool: " + ToolId);
++        sb.AppendLine("Timestamp: " + CreatedUtc.ToString("O"));
+         if (!string.IsNullOrWhiteSpace(RelatedAttachment))
+             sb.AppendLine($"Attachment: {RelatedAttachment}");
+         if (Tags.Count > 0)
+             sb.AppendLine("Tags: " + string.Join(", ", Tags));
++        if (!string.IsNullOrWhiteSpace(Metadata))
++            sb.AppendLine("Meta: " + Metadata);
+         if (!string.IsNullOrWhiteSpace(Summary))
+             sb.AppendLine("Summary: " + Summary);
+         if (!string.IsNullOrWhiteSpace(Preview))
+@@ -62,6 +70,9 @@ public sealed class OutputCard
+             Summary = card.Summary,
+             RelatedAttachment = card.RelatedAttachment,
+             Tags = card.Tags,
++            ToolId = card.ToolId,
++            CreatedUtc = card.CreatedUtc,
++            Metadata = card.Metadata,
+             Preview = Trim(card.Preview, maxPreview),
+             FullContent = Trim(card.FullContent, maxContent)
+         };
+diff --git a/Workflow/ProviderApiHost.cs b/Workflow/ProviderApiHost.cs
+index 3bb2e16..d3bb108 100644
+--- a/Workflow/ProviderApiHost.cs
++++ b/Workflow/ProviderApiHost.cs
+@@ -89,6 +89,16 @@ public sealed class ProviderApiHost : IDisposable
+                 return;
+             }
+ 
++            if (path.EndsWith("/api/plan", StringComparison.OrdinalIgnoreCase))
++            {
++                await WriteJsonAsync(ctx, new
++                {
++                    plan = _workflow.GetPendingPlan(),
++                    session = Guid.NewGuid().ToString("N")
++                }).ConfigureAwait(false);
++                return;
++            }
++
+             if (path.EndsWith("/api/jobs", StringComparison.OrdinalIgnoreCase) && ctx.Request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase))
+             {
+                 using var reader = new System.IO.StreamReader(ctx.Request.InputStream, ctx.Request.ContentEncoding);
+@@ -97,6 +107,9 @@ public sealed class ProviderApiHost : IDisposable
+                 {
+                     var json = JsonDocument.Parse(body);
+                     var text = json.RootElement.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? "" : "";
++                    var session = json.RootElement.TryGetProperty("session", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() ?? "" : "";
++                    if (!string.IsNullOrWhiteSpace(session))
++                        _workflow.OverrideSession(session);
+                     _ = _workflow.RouteUserInput(text, CancellationToken.None);
+                     await WriteJsonAsync(ctx, new { ok = true }).ConfigureAwait(false);
+                 }
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 4964cbb..82ad0a5 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -363,6 +363,10 @@ public sealed class WorkflowFacade
+         {
+             var missing = spec.GetMissingFields();
+             missing = missing.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
++            if (_state.ClarificationAnswers.Count > 0)
++            {
++                missing.RemoveAll(m => string.Equals(m, "context", StringComparison.OrdinalIgnoreCase));
++            }
+ 
+             // Special invalid_json case.
+             if (missing.Count == 1 && string.Equals(missing[0], "invalid_json", StringComparison.OrdinalIgnoreCase))
+@@ -547,10 +551,17 @@ public sealed class WorkflowFacade
+             stepIndex = _state.PendingStepIndex,
+             steps = _state.PendingToolPlan?.Steps?.Count ?? 0,
+             pendingQuestion = _state.PendingQuestion,
+-            ready = _state.PendingToolPlan != null && _state.PendingStepIndex < (_state.PendingToolPlan?.Steps?.Count ?? 0)
++            ready = _state.PendingToolPlan != null && _state.PendingStepIndex < (_state.PendingToolPlan?.Steps?.Count ?? 0),
++            session = _state.SessionToken
+         };
+     }
+ 
++    public void OverrideSession(string session)
++    {
++        if (string.IsNullOrWhiteSpace(session)) return;
++        _state.SessionToken = session.Trim();
++    }
++
+     private async Task<JobSpec> RunJobSpecDigestAsync(string userText, CancellationToken ct)
+     {
+         var prompt = (_cfg.General.JobSpecDigestPrompt ?? "").Trim();
+@@ -1055,6 +1066,13 @@ public sealed class WorkflowFacade
+             sb.AppendLine("CONSTRAINTS:" + string.Join(" | ", constraints));
+         }
+ 
++        var orderedActions = _state.LastIntent?.Actions ?? new List<string>();
++        if (orderedActions.Count > 0)
++        {
++            sb.AppendLine();
++            sb.AppendLine("ORDERED_ACTIONS:" + string.Join(" -> ", orderedActions));
++        }
++
+         if (blueprint != null)
+         {
+             sb.AppendLine();
+@@ -1335,7 +1353,9 @@ public sealed class WorkflowFacade
+             Summary = Trunc(resp, 200),
+             Preview = Trunc(resp, 600),
+             FullContent = resp,
+-            Tags = new[] { "final" }
++            Tags = new[] { "final" },
++            CreatedUtc = DateTimeOffset.UtcNow,
++            ToolId = "orchestrator"
+         };
+         _state.OutputCards.Add(finalCard);
+         OutputCardProduced?.Invoke(finalCard);
+diff --git a/Workflow/WorkflowState.cs b/Workflow/WorkflowState.cs
+index d2a0dfb..3cedcb6 100644
+--- a/Workflow/WorkflowState.cs
++++ b/Workflow/WorkflowState.cs
+@@ -26,6 +26,7 @@ public sealed class WorkflowState
+     public Dictionary<string, string> ClarificationAsked { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+     public HashSet<string> AskedMissingFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+     public bool GenerateArtifacts { get; set; }
++    public string SessionToken { get; set; } = Guid.NewGuid().ToString("N");
+ 
+     public void ClearPlan()
+     {

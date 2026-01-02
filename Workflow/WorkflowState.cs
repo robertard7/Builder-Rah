@@ -26,6 +26,7 @@ public sealed class WorkflowState
     public Dictionary<string, string> ClarificationAsked { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> AskedMissingFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool GenerateArtifacts { get; set; }
+    public string SessionToken { get; set; } = Guid.NewGuid().ToString("N");
 
     public void ClearPlan()
     {

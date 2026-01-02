@@ -363,6 +363,10 @@ public sealed class WorkflowFacade
         {
             var missing = spec.GetMissingFields();
             missing = missing.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (_state.ClarificationAnswers.Count > 0)
+            {
+                missing.RemoveAll(m => string.Equals(m, "context", StringComparison.OrdinalIgnoreCase));
+            }
 
             // Special invalid_json case.
             if (missing.Count == 1 && string.Equals(missing[0], "invalid_json", StringComparison.OrdinalIgnoreCase))
@@ -547,8 +551,15 @@ public sealed class WorkflowFacade
             stepIndex = _state.PendingStepIndex,
             steps = _state.PendingToolPlan?.Steps?.Count ?? 0,
             pendingQuestion = _state.PendingQuestion,
-            ready = _state.PendingToolPlan != null && _state.PendingStepIndex < (_state.PendingToolPlan?.Steps?.Count ?? 0)
+            ready = _state.PendingToolPlan != null && _state.PendingStepIndex < (_state.PendingToolPlan?.Steps?.Count ?? 0),
+            session = _state.SessionToken
         };
+    }
+
+    public void OverrideSession(string session)
+    {
+        if (string.IsNullOrWhiteSpace(session)) return;
+        _state.SessionToken = session.Trim();
     }
 
     private async Task<JobSpec> RunJobSpecDigestAsync(string userText, CancellationToken ct)
@@ -1055,6 +1066,13 @@ public sealed class WorkflowFacade
             sb.AppendLine("CONSTRAINTS:" + string.Join(" | ", constraints));
         }
 
+        var orderedActions = _state.LastIntent?.Actions ?? new List<string>();
+        if (orderedActions.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("ORDERED_ACTIONS:" + string.Join(" -> ", orderedActions));
+        }
+
         if (blueprint != null)
         {
             sb.AppendLine();
@@ -1335,7 +1353,9 @@ public sealed class WorkflowFacade
             Summary = Trunc(resp, 200),
             Preview = Trunc(resp, 600),
             FullContent = resp,
-            Tags = new[] { "final" }
+            Tags = new[] { "final" },
+            CreatedUtc = DateTimeOffset.UtcNow,
+            ToolId = "orchestrator"
         };
         _state.OutputCards.Add(finalCard);
         OutputCardProduced?.Invoke(finalCard);

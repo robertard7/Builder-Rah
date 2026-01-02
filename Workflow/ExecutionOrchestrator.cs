@@ -97,7 +97,10 @@ public sealed class ExecutionOrchestrator
                 Preview = preview,
                 FullContent = full,
                 RelatedAttachment = name,
-                Tags = new[] { "file", "text" }
+                Tags = new[] { "file", "text" },
+                ToolId = toolId,
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Metadata = "sha256=" + (root.TryGetProperty("sha256", out var sh) ? sh.GetString() ?? "" : "")
             };
         }
 
@@ -120,7 +123,9 @@ public sealed class ExecutionOrchestrator
                 Preview = caption,
                 FullContent = caption,
                 RelatedAttachment = name,
-                Tags = tags
+                Tags = tags,
+                ToolId = toolId,
+                CreatedUtc = DateTimeOffset.UtcNow
             };
         }
 
