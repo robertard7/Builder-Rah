@@ -543,6 +543,24 @@ public sealed class WorkflowFacade
         return _state.OutputCards.Select(c => OutputCard.Truncate(c)).ToList();
     }
 
+    public object GetPlanSnapshot()
+    {
+        var steps = _state.PendingToolPlan?.Steps?.Select(s => new
+        {
+            s.Id,
+            s.ToolId,
+            Inputs = s.Inputs,
+            s.Why
+        }).ToList() ?? new List<object>();
+
+        return new
+        {
+            session = _state.SessionToken,
+            steps,
+            ready = steps.Count > 0
+        };
+    }
+
     public object GetPublicSnapshot()
     {
         return new

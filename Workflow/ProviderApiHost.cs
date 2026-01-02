@@ -76,6 +76,10 @@ public sealed class ProviderApiHost : IDisposable
         try
         {
             var path = ctx.Request.Url?.AbsolutePath?.TrimEnd('/') ?? "";
+            var session = ctx.Request.QueryString?["session"] ?? "";
+            if (!string.IsNullOrWhiteSpace(session))
+                _workflow.OverrideSession(session);
+
             if (path.EndsWith("/api/status", StringComparison.OrdinalIgnoreCase))
             {
                 var snapshot = _workflow.GetPublicSnapshot();
@@ -84,6 +88,12 @@ public sealed class ProviderApiHost : IDisposable
             }
 
             if (path.EndsWith("/api/results", StringComparison.OrdinalIgnoreCase))
+            {
+                await WriteJsonAsync(ctx, _workflow.GetOutputCards()).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/output", StringComparison.OrdinalIgnoreCase))
             {
                 await WriteJsonAsync(ctx, _workflow.GetOutputCards()).ConfigureAwait(false);
                 return;
@@ -98,11 +108,7 @@ public sealed class ProviderApiHost : IDisposable
 
             if (path.EndsWith("/api/plan", StringComparison.OrdinalIgnoreCase))
             {
-                await WriteJsonAsync(ctx, new
-                {
-                    plan = _workflow.GetPendingPlan(),
-                    session = Guid.NewGuid().ToString("N")
-                }).ConfigureAwait(false);
+                await WriteJsonAsync(ctx, _workflow.GetPlanSnapshot()).ConfigureAwait(false);
                 return;
             }
 
@@ -114,9 +120,9 @@ public sealed class ProviderApiHost : IDisposable
                 {
                     var json = JsonDocument.Parse(body);
                     var text = json.RootElement.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? "" : "";
-                    var session = json.RootElement.TryGetProperty("session", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() ?? "" : "";
-                    if (!string.IsNullOrWhiteSpace(session))
-                        _workflow.OverrideSession(session);
+                    var sessionBody = json.RootElement.TryGetProperty("session", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() ?? "" : "";
+                    if (!string.IsNullOrWhiteSpace(sessionBody))
+                        _workflow.OverrideSession(sessionBody);
                     _ = _workflow.RouteUserInput(text, CancellationToken.None);
                     await WriteJsonAsync(ctx, new { ok = true }).ConfigureAwait(false);
                 }
