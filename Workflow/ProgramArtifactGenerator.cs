@@ -143,6 +143,16 @@ public sealed class ProgramArtifactGenerator
         }
     }
 
+    public static string BuildTreePreview(IEnumerable<ProgramArtifact> files)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var file in files.OrderBy(f => f.Path, StringComparer.OrdinalIgnoreCase))
+        {
+            sb.AppendLine(file.Path.Replace("\\", "/"));
+        }
+        return sb.ToString().TrimEnd();
+    }
+
     private static string Sanitize(string path)
     {
         path ??= "";

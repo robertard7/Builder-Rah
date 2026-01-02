@@ -89,6 +89,13 @@ public sealed class ProviderApiHost : IDisposable
                 return;
             }
 
+            if (path.EndsWith("/api/artifacts", StringComparison.OrdinalIgnoreCase))
+            {
+                var cards = _workflow.GetOutputCards().Where(c => c.Kind == OutputCardKind.Program).ToList();
+                await WriteJsonAsync(ctx, new { cards }).ConfigureAwait(false);
+                return;
+            }
+
             if (path.EndsWith("/api/plan", StringComparison.OrdinalIgnoreCase))
             {
                 await WriteJsonAsync(ctx, new

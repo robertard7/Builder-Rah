@@ -27,6 +27,7 @@ public sealed class WorkflowState
     public HashSet<string> AskedMissingFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool GenerateArtifacts { get; set; }
     public string SessionToken { get; set; } = Guid.NewGuid().ToString("N");
+    public List<string> ArtifactPackages { get; set; } = new();
 
     public void ClearPlan()
     {
@@ -40,6 +41,7 @@ public sealed class WorkflowState
         AutoApproveAll = false;
         PlanPaused = false;
         GenerateArtifacts = false;
+        ArtifactPackages = new List<string>();
     }
 
     public void ClearClarifications()
