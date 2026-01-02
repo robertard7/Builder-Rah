@@ -72,6 +72,7 @@ Rules:
 - ALWAYS emit valid JSON; no markdown or comments.
 - Always include an attachments array (can be empty).
 - Use the ATTACHMENTS section to pre-fill storedName, kind, status (default present), summary, tags (keywords from filename/description), and tools (vision.describe.image for images; file.read.text for documents/code).
+- Base actions on attachments and intent: e.g., describe images, read/summarize documents/code, then combine results when requested.
 - If any required field is missing/ambiguous, set state.ready=false and list the missing concepts in state.missing. Otherwise, set ready=true and missing=[].
 - Ask at most ONE clarifying question in ""clarification"" when ready=false; leave it empty when ready=true.
 - Do NOT invent tools beyond vision.describe.image or file.read.text.";
