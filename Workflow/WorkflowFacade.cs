@@ -272,6 +272,7 @@ public sealed class WorkflowFacade
         // Run digest.
         var userTextWithAttachments = AppendAttachmentMetadata(text);
         var spec = await RunJobSpecDigestAsync(userTextWithAttachments, ct).ConfigureAwait(true);
+        spec = ValidateJobSpec(spec);
 
         if (!spec.IsComplete)
         {
@@ -289,12 +290,37 @@ public sealed class WorkflowFacade
             // Normal WAIT_USER (missing real fields)
             _forceEditBecauseInvalidJson = false;
 
-            var qs = ClarificationQuestionBank.PickQuestions(missing, 1);
-            _state.PendingQuestions = qs;
-            _state.PendingQuestion = qs.FirstOrDefault();
+            var unanswered = missing.Where(m => !_state.AskedMissingFields.Contains(m)).ToList();
+            foreach (var m in unanswered)
+                _state.AskedMissingFields.Add(m);
+
+            var targets = unanswered.Count > 0 ? unanswered : missing;
+            var question = spec.Clarification;
+            if (string.IsNullOrWhiteSpace(question) && unanswered.Count > 0)
+            {
+                var qs = ClarificationQuestionBank.PickQuestions(targets, 1);
+                _state.PendingQuestions = qs;
+                question = qs.FirstOrDefault();
+            }
+            else if (string.IsNullOrWhiteSpace(question) && missing.Count > 0)
+            {
+                question = "I still need details on " + string.Join(", ", missing) + " to finish the JobSpec.";
+                _state.PendingQuestions = new List<string> { question };
+            }
+            else
+            {
+                _state.PendingQuestions = new List<string> { question };
+            }
+
+            if (string.IsNullOrWhiteSpace(question))
+                question = "Could you share a bit more detail so I can finish the plan?";
+
+            _state.PendingQuestions = new List<string> { question };
+
+            _state.PendingQuestion = question;
             PendingQuestionChanged?.Invoke(_state.PendingQuestion);
-            _trace.Emit("[route:wait_user] JobSpec incomplete; asking clarifications.");
-            EmitWaitUser(_state.PendingQuestion ?? "Could you share a bit more detail?", _state.PendingQuestion ?? "Could you share a bit more detail?");
+            _trace.Emit("[route:wait_user] JobSpec incomplete; asking clarifications. missing=" + string.Join(",", missing));
+            EmitWaitUser(question, question);
             NotifyStatus("Waiting clarification");
             return;
         }
@@ -323,7 +349,7 @@ public sealed class WorkflowFacade
             return;
         }
 
-        var docAttachments = activeAttachments.Where(a => string.Equals(a.Kind, "document", StringComparison.OrdinalIgnoreCase)).ToList();
+        var docAttachments = activeAttachments.Where(a => IsTextualAttachment(a.Kind)).ToList();
         if (docAttachments.Count > 1 && string.IsNullOrWhiteSpace(_state.PendingQuestion) && _state.PendingToolPlan == null && _state.ClarificationAnswers.Count == 0)
         {
             var names = string.Join(", ", docAttachments.Select(a => a.StoredName));
@@ -502,6 +528,36 @@ public sealed class WorkflowFacade
         return Convert.ToHexString(sha.ComputeHash(bytes));
     }
 
+    private static string NormalizeAttachmentKind(string kind)
+    {
+        var k = (kind ?? "").ToLowerInvariant();
+        return k switch
+        {
+            "image" => "image",
+            "document" => "document",
+            "code" => "code",
+            _ => "other"
+        };
+    }
+
+    private static bool IsTextualAttachment(string kind)
+    {
+        var k = NormalizeAttachmentKind(kind);
+        return k is "document" or "code";
+    }
+
+    private static string SuggestToolForKind(string kind)
+    {
+        var k = NormalizeAttachmentKind(kind);
+        return k switch
+        {
+            "image" => "vision.describe.image",
+            "document" => "file.read.text",
+            "code" => "file.read.text",
+            _ => ""
+        };
+    }
+
     private static string Trunc(string s, int max)
     {
         s ??= "";
@@ -542,15 +598,19 @@ public sealed class WorkflowFacade
             var idx = Math.Max(0, _state.PendingStepIndex);
             var count = _state.PendingToolPlan.Steps.Count;
             if (idx >= count)
-                return "Tool plan complete";
-            return $"Tool step {idx + 1}/{count}";
+                return "Done";
+            if (idx == 0 && _state.ToolOutputs.Count == 0)
+                return "Planning";
+            if (_state.AutoApproveAll || _state.ToolOutputs.Count > 0)
+                return "Executing tools";
+            return "Waiting user action";
         }
 
         if (!string.IsNullOrWhiteSpace(_state.PendingQuestion))
-            return "Waiting clarification";
+            return "Clarifying";
 
         if (!string.IsNullOrWhiteSpace(_state.PendingUserRequest))
-            return "Digesting";
+            return "Digesting intent";
 
         return "Idle";
     }
@@ -573,7 +633,10 @@ public sealed class WorkflowFacade
         sb.AppendLine("ATTACHMENTS:");
         foreach (var a in activeAttachments)
         {
-            sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}");
+            var kind = NormalizeAttachmentKind(a.Kind);
+            var suggestedTool = SuggestToolForKind(kind);
+            var toolText = string.IsNullOrWhiteSpace(suggestedTool) ? "n/a" : suggestedTool;
+            sb.AppendLine($"- storedName: {a.StoredName}, originalName: {a.OriginalName}, kind: {kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}, suggestedTool: {toolText}");
         }
         sb.AppendLine();
         sb.Append(userText ?? "");
@@ -786,7 +849,10 @@ public sealed class WorkflowFacade
         sb.AppendLine("ATTACHMENTS:");
         foreach (var a in activeAttachments)
         {
-            sb.AppendLine($"- storedName: {a.StoredName}, kind: {a.Kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}");
+            var kind = NormalizeAttachmentKind(a.Kind);
+            var suggestedTool = SuggestToolForKind(kind);
+            var toolText = string.IsNullOrWhiteSpace(suggestedTool) ? "n/a" : suggestedTool;
+            sb.AppendLine($"- storedName: {a.StoredName}, kind: {kind}, sizeBytes: {a.SizeBytes}, sha256: {a.Sha256}, suggestedTool: {toolText}");
         }
 
         if (blueprint != null)
@@ -891,6 +957,27 @@ public sealed class WorkflowFacade
             }
         }
 
+        var expectedTools = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var att in activeAttachments)
+        {
+            var expected = SuggestToolForKind(att.Kind);
+            if (!string.IsNullOrWhiteSpace(expected))
+                expectedTools[att.StoredName] = expected;
+        }
+
+        foreach (var step in plan.Steps)
+        {
+            if (!step.Inputs.TryGetValue("storedName", out var stored) || string.IsNullOrWhiteSpace(stored))
+                continue;
+
+            if (expectedTools.TryGetValue(stored, out var expectedTool) &&
+                !step.ToolId.Equals(expectedTool, StringComparison.OrdinalIgnoreCase))
+            {
+                _trace.Emit($"[toolplan:error] tool mismatch for attachment {stored}: expected {expectedTool}, got {step.ToolId}.");
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -902,8 +989,11 @@ public sealed class WorkflowFacade
             return;
         }
 
+        var planSummary = BuildPlanSummary(_state.PendingToolPlan, _state.PendingStepIndex);
+        if (!string.IsNullOrWhiteSpace(planSummary) && _state.PendingStepIndex == 0)
+            UserFacingMessage?.Invoke(planSummary);
+
         var mode = _cfg.General.ConversationMode;
-        string msg;
         string stepSummary = "";
 
         if (mode == ConversationMode.Strict)
@@ -929,7 +1019,7 @@ public sealed class WorkflowFacade
             var question = string.IsNullOrWhiteSpace(summary)
                 ? "Ready to proceed with the next step?"
                 : $"I can {summary}. Want me to proceed?";
-            EmitWaitUser(question, question);
+            EmitWaitUser(question, question, string.IsNullOrWhiteSpace(planSummary) ? null : planSummary);
         }
 
         _state.PendingQuestion = null;
@@ -957,6 +1047,7 @@ public sealed class WorkflowFacade
         }
 
         var step = _state.PendingToolPlan.Steps[_state.PendingStepIndex];
+        NotifyStatus($"Running {DescribeStep(step)}");
         var result = await ToolStepRunner.RunAsync(step, _cfg, _trace, _attachments, _toolManifest, _toolPrompts, ct).ConfigureAwait(false);
         if (!result.Ok)
         {
@@ -1037,6 +1128,76 @@ public sealed class WorkflowFacade
         return "Tweak";
     }
 
+    private JobSpec ValidateJobSpec(JobSpec spec)
+    {
+        if (spec == null) return JobSpec.Invalid("invalid_spec");
+
+        var missing = spec.GetMissingFields();
+        var goal = (spec.Goal ?? "").Trim();
+        var context = spec.Context ?? "";
+        var actions = spec.Actions?.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList() ?? new List<string>();
+        var constraints = spec.Constraints?.Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim()).ToList() ?? new List<string>();
+        var attachments = spec.Attachments?.Where(a => a != null && !string.IsNullOrWhiteSpace(a.StoredName)).ToList() ?? new List<JobSpecAttachment>();
+
+        if (string.IsNullOrWhiteSpace(goal))
+            AddMissing("goal", missing);
+        if (actions.Count == 0)
+            AddMissing("actions", missing);
+        if (attachments.Count == 0)
+            AddMissing("attachments", missing);
+
+        foreach (var att in attachments)
+        {
+            var kind = NormalizeAttachmentKind(att.Kind);
+            if (string.IsNullOrWhiteSpace(att.StoredName) || string.IsNullOrWhiteSpace(kind))
+            {
+                AddMissing("attachments", missing);
+                continue;
+            }
+
+            var expectedTool = SuggestToolForKind(kind);
+            if (string.IsNullOrWhiteSpace(expectedTool))
+                AddMissing("attachments", missing);
+        }
+
+        var ready = spec.Ready && missing.Count == 0;
+
+        return JobSpec.FromJson(
+            spec.Raw,
+            string.IsNullOrWhiteSpace(spec.Mode) ? "jobspec.v2" : spec.Mode,
+            goal,
+            context,
+            actions,
+            constraints,
+            attachments,
+            spec.Clarification,
+            ready,
+            missing);
+    }
+
+    private static void AddMissing(string field, List<string> missing)
+    {
+        if (missing == null) return;
+        if (missing.Contains(field, StringComparer.OrdinalIgnoreCase)) return;
+        missing.Add(field);
+    }
+
+    private string BuildPlanSummary(ToolPlan plan, int currentStepIndex)
+    {
+        if (plan == null || plan.Steps == null || plan.Steps.Count == 0)
+            return "";
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Plan ready. I will:");
+        for (int i = 0; i < plan.Steps.Count; i++)
+        {
+            var marker = i == currentStepIndex ? "->" : "-";
+            sb.AppendLine($"{marker} Step {i + 1}: {DescribeStep(plan.Steps[i])}");
+        }
+        sb.AppendLine("Use Run Next to continue, Stop to cancel, or Edit Plan to change it.");
+        return sb.ToString().TrimEnd();
+    }
+
     private void SendChatStepSummary(ToolRunResult result)
     {
         if (!result.Output.HasValue) return;
@@ -1050,8 +1211,14 @@ public sealed class WorkflowFacade
             {
                 var name = root.TryGetProperty("storedName", out var n) ? n.GetString() : "";
                 var content = root.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
-                var preview = content.Length <= 200 ? content : content.Substring(0, 200) + "...";
-                UserFacingMessage?.Invoke($"I read {name}. Quick take: {preview}");
+                var preview = content.Length <= 240 ? content : content.Substring(0, 240) + "...";
+                var sb = new StringBuilder();
+                sb.AppendLine("🗂️ File read");
+                sb.AppendLine($"Name: {name}");
+                sb.AppendLine("Preview:");
+                sb.AppendLine(preview);
+                sb.AppendLine("Tap Run Next to continue or Edit Plan to change steps.");
+                UserFacingMessage?.Invoke(sb.ToString().TrimEnd());
             }
             else if (toolId.Equals("vision.describe.image", StringComparison.OrdinalIgnoreCase))
             {
@@ -1060,10 +1227,15 @@ public sealed class WorkflowFacade
                 var tags = root.TryGetProperty("tags", out var tagsEl) && tagsEl.ValueKind == JsonValueKind.Array
                     ? string.Join(", ", tagsEl.EnumerateArray().Where(t => t.ValueKind == JsonValueKind.String).Select(t => t.GetString()).Where(s => !string.IsNullOrWhiteSpace(s)))
                     : "";
-                var msg = $"I described {name}: {caption}";
+                var sb = new StringBuilder();
+                sb.AppendLine("🖼️ Vision result");
+                sb.AppendLine($"Image: {name}");
+                if (!string.IsNullOrWhiteSpace(caption))
+                    sb.AppendLine("Caption: " + caption);
                 if (!string.IsNullOrWhiteSpace(tags))
-                    msg += $" (tags: {tags})";
-                UserFacingMessage?.Invoke(msg);
+                    sb.AppendLine("Tags: " + tags);
+                sb.AppendLine("Tap Run Next to continue or Edit Plan to change steps.");
+                UserFacingMessage?.Invoke(sb.ToString().TrimEnd());
             }
         }
         catch { }

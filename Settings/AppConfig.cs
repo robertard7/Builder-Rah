@@ -45,22 +45,35 @@ public sealed class GeneralSettings
 
     // SAVE POINT: global digest prompt lives here (JSON-only, no tools)
     public string JobSpecDigestPrompt { get; set; } =
-        @"You are the JobSpec Digest. Respond with exactly one JSON object and nothing else.
-Output shape (no code fences, no prose):
+        @"You are the JobSpec Digest. Respond with ONE JSON object only (no prose, no code fences).
+Summarize intent as: {Goal, Attachments, Actions, Context, Constraints}
+Output shape:
 {
-  ""request"": ""<brief restatement of the user's ask>"",
-  ""state"": {
-    ""ready"": <true|false>,
-    ""missing"": [""field1"", ""field2""]
-  }
+  ""mode"": ""jobspec.v2"",
+  ""goal"": ""<plain goal>"",
+  ""context"": ""<helpful background or empty>"",
+  ""actions"": [""describe image"", ""summarize document"", ""combine findings""],
+  ""constraints"": [""<constraint>"", ""<constraint>""],
+  ""attachments"": [
+    {
+      ""storedName"": ""<storedName from ATTACHMENTS block>"",
+      ""kind"": ""image|document|code|other"",
+      ""status"": ""present|missing|pending"",
+      ""summary"": ""<how to use this attachment>"",
+      ""tags"": [""<keywords>"", ""...""],
+      ""tools"": [""vision.describe.image"" or ""file.read.text""]
+    }
+  ],
+  ""clarification"": ""<one short natural question if anything important is missing; empty when ready>"",
+  ""state"": { ""ready"": <true|false>, ""missing"": [""goal"", ""actions"", ""attachments"", ""context"", ""constraints""] }
 }
 Rules:
-- Emit ONLY valid JSON. No markdown, comments, or additional text.
-- Top-level keys MUST be exactly: request (string) and state (object).
-- state.ready is a boolean. state.missing is an array of strings naming absent/ambiguous fields.
-- If any required information is missing, set state.ready=false and list each missing field in state.missing.
-- If the request is complete, set state.ready=true and state.missing=[].
-- Any non-JSON output is a prompt failure.";
+- ALWAYS emit valid JSON; no markdown or comments.
+- Use the ATTACHMENTS section to pre-fill attachments with storedName, kind, and tool suggestion (vision.describe.image for images; file.read.text for documents/code).
+- Include an attachments array even if empty.
+- If any required field is missing/ambiguous, set state.ready=false and list the missing concepts in state.missing. Otherwise, set ready=true and missing=[].
+- Ask at most ONE clarifying question in ""clarification"" when ready=false; leave it empty when ready=true.
+- Do NOT invent tools beyond vision.describe.image or file.read.text.";
 
     public void Normalize()
     {
