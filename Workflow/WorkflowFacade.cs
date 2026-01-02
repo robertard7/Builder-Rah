@@ -293,7 +293,7 @@ public sealed class WorkflowFacade
             EmitToolPlanWait();
     }
 
-    public async Task<RunnerBuildSummary> RunFromCodexAsync(CancellationToken ct)
+    public async Task<RunnerBuildSummary> RunFromCodexAsync(string userText, CancellationToken ct)
     {
         var repoScope = RepoScope.Resolve(_cfg);
         _trace.Emit(repoScope.Message);
@@ -302,6 +302,15 @@ public sealed class WorkflowFacade
 
         if (!EnsureProvidersConfigured() || !EnsureToolPromptsReady())
             return RunnerBuildSummary.Failed("validation_failed");
+
+        var mermaid = _cfg.WorkflowGraph.MermaidText ?? "";
+        var gv = _router.ValidateGraph(mermaid);
+        if (!gv.Ok)
+            return RunnerBuildSummary.Failed("graph_invalid", gv.Message);
+
+        var digest = await RunJobSpecDigestAsync(AppendAttachmentMetadata(userText), ct).ConfigureAwait(false);
+        if (!digest.IsComplete)
+            return RunnerBuildSummary.Failed("jobspec_incomplete", string.Join(", ", digest.GetMissingFields()));
 
         var repo = Environment.GetEnvironmentVariable("GITHUB_REPOSITORY") ?? "";
         if (string.IsNullOrWhiteSpace(repo))
