@@ -1,9 +1,18 @@
-<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
+
+  <!-- If you have any xUnit test .cs files accidentally living in this WinForms project,
+       exclude them so the app compiles without dragging test deps into the UI app. -->
+  <ItemGroup>
+    <Compile Remove="**\*Tests.cs" />
+    <Compile Remove="**\*Test.cs" />
+  </ItemGroup>
 </Project>
