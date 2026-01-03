@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace RahBuilder.Workflow;
 
@@ -54,6 +55,13 @@ public static class SessionManager
     private static readonly ConcurrentDictionary<string, SessionRecord> _sessions = new(StringComparer.OrdinalIgnoreCase);
     private static readonly string Root = Path.Combine(AppContext.BaseDirectory, "SessionData");
     private static readonly TimeSpan Expiry = TimeSpan.FromHours(12);
+    private static readonly object FileLock = new();
+    private static readonly JsonSerializerOptions StorageOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 
     static SessionManager()
     {
@@ -70,10 +78,14 @@ public static class SessionManager
         {
             foreach (var f in Directory.GetFiles(Root, "*.json"))
             {
-                var rec = JsonSerializer.Deserialize<SessionRecord>(File.ReadAllText(f));
+                SessionRecord? rec;
+                lock (FileLock)
+                {
+                    rec = JsonSerializer.Deserialize<SessionRecord>(File.ReadAllText(f), StorageOptions);
+                }
                 if (rec != null && !string.IsNullOrWhiteSpace(rec.SessionId))
                 {
-                    rec.LastActiveUtc = rec.LastActiveUtc == default ? rec.CreatedUtc : rec.LastActiveUtc;
+                    NormalizeRecord(rec);
                     _sessions[rec.SessionId] = rec;
                 }
             }
@@ -85,9 +97,40 @@ public static class SessionManager
     {
         try
         {
-            File.WriteAllText(GetPath(rec.SessionId), JsonSerializer.Serialize(rec, new JsonSerializerOptions { WriteIndented = true }));
+            var path = GetPath(rec.SessionId);
+            var tmp = path + ".tmp";
+            var json = JsonSerializer.Serialize(rec, StorageOptions);
+            lock (FileLock)
+            {
+                File.WriteAllText(tmp, json);
+                if (File.Exists(path))
+                    File.Delete(path);
+                File.Move(tmp, path);
+            }
         }
         catch { }
+    }
+
+    private static void NormalizeRecord(SessionRecord rec)
+    {
+        rec.LastActiveUtc = rec.LastActiveUtc == default ? rec.CreatedUtc : rec.LastActiveUtc;
+        rec.History.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
+        RebuildDerivedState(rec);
+    }
+
+    private static void RebuildDerivedState(SessionRecord rec)
+    {
+        rec.Cards.Clear();
+        rec.Logs.Clear();
+        rec.Artifacts.Clear();
+        rec.PlanVersions.Clear();
+
+        foreach (var ev in rec.History.OrderBy(h => h.Timestamp))
+        {
+            ApplyEventToRecord(rec, ev);
+        }
+
+        rec.LastActiveUtc = rec.History.LastOrDefault()?.Timestamp ?? rec.LastActiveUtc;
     }
 
     private static SessionRecord GetOrCreate(string id)
@@ -142,32 +185,27 @@ public static class SessionManager
         var rec = GetOrCreate(id);
         var evt = new SessionEvent(type, data, DateTimeOffset.UtcNow);
         rec.History.Add(evt);
+        ApplyEventToRecord(rec, evt);
         rec.LastActiveUtc = DateTimeOffset.UtcNow;
         Save(rec);
         SessionEvents.Notify(id, evt);
     }
 
-    public static List<SessionRecord> GetHistory(string id)
+    public static IReadOnlyList<SessionEvent> GetHistory(string id)
     {
-        return TryGet(id, out var rec) ? new List<SessionRecord> { rec } : new();
+        return TryGet(id, out var rec) ? rec.History.OrderBy(h => h.Timestamp).ToList() : new List<SessionEvent>();
     }
 
     public static void AppendCard(string session, OutputCard card)
     {
         if (card == null) return;
-        var rec = GetOrCreate(session);
-        rec.Cards.Add(OutputCard.Truncate(card));
-        rec.LastActiveUtc = DateTimeOffset.UtcNow;
-        Save(rec);
+        AddEvent(session, "output_card", OutputCard.Truncate(card));
     }
 
     public static void AppendLog(string session, string log)
     {
         if (string.IsNullOrWhiteSpace(log)) return;
-        var rec = GetOrCreate(session);
-        rec.Logs.Add("[" + DateTimeOffset.UtcNow.ToString("O") + "] " + log.Trim());
-        rec.LastActiveUtc = DateTimeOffset.UtcNow;
-        Save(rec);
+        AddEvent(session, "log", new { message = log.Trim(), timestamp = DateTimeOffset.UtcNow });
     }
 
     public static void UpdateMemory(string session, object memory)
@@ -180,12 +218,8 @@ public static class SessionManager
 
     public static void UpdateArtifacts(string session, IReadOnlyList<string> artifacts)
     {
-        var rec = GetOrCreate(session);
-        rec.Artifacts.Clear();
-        if (artifacts != null)
-            rec.Artifacts.AddRange(artifacts);
-        rec.LastActiveUtc = DateTimeOffset.UtcNow;
-        Save(rec);
+        var list = artifacts?.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()).ToList() ?? new List<string>();
+        AddEvent(session, "artifacts_updated", list);
     }
 
     public static void AddHistoryEvent(string session, string type, object data) => AddEvent(session, type, data);
@@ -201,24 +235,22 @@ public static class SessionManager
         var rec = GetOrCreate(session);
         var version = rec.PlanVersions.Count + 1;
         var snapshot = new PlanVersionSnapshot(version, DateTimeOffset.UtcNow, steps.ToList(), planJson);
-        rec.PlanVersions.Add(snapshot);
-        rec.LastActiveUtc = DateTimeOffset.UtcNow;
-        AddEvent(session, "plan", new { version, steps = steps.Select(s => s.Title).ToList() });
-        Save(rec);
+        AddEvent(session, "plan_updated", snapshot);
         return snapshot;
     }
 
     public static IReadOnlyList<PlanVersionSnapshot> GetPlanVersions(string session)
     {
         var rec = GetOrCreate(session);
-        return rec.PlanVersions.ToList();
+        return rec.PlanVersions.OrderBy(p => p.Version).ToList();
     }
 
     public static object GetPlanDiff(string session, int from, int to)
     {
         var rec = GetOrCreate(session);
-        var a = rec.PlanVersions.FirstOrDefault(p => p.Version == from);
-        var b = rec.PlanVersions.FirstOrDefault(p => p.Version == to);
+        var ordered = rec.PlanVersions.OrderBy(p => p.Version).ToList();
+        var a = ordered.FirstOrDefault(p => p.Version == from);
+        var b = ordered.FirstOrDefault(p => p.Version == to);
         if (a == null || b == null)
             return new { ok = false, error = "version_not_found" };
 
@@ -303,5 +335,96 @@ public static class SessionManager
         var expired = _sessions.Values.Where(rec => now - rec.LastActiveUtc > Expiry).Select(r => r.SessionId).ToList();
         foreach (var id in expired)
             Terminate(id);
+    }
+
+    private static bool TryConvert<T>(object? data, out T result)
+    {
+        switch (data)
+        {
+            case T typed:
+                result = typed;
+                return true;
+            case JsonElement el:
+                try
+                {
+                    var deserialized = el.Deserialize<T>(StorageOptions);
+                    if (deserialized != null)
+                    {
+                        result = deserialized;
+                        return true;
+                    }
+                }
+                catch { }
+                break;
+        }
+
+        result = default!;
+        return false;
+    }
+
+    private static void ApplyEventToRecord(SessionRecord rec, SessionEvent evt)
+    {
+        switch (evt.Type)
+        {
+            case "output_card":
+                if (TryConvert<OutputCard>(evt.Data, out var card) && card != null)
+                    rec.Cards.Add(OutputCard.Truncate(card));
+                break;
+            case "log":
+                var message = "";
+                var timestamp = evt.Timestamp;
+                if (TryConvert<string>(evt.Data, out var logText) && !string.IsNullOrWhiteSpace(logText))
+                {
+                    message = logText.Trim();
+                }
+                else if (evt.Data is JsonElement el && el.ValueKind == JsonValueKind.String)
+                {
+                    message = el.GetString() ?? "";
+                }
+                else if (TryConvert<Dictionary<string, object>>(evt.Data, out var obj))
+                {
+                    if (obj.TryGetValue("message", out var msg) && msg is string s)
+                        message = s;
+                    if (obj.TryGetValue("timestamp", out var ts) && ts is DateTimeOffset dto)
+                        timestamp = dto;
+                }
+                else if (evt.Data is JsonElement elObj && elObj.ValueKind == JsonValueKind.Object)
+                {
+                    if (elObj.TryGetProperty("message", out var msgProp) && msgProp.ValueKind == JsonValueKind.String)
+                        message = msgProp.GetString() ?? "";
+                    if (elObj.TryGetProperty("timestamp", out var tsProp) && tsProp.ValueKind is JsonValueKind.String or JsonValueKind.Number)
+                    {
+                        if (tsProp.ValueKind == JsonValueKind.String && DateTimeOffset.TryParse(tsProp.GetString(), out var parsed))
+                            timestamp = parsed;
+                        else if (tsProp.ValueKind == JsonValueKind.Number && tsProp.TryGetInt64(out var unix))
+                            timestamp = DateTimeOffset.FromUnixTimeMilliseconds(unix);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(message))
+                    rec.Logs.Add($"[{timestamp:O}] {message.Trim()}");
+                break;
+            case "artifacts_updated":
+                if (TryConvert<List<string>>(evt.Data, out var artifacts) && artifacts != null)
+                {
+                    rec.Artifacts.Clear();
+                    rec.Artifacts.AddRange(artifacts.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()));
+                }
+                else if (TryConvert<string[]>(evt.Data, out var arr) && arr != null)
+                {
+                    rec.Artifacts.Clear();
+                    rec.Artifacts.AddRange(arr.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a.Trim()));
+                }
+                break;
+            case "plan_updated":
+                if (TryConvert<PlanVersionSnapshot>(evt.Data, out var snap) && snap != null)
+                {
+                    var existing = rec.PlanVersions.FirstOrDefault(p => p.Version == snap.Version);
+                    if (existing != null)
+                        rec.PlanVersions.Remove(existing);
+                    rec.PlanVersions.Add(snap);
+                }
+                break;
+        }
     }
 }
