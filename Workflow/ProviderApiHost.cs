@@ -111,6 +111,13 @@ public sealed class ProviderApiHost : IDisposable
                 return;
             }
 
+            if (path.EndsWith("/api/sessions", StringComparison.OrdinalIgnoreCase))
+            {
+                var sessions = SessionManager.Instance.ListSessions();
+                await WriteJsonAsync(ctx, new { ok = true, sessions }).ConfigureAwait(false);
+                return;
+            }
+
             if (path.EndsWith("/api/output", StringComparison.OrdinalIgnoreCase))
             {
                 await WriteJsonAsync(ctx, _workflow.GetOutputCards()).ConfigureAwait(false);
@@ -142,6 +149,18 @@ public sealed class ProviderApiHost : IDisposable
             {
                 var ok = SessionManager.Instance.Reset(currentSession);
                 await WriteJsonAsync(ctx, new { ok, session = currentSession }).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/stream", StringComparison.OrdinalIgnoreCase))
+            {
+                ctx.Response.ContentType = "text/event-stream";
+                ctx.Response.Headers.Add("Cache-Control", "no-cache");
+                await using var writer = new StreamWriter(ctx.Response.OutputStream);
+                await writer.WriteAsync("event: ping\n");
+                await writer.WriteAsync($"data: {{\"session\":\"{currentSession}\"}}\n\n");
+                await writer.FlushAsync().ConfigureAwait(false);
+                ctx.Response.Close();
                 return;
             }
 
