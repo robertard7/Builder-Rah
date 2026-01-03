@@ -19,9 +19,33 @@ function Docs() {
       <CodeSnippet>{`curl -X POST http://localhost:5173/api/jobs
 curl -X POST "http://localhost:5173/api/jobs?session=SESSION_TOKEN&text=Run+task"`}</CodeSnippet>
 
+      <h3>POST /api/session/create</h3>
+      <p>Create and return a new session token.</p>
+      <CodeSnippet>{`curl -X POST http://localhost:5173/api/session/create`}</CodeSnippet>
+
+      <h3>POST /api/session/reset</h3>
+      <p>Reset the active session's state and history.</p>
+      <CodeSnippet>{`curl -X POST "http://localhost:5173/api/session/reset?session=SESSION_TOKEN"`}</CodeSnippet>
+
+      <h3>POST /api/session/terminate</h3>
+      <p>Terminate a session and remove persisted state.</p>
+      <CodeSnippet>{`curl -X POST "http://localhost:5173/api/session/terminate?session=SESSION_TOKEN"`}</CodeSnippet>
+
+      <h3>GET /api/sessions</h3>
+      <p>List active sessions and metadata.</p>
+      <CodeSnippet>{`curl "http://localhost:5173/api/sessions"`}</CodeSnippet>
+
       <h3>GET /api/plan</h3>
       <p>Fetch the current plan for a session.</p>
       <CodeSnippet>{`curl "http://localhost:5173/api/plan?session=SESSION_TOKEN"`}</CodeSnippet>
+
+      <h3>GET /api/plan/versions</h3>
+      <p>List stored plan versions for a session.</p>
+      <CodeSnippet>{`curl "http://localhost:5173/api/plan/versions?session=SESSION_TOKEN"`}</CodeSnippet>
+
+      <h3>GET /api/plan/diff</h3>
+      <p>Show a diff between two plan versions.</p>
+      <CodeSnippet>{`curl "http://localhost:5173/api/plan/diff?session=SESSION_TOKEN&from=1&to=2"`}</CodeSnippet>
 
       <h3>POST /api/plan/update</h3>
       <p>Update the plan for a session.</p>
@@ -49,9 +73,14 @@ source.onmessage = (event) => {
       <p>Download a ZIP archive of generated artifacts.</p>
       <CodeSnippet>{`curl -o artifacts.zip "http://localhost:5173/api/artifacts/download?session=SESSION_TOKEN"`}</CodeSnippet>
 
-      <h3>POST /api/session/reset</h3>
-      <p>Reset the current session state.</p>
-      <CodeSnippet>{`curl -X POST "http://localhost:5173/api/session/reset?session=SESSION_TOKEN"`}</CodeSnippet>
+      <h3>GET /api/history</h3>
+      <p>Retrieve session history, plan versions, and conversation snapshots.</p>
+      <CodeSnippet>{`curl "http://localhost:5173/api/history?session=SESSION_TOKEN"`}</CodeSnippet>
+
+      <h3>GET /api/logs</h3>
+      <p>Fetch session-specific logs for debugging.</p>
+      <CodeSnippet>{`curl "http://localhost:5173/api/logs?session=SESSION_TOKEN"`}</CodeSnippet>
+
     </div>
   );
 }
