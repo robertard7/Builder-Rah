@@ -109,7 +109,6 @@ public sealed class WorkflowFacade
         if (card == null) return;
         SessionManager.AppendCard(_state.SessionToken, card);
         OutputCardProduced?.Invoke(card);
-        SessionManager.AddEvent(_state.SessionToken, "output_card", card);
     }
 
     private void BroadcastEvent(string type, object payload) => SessionManager.AddEvent(_state.SessionToken, type, payload);
