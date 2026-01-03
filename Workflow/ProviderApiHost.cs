@@ -174,7 +174,14 @@ public sealed class ProviderApiHost : IDisposable
 
             if (path.EndsWith("/api/stream", StringComparison.OrdinalIgnoreCase))
             {
-                _streams.AddStream(currentSession, ctx);
+                if (!SessionManager.Instance.Exists(currentSession) && !string.IsNullOrWhiteSpace(session))
+                {
+                    await WriteJsonAsync(ctx, new { ok = false, error = "session_not_found" }, HttpStatusCode.NotFound).ConfigureAwait(false);
+                    return;
+                }
+
+                var history = SessionManager.Instance.TryGetSnapshot(currentSession, out var snap) ? snap.History?.Select(h => new SessionEvent(h.Type, h.Data, h.Timestamp)) : null;
+                _streams.AddStream(currentSession, ctx, history);
                 return;
             }
 

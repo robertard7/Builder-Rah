@@ -70,6 +70,18 @@ public sealed class SessionManager
         });
     }
 
+    public bool TryGetSnapshot(string session, out SessionSnapshot snapshot)
+    {
+        snapshot = default!;
+        if (string.IsNullOrWhiteSpace(session) || !_sessions.TryGetValue(session, out _))
+            return false;
+
+        snapshot = Snapshot(session);
+        return true;
+    }
+
+    public bool Exists(string session) => !string.IsNullOrWhiteSpace(session) && _sessions.ContainsKey(session);
+
     public void AppendCard(string session, OutputCard card)
     {
         if (!_sessions.TryGetValue(session, out var rec))
