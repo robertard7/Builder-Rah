@@ -14,6 +14,8 @@ public enum OutputCardKind
     Diff,
     Final,
     Program,
+    Tree,
+    Archive,
     Error
 }
 

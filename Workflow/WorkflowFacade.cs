@@ -555,6 +555,16 @@ public sealed class WorkflowFacade
         return _state.OutputCards.Select(c => OutputCard.Truncate(c)).ToList();
     }
 
+    public IReadOnlyList<ProgramArtifactResult> GetArtifacts()
+    {
+        return _state.ProgramArtifacts.ToList();
+    }
+
+    public IReadOnlyList<string> GetArtifactPackages()
+    {
+        return _state.ArtifactPackages.ToList();
+    }
+
     public object GetPlanSnapshot()
     {
         var steps = _state.PendingToolPlan?.Steps?.Select(s => new
@@ -585,6 +595,8 @@ public sealed class WorkflowFacade
             session = _state.SessionToken
         };
     }
+
+    public string GetSessionToken() => _state.SessionToken;
 
     public void OverrideSession(string session)
     {
@@ -1473,7 +1485,7 @@ public sealed class WorkflowFacade
             return;
         }
 
-        var result = await _artifactGenerator.GenerateAsync(_cfg, intent, GetActiveAttachments(), repo.RepoRoot, ct).ConfigureAwait(false);
+        var result = await _artifactGenerator.GenerateAsync(_cfg, intent, GetActiveAttachments(), _state.ToolOutputs, repo.RepoRoot, _state.SessionToken, ct).ConfigureAwait(false);
         if (!result.Ok)
         {
             _trace.Emit("[program:error] " + result.Message);
@@ -1482,9 +1494,10 @@ public sealed class WorkflowFacade
 
         if (!string.IsNullOrWhiteSpace(result.ZipPath))
             _state.ArtifactPackages.Add(result.ZipPath);
+        _state.ProgramArtifacts.Add(result);
 
         var previewLines = result.Files.Take(5).Select(f => $"- {f.Path}");
-        var tree = ProgramArtifactGenerator.BuildTreePreview(result.Files);
+        var tree = result.TreePreview;
         var card = new OutputCard
         {
             Kind = OutputCardKind.Program,
@@ -1499,9 +1512,63 @@ public sealed class WorkflowFacade
 
         _state.OutputCards.Add(card);
         OutputCardProduced?.Invoke(card);
+        EmitArtifactCards(result);
         var msg = card.ToDisplayText();
         RecordAssistantMessage(msg);
         UserFacingMessage?.Invoke(msg);
+    }
+
+    private void EmitArtifactCards(ProgramArtifactResult result)
+    {
+        if (result == null) return;
+
+        var treeCard = new OutputCard
+        {
+            Kind = OutputCardKind.Tree,
+            Title = "Project tree",
+            Summary = $"Files: {result.Files.Count}",
+            Preview = result.TreePreview,
+            FullContent = result.TreePreview,
+            Tags = new[] { "tree", "artifact" },
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Metadata = result.ZipPath
+        };
+        _state.OutputCards.Add(treeCard);
+        OutputCardProduced?.Invoke(treeCard);
+
+        foreach (var preview in result.Previews)
+        {
+            var fileCard = new OutputCard
+            {
+                Kind = OutputCardKind.Code,
+                Title = preview.Path,
+                Summary = $"{preview.LineCount} lines ({preview.ContentType})",
+                Preview = preview.Preview,
+                FullContent = preview.Preview,
+                Tags = preview.Tags.Count > 0 ? preview.Tags : new[] { "code", "generated" },
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Metadata = result.ZipPath
+            };
+            _state.OutputCards.Add(fileCard);
+            OutputCardProduced?.Invoke(fileCard);
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.ZipPath))
+        {
+            var zipCard = new OutputCard
+            {
+                Kind = OutputCardKind.Archive,
+                Title = "Download ZIP",
+                Summary = Path.GetFileName(result.ZipPath),
+                Preview = "Download generated artifacts.",
+                FullContent = $"Path: {result.ZipPath}",
+                Tags = new[] { "zip", "artifact" },
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Metadata = result.ZipPath
+            };
+            _state.OutputCards.Add(zipCard);
+            OutputCardProduced?.Invoke(zipCard);
+        }
     }
 
     private async Task<bool> HandleProgramOnlyFlowAsync(string userText, string jobSpecJson, CancellationToken ct)
