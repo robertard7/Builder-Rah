@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -14,10 +15,12 @@ public sealed class ProviderApiHost : IDisposable
     private readonly WorkflowFacade _workflow;
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
+    private readonly SessionEventStreamManager _streams;
 
-    public ProviderApiHost(WorkflowFacade workflow)
+    public ProviderApiHost(WorkflowFacade workflow, SessionEventStreamManager streams)
     {
         _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
+        _streams = streams ?? throw new ArgumentNullException(nameof(streams));
     }
 
     public bool IsRunning => _listener?.IsListening == true;
@@ -78,7 +81,7 @@ public sealed class ProviderApiHost : IDisposable
         {
             var path = ctx.Request.Url?.AbsolutePath?.TrimEnd('/') ?? "";
             var session = ctx.Request.QueryString?["session"] ?? "";
-            var currentSession = _workflow.GetSessionToken();
+            var currentSession = string.IsNullOrWhiteSpace(session) ? _workflow.GetSessionToken() : session;
             var allowOverride = path.EndsWith("/api/jobs", StringComparison.OrdinalIgnoreCase);
 
             if (!allowOverride && !string.IsNullOrWhiteSpace(session) && !string.Equals(session, currentSession, StringComparison.Ordinal))
@@ -89,11 +92,21 @@ public sealed class ProviderApiHost : IDisposable
 
             if (allowOverride && !string.IsNullOrWhiteSpace(session))
                 _workflow.OverrideSession(session);
+            else if (!string.IsNullOrWhiteSpace(session))
+                _workflow.OverrideSession(session);
 
             if (path.EndsWith("/api/status", StringComparison.OrdinalIgnoreCase))
             {
                 var snapshot = _workflow.GetPublicSnapshot();
                 await WriteJsonAsync(ctx, snapshot).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/session/create", StringComparison.OrdinalIgnoreCase) && ctx.Request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase))
+            {
+                var id = SessionManager.Instance.CreateSession();
+                _workflow.OverrideSession(id);
+                await WriteJsonAsync(ctx, new { ok = true, session = id }).ConfigureAwait(false);
                 return;
             }
 
@@ -113,7 +126,7 @@ public sealed class ProviderApiHost : IDisposable
 
             if (path.EndsWith("/api/sessions", StringComparison.OrdinalIgnoreCase))
             {
-                var sessions = SessionManager.Instance.ListSessions();
+                var sessions = SessionManager.Instance.ListSessions().Select(s => new { s.Session, s.Started, s.LastActive, cards = s.Cards?.Count ?? 0 }).ToList();
                 await WriteJsonAsync(ctx, new { ok = true, sessions }).ConfigureAwait(false);
                 return;
             }
@@ -152,15 +165,23 @@ public sealed class ProviderApiHost : IDisposable
                 return;
             }
 
+            if (path.EndsWith("/api/session/terminate", StringComparison.OrdinalIgnoreCase) && ctx.Request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase))
+            {
+                var ok = SessionManager.Instance.Terminate(currentSession);
+                await WriteJsonAsync(ctx, new { ok, session = currentSession }).ConfigureAwait(false);
+                return;
+            }
+
             if (path.EndsWith("/api/stream", StringComparison.OrdinalIgnoreCase))
             {
-                ctx.Response.ContentType = "text/event-stream";
-                ctx.Response.Headers.Add("Cache-Control", "no-cache");
-                await using var writer = new StreamWriter(ctx.Response.OutputStream);
-                await writer.WriteAsync("event: ping\n");
-                await writer.WriteAsync($"data: {{\"session\":\"{currentSession}\"}}\n\n");
-                await writer.FlushAsync().ConfigureAwait(false);
-                ctx.Response.Close();
+                if (!SessionManager.Instance.Exists(currentSession) && !string.IsNullOrWhiteSpace(session))
+                {
+                    await WriteJsonAsync(ctx, new { ok = false, error = "session_not_found" }, HttpStatusCode.NotFound).ConfigureAwait(false);
+                    return;
+                }
+
+                var history = SessionManager.Instance.TryGetSnapshot(currentSession, out var snap) ? snap.History?.Select(h => new SessionEvent(h.Type, h.Data, h.Timestamp)) : null;
+                _streams.AddStream(currentSession, ctx, history);
                 return;
             }
 
@@ -191,6 +212,51 @@ public sealed class ProviderApiHost : IDisposable
             if (path.EndsWith("/api/plan", StringComparison.OrdinalIgnoreCase))
             {
                 await WriteJsonAsync(ctx, _workflow.GetPlanSnapshot()).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/plan/versions", StringComparison.OrdinalIgnoreCase))
+            {
+                var versions = SessionManager.Instance.GetPlanVersions(currentSession);
+                await WriteJsonAsync(ctx, new { ok = true, session = currentSession, versions }).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/plan/diff", StringComparison.OrdinalIgnoreCase))
+            {
+                var from = int.TryParse(ctx.Request.QueryString?["from"] ?? "", out var a) ? a : 0;
+                var to = int.TryParse(ctx.Request.QueryString?["to"] ?? "", out var b) ? b : 0;
+                var diff = SessionManager.Instance.GetPlanDiff(currentSession, from, to);
+                await WriteJsonAsync(ctx, diff).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/plan/update", StringComparison.OrdinalIgnoreCase) && ctx.Request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase))
+            {
+                using var reader = new System.IO.StreamReader(ctx.Request.InputStream, ctx.Request.ContentEncoding);
+                var body = await reader.ReadToEndAsync().ConfigureAwait(false);
+                try
+                {
+                    var json = JsonDocument.Parse(body);
+                    var steps = new List<PlanVersionStep>();
+                    if (json.RootElement.TryGetProperty("steps", out var arr) && arr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var el in arr.EnumerateArray())
+                        {
+                            var id = el.TryGetProperty("id", out var i) ? i.GetString() ?? Guid.NewGuid().ToString("N") : Guid.NewGuid().ToString("N");
+                            var text = el.TryGetProperty("text", out var t) ? t.GetString() ?? "" : "";
+                            steps.Add(new PlanVersionStep(id, text, "manual.edit", "", new Dictionary<string, string> { { "text", text } }));
+                        }
+                    }
+                    var snap = SessionManager.Instance.AddPlanVersion(currentSession, steps, json.RootElement.GetRawText());
+                    _workflow.OverrideSession(currentSession);
+                    _workflow.UpdatePendingPlanFromClient(steps, false);
+                    await WriteJsonAsync(ctx, new { ok = true, session = currentSession, version = snap.Version }).ConfigureAwait(false);
+                }
+                catch
+                {
+                    await WriteJsonAsync(ctx, new { ok = false, error = "invalid_payload" }, HttpStatusCode.BadRequest).ConfigureAwait(false);
+                }
                 return;
             }
 
