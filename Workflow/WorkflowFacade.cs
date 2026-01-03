@@ -238,6 +238,7 @@ public sealed class WorkflowFacade
 
         _trace.Emit($"[chat] {text}");
         _state.Memory.Add("user", text);
+        _state.MemoryStore.AddUserMessage(text);
         _recentlyCompleted = false;
 
         var action = UserReplyInterpreter.Interpret(_cfg, _state, text);
@@ -302,6 +303,7 @@ public sealed class WorkflowFacade
         if (action.Action == ReplyActionType.AnswerClarification && !string.IsNullOrWhiteSpace(action.Payload))
         {
             _state.ClarificationAnswers.Add(action.Payload);
+            _state.MemoryStore.AddClarificationAnswer("unspecified", action.Payload);
             _state.PendingQuestion = null;
             PendingQuestionChanged?.Invoke(null);
             text = $"{_state.PendingUserRequest}\n\nAdditional detail: {string.Join("\n", _state.ClarificationAnswers)}";
@@ -309,6 +311,11 @@ public sealed class WorkflowFacade
         }
         else
         {
+            if (action.Action == ReplyActionType.NewRequest && _state.LastIntent != null && !string.IsNullOrWhiteSpace(_state.PendingUserRequest))
+            {
+                text = $"{_state.PendingUserRequest}\nFollow-up: {text}";
+                _state.MemoryStore.AddPlanNote("Follow-up: " + text);
+            }
             _state.PendingUserRequest = text;
             _state.ClearClarifications();
             _state.PendingQuestion = null;
@@ -596,6 +603,16 @@ public sealed class WorkflowFacade
         };
     }
 
+    public object GetHistorySnapshot()
+    {
+        return new
+        {
+            session = _state.SessionToken,
+            memory = _state.MemoryStore.ToSnapshot(),
+            chat = _state.Memory.Summarize(20)
+        };
+    }
+
     public string GetSessionToken() => _state.SessionToken;
 
     public void OverrideSession(string session)
@@ -656,7 +673,7 @@ public sealed class WorkflowFacade
     {
         try
         {
-            var result = await IntentExtractor.ExtractAsync(_cfg, userText, GetActiveAttachments(), _state.Memory, ct).ConfigureAwait(false);
+            var result = await IntentExtractor.ExtractAsync(_cfg, userText, GetActiveAttachments(), _state.Memory, _state.MemoryStore, ct).ConfigureAwait(false);
             if (!result.Ok || result.Extraction == null)
             {
                 _trace.Emit("[intent:error] " + result.Error);
@@ -697,6 +714,7 @@ public sealed class WorkflowFacade
     {
         if (string.IsNullOrWhiteSpace(text)) return;
         _state.Memory.Add("assistant", text);
+        _state.MemoryStore.AddAssistantMessage(text);
     }
 
     private void EmitWaitUser(string reason, string? friendly = null, string? preview = null)
@@ -709,6 +727,8 @@ public sealed class WorkflowFacade
             RecordAssistantMessage(chat);
             UserFacingMessage?.Invoke(chat);
         }
+        if (!string.IsNullOrWhiteSpace(preview))
+            _state.MemoryStore.AddClarificationQuestion(preview);
     }
 
     private void SyncGraphToHub(AppConfig cfg)
@@ -1200,6 +1220,7 @@ public sealed class WorkflowFacade
         _state.GenerateArtifacts = _planNeedsArtifacts;
         _state.PendingQuestion = null;
         _state.PlanConfirmed = false;
+        _state.MemoryStore.AddPlanNote("Plan prepared with steps: " + string.Join(", ", plan.Steps.Select(s => s.ToolId)));
         PlanReady?.Invoke(PlanDefinition.FromToolPlan(_state.SessionToken, plan));
         NotifyStatus("Planning");
         return true;
@@ -1651,6 +1672,7 @@ public sealed class WorkflowFacade
 
         var intent = _state.LastIntent;
         var missing = spec.GetMissingFields();
+        missing.RemoveAll(m => _state.MemoryStore.HasAnswerFor(m));
         var request = (spec.Request ?? intent?.Request ?? "").Trim();
         var goal = (spec.Goal ?? intent?.Goal ?? "").Trim();
         var context = string.IsNullOrWhiteSpace(spec.Context) ? intent?.Context ?? "" : spec.Context;
