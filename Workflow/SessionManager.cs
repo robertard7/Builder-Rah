@@ -9,6 +9,15 @@ using System.Text.Json;
 namespace RahBuilder.Workflow;
 
 public record SessionEvent(string Type, object Data, DateTimeOffset Timestamp);
+public static class SessionEvents
+{
+    public static event Action<string, SessionEvent>? EventAdded;
+
+    public static void Notify(string sessionId, SessionEvent evt)
+    {
+        try { EventAdded?.Invoke(sessionId, evt); } catch { }
+    }
+}
 
 public sealed record SessionHistoryEvent(string Type, DateTimeOffset Timestamp, object Data);
 
@@ -131,9 +140,11 @@ public static class SessionManager
     {
         if (string.IsNullOrWhiteSpace(id)) return;
         var rec = GetOrCreate(id);
-        rec.History.Add(new SessionEvent(type, data, DateTimeOffset.UtcNow));
+        var evt = new SessionEvent(type, data, DateTimeOffset.UtcNow);
+        rec.History.Add(evt);
         rec.LastActiveUtc = DateTimeOffset.UtcNow;
         Save(rec);
+        SessionEvents.Notify(id, evt);
     }
 
     public static List<SessionRecord> GetHistory(string id)
