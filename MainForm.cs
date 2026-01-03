@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -42,11 +43,15 @@ public sealed class MainForm : Form
     private readonly Button _stopButton;
     private readonly Button _editPlanButton;
     private readonly Button _previewPlanButton;
+    private readonly Button _downloadButton;
     private readonly Panel _clarifyPanel;
     private readonly Label _clarifyLabel;
     private readonly SplitContainer _chatSplit;
     private readonly ListBox _cardList;
     private readonly RichTextBox _cardDetail;
+    private readonly TreeView _artifactTree;
+    private readonly RichTextBox _artifactPreview;
+    private readonly Dictionary<string, string> _filePreviews = new(StringComparer.OrdinalIgnoreCase);
 
     public MainForm()
     {
@@ -208,11 +213,19 @@ public sealed class MainForm : Form
 
         _cardList = new ListBox
         {
-            Dock = DockStyle.Left,
-            Width = 260,
+            Dock = DockStyle.Fill,
             HorizontalScrollbar = true
         };
         _cardList.SelectedIndexChanged += (_, _) => ShowSelectedCard();
+
+        _downloadButton = new Button
+        {
+            Text = "Download ZIP",
+            Dock = DockStyle.Top,
+            Height = 30,
+            Enabled = false
+        };
+        _downloadButton.Click += (_, _) => DownloadSelectedArtifact();
 
         _cardDetail = new RichTextBox
         {
@@ -223,6 +236,22 @@ public sealed class MainForm : Form
             Font = new Font("Segoe UI", 9f)
         };
 
+        _artifactTree = new TreeView
+        {
+            Dock = DockStyle.Fill,
+            HideSelection = false
+        };
+        _artifactTree.AfterSelect += (_, _) => ShowArtifactPreview();
+
+        _artifactPreview = new RichTextBox
+        {
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            ReadOnly = true,
+            WordWrap = false,
+            Font = new Font("Consolas", 9f)
+        };
+
         var outputSplit = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -230,8 +259,25 @@ public sealed class MainForm : Form
             Panel1MinSize = 200,
             SplitterDistance = 260
         };
-        outputSplit.Panel1.Controls.Add(_cardList);
-        outputSplit.Panel2.Controls.Add(_cardDetail);
+        var cardPanel = new Panel { Dock = DockStyle.Fill };
+        cardPanel.Controls.Add(_downloadButton);
+        cardPanel.Controls.Add(_cardList);
+        outputSplit.Panel1.Controls.Add(cardPanel);
+        var artifactSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            Panel1MinSize = 150,
+            SplitterDistance = 220
+        };
+        artifactSplit.Panel1.Controls.Add(_artifactTree);
+        artifactSplit.Panel2.Controls.Add(_artifactPreview);
+
+        var detailTabs = new TabControl { Dock = DockStyle.Fill };
+        detailTabs.TabPages.Add(new TabPage("Details") { Controls = { _cardDetail } });
+        detailTabs.TabPages.Add(new TabPage("Artifacts") { Controls = { artifactSplit } });
+
+        outputSplit.Panel2.Controls.Add(detailTabs);
 
         var auxTabs = new TabControl { Dock = DockStyle.Fill };
         auxTabs.TabPages.Add(new TabPage("Trace") { Controls = { _traceBox } });
@@ -410,16 +456,138 @@ public sealed class MainForm : Form
         _cards.Add(card);
         _cardList.Items.Add($"{card.Kind}: {card.Title}");
         if (_cardList.Items.Count > 0)
+        {
             _cardList.SelectedIndex = _cardList.Items.Count - 1;
-        _cardDetail.Text = card.ToDisplayText();
+            ShowSelectedCard();
+        }
+
+        if (card.Kind == OutputCardKind.ProgramFile && !string.IsNullOrWhiteSpace(card.Title))
+        {
+            _filePreviews[card.Title] = card.Preview;
+            AddPathToTree(card.Title);
+        }
     }
 
     private void ShowSelectedCard()
     {
         if (_cardList.SelectedIndex < 0 || _cardList.SelectedIndex >= _cards.Count)
+        {
+            _cardDetail.Text = "";
+            _downloadButton.Enabled = false;
+            return;
+        }
+
+        var card = _cards[_cardList.SelectedIndex];
+        _cardDetail.Text = card.ToDisplayText();
+        _downloadButton.Enabled = card.Kind is OutputCardKind.Program or OutputCardKind.ProgramZip or OutputCardKind.ProgramTree;
+
+        if (card.Kind == OutputCardKind.ProgramTree)
+        {
+            BuildTreeFromPreview(card.Preview);
+        }
+        else if (card.Kind == OutputCardKind.ProgramFile && !string.IsNullOrWhiteSpace(card.Title))
+        {
+            AddPathToTree(card.Title);
+            _artifactPreview.Text = card.Preview;
+        }
+    }
+
+    private void DownloadSelectedArtifact()
+    {
+        if (_cardList.SelectedIndex < 0 || _cardList.SelectedIndex >= _cards.Count)
             return;
 
-        _cardDetail.Text = _cards[_cardList.SelectedIndex].ToDisplayText();
+        var card = _cards[_cardList.SelectedIndex];
+        var zipPath = card.Metadata;
+        if (string.IsNullOrWhiteSpace(zipPath) || !File.Exists(zipPath))
+            return;
+
+        using var dialog = new SaveFileDialog
+        {
+            FileName = Path.GetFileName(zipPath),
+            Filter = "Zip archive|*.zip|All files|*.*"
+        };
+        if (dialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(dialog.FileName))
+        {
+            File.Copy(zipPath, dialog.FileName, overwrite: true);
+        }
+    }
+
+    private void BuildTreeFromPreview(string preview)
+    {
+        _artifactTree.BeginUpdate();
+        _artifactTree.Nodes.Clear();
+
+        var stack = new Stack<TreeNode>();
+        var lines = (preview ?? "").Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            var trimmedEnd = line.TrimEnd();
+            var depth = line.TakeWhile(ch => ch == ' ').Count() / 2;
+            var name = trimmedEnd.Trim();
+            var isDir = name.EndsWith("/", StringComparison.Ordinal);
+            name = name.TrimEnd('/');
+            while (stack.Count > depth)
+                stack.Pop();
+
+            var path = stack.Count == 0 ? name : string.Join("/", stack.Reverse().Select(n => n.Text).Concat(new[] { name }));
+            var node = new TreeNode(name) { Tag = path };
+            if (stack.Count == 0)
+                _artifactTree.Nodes.Add(node);
+            else
+                stack.Peek().Nodes.Add(node);
+
+            if (isDir)
+                stack.Push(node);
+        }
+
+        _artifactTree.ExpandAll();
+        _artifactTree.EndUpdate();
+    }
+
+    private void AddPathToTree(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        var parts = path.Replace("\\", "/").Split('/', StringSplitOptions.RemoveEmptyEntries);
+        TreeNodeCollection current = _artifactTree.Nodes;
+        var built = new List<string>();
+        TreeNode? last = null;
+        foreach (var part in parts)
+        {
+            built.Add(part);
+            var existing = current.Cast<TreeNode>().FirstOrDefault(n => string.Equals(n.Text, part, StringComparison.OrdinalIgnoreCase));
+            if (existing == null)
+            {
+                existing = new TreeNode(part) { Tag = string.Join("/", built) };
+                current.Add(existing);
+            }
+            last = existing;
+            current = existing.Nodes;
+        }
+
+        if (last != null)
+            _artifactTree.SelectedNode = last;
+    }
+
+    private void ShowArtifactPreview()
+    {
+        var node = _artifactTree.SelectedNode;
+        if (node == null)
+        {
+            _artifactPreview.Text = "";
+            return;
+        }
+
+        var path = node.Tag as string ?? node.Text;
+        if (_filePreviews.TryGetValue(path, out var preview))
+        {
+            _artifactPreview.Text = preview;
+            return;
+        }
+
+        _artifactPreview.Text = "";
     }
 
     private void ToggleTracePane()

@@ -22,12 +22,14 @@ public sealed class WorkflowState
     public bool PlanPaused { get; set; }
     public IntentExtraction? LastIntent { get; set; }
     public ChatMemory Memory { get; } = new();
+    public ConversationMemory MemoryStore { get; } = new();
     public HashSet<string> ConfirmedFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, string> ClarificationAsked { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> AskedMissingFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool GenerateArtifacts { get; set; }
     public string SessionToken { get; set; } = Guid.NewGuid().ToString("N");
     public List<string> ArtifactPackages { get; set; } = new();
+    public List<ProgramArtifactResult> ProgramArtifacts { get; set; } = new();
     public bool PlanConfirmed { get; set; }
 
     public void ClearPlan()
@@ -43,6 +45,7 @@ public sealed class WorkflowState
         PlanPaused = false;
         GenerateArtifacts = false;
         ArtifactPackages = new List<string>();
+        ProgramArtifacts = new List<ProgramArtifactResult>();
         PlanConfirmed = false;
     }
 

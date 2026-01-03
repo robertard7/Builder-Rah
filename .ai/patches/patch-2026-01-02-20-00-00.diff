@@ -1,0 +1,21 @@
+diff --git a/Workflow/SessionManager.cs b/Workflow/SessionManager.cs
+index 37bbbf9..0b4f9d6 100644
+--- a/Workflow/SessionManager.cs
++++ b/Workflow/SessionManager.cs
+@@
+ public sealed class SessionManager
+ {
+@@
+     public SessionSnapshot Snapshot(string session)
+     {
+         var rec = GetOrCreate(session);
+         return new SessionSnapshot(rec.Session, rec.StartedUtc, rec.LastActive, rec.Cards.ToList(), rec.Memory ?? new { }, rec.Artifacts.ToList(), rec.Logs.ToList());
+     }
++
++    public IReadOnlyList<SessionSnapshot> ListSessions()
++    {
++        return _sessions.Values
++            .OrderByDescending(s => s.LastActive)
++            .Select(s => new SessionSnapshot(s.Session, s.StartedUtc, s.LastActive, s.Cards.ToList(), s.Memory ?? new { }, s.Artifacts.ToList(), s.Logs.ToList()))
++            .ToList();
++    }

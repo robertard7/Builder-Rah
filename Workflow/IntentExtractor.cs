@@ -35,12 +35,14 @@ public static class IntentExtractor
         string userText,
         IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments,
         ChatMemory memory,
+        ConversationMemory conversation,
         CancellationToken ct)
     {
         if (cfg == null) throw new ArgumentNullException(nameof(cfg));
         userText ??= "";
         attachments ??= Array.Empty<AttachmentInbox.AttachmentEntry>();
         memory ??= new ChatMemory();
+        conversation ??= new ConversationMemory();
 
         var prompt = (cfg.General.IntentExtractorPrompt ?? "").Trim();
         if (prompt.Length == 0)
@@ -63,6 +65,20 @@ public static class IntentExtractor
         {
             sb.AppendLine("RECENT_MEMORY:");
             sb.AppendLine(history);
+            sb.AppendLine();
+        }
+        if (conversation.ClarificationAnswers.Count > 0)
+        {
+            sb.AppendLine("CLARIFICATIONS_ANSWERED:");
+            foreach (var kv in conversation.ClarificationAnswers)
+                sb.AppendLine($"- {kv.Key}: {kv.Value}");
+            sb.AppendLine();
+        }
+        if (conversation.PlanNotes.Count > 0)
+        {
+            sb.AppendLine("PLAN_NOTES:");
+            foreach (var note in conversation.PlanNotes)
+                sb.AppendLine("- " + note);
             sb.AppendLine();
         }
         sb.AppendLine("USER_TEXT:");

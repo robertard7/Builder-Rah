@@ -14,6 +14,11 @@ public enum OutputCardKind
     Diff,
     Final,
     Program,
+    ProgramTree,
+    ProgramFile,
+    ProgramZip,
+    Tree,
+    Archive,
     Error
 }
 
@@ -30,6 +35,7 @@ public sealed class OutputCard
     public string ToolId { get; init; } = "";
     public DateTimeOffset CreatedUtc { get; init; } = DateTimeOffset.UtcNow;
     public string Metadata { get; init; } = "";
+    public string DownloadUrl { get; init; } = "";
 
     public string ToDisplayText()
     {
@@ -44,6 +50,8 @@ public sealed class OutputCard
             sb.AppendLine("Tags: " + string.Join(", ", Tags));
         if (!string.IsNullOrWhiteSpace(Metadata))
             sb.AppendLine("Meta: " + Metadata);
+        if (!string.IsNullOrWhiteSpace(DownloadUrl))
+            sb.AppendLine("Download: " + DownloadUrl);
         if (!string.IsNullOrWhiteSpace(Summary))
             sb.AppendLine("Summary: " + Summary);
         if (!string.IsNullOrWhiteSpace(Preview))
@@ -73,6 +81,7 @@ public sealed class OutputCard
             ToolId = card.ToolId,
             CreatedUtc = card.CreatedUtc,
             Metadata = card.Metadata,
+            DownloadUrl = card.DownloadUrl,
             Preview = Trim(card.Preview, maxPreview),
             FullContent = Trim(card.FullContent, maxContent)
         };
