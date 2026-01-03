@@ -2,141 +2,85 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace RahBuilder.Workflow;
 
-public sealed record SessionEvent(string Type, object Data, DateTimeOffset Timestamp);
-
-internal sealed class SessionEventStream : IDisposable
+internal class EventStream
 {
-    private readonly HttpListenerContext _context;
+    private readonly HttpListenerContext _ctx;
     private readonly CancellationTokenSource _cts = new();
-    private readonly BlockingCollection<SessionEvent> _queue = new();
-    private readonly Task _writerTask;
 
-    public string Session { get; }
+    public EventStream(HttpListenerContext ctx) => _ctx = ctx;
 
-    public SessionEventStream(string session, HttpListenerContext ctx, IEnumerable<SessionEvent>? initial = null)
+    public void Close() => _cts.Cancel();
+
+    public async Task Run(string sessionId)
     {
-        Session = session;
-        _context = ctx;
-        if (initial != null)
+        var resp = _ctx.Response;
+        resp.AddHeader("Cache-Control", "no-cache");
+        resp.ContentType = "text/event-stream";
+        resp.AddHeader("Connection", "keep-alive");
+
+        await resp.OutputStream.FlushAsync().ConfigureAwait(false);
+
+        var lastIndex = 0;
+        if (SessionManager.TryGet(sessionId, out var session))
         {
-            foreach (var evt in initial)
-                _queue.Add(evt);
-        }
-        _writerTask = Task.Run(() => WriterLoopAsync());
-    }
-
-    private async Task WriterLoopAsync()
-    {
-        try
-        {
-            _context.Response.StatusCode = 200;
-            _context.Response.ContentType = "text/event-stream";
-            _context.Response.Headers.Add("Cache-Control", "no-cache");
-            _context.Response.SendChunked = true;
-
-            await using var writer = new StreamWriter(_context.Response.OutputStream);
-            await WriteEventAsync(writer, new SessionEvent("ping", new { session = Session }, DateTimeOffset.UtcNow)).ConfigureAwait(false);
-
-            foreach (var evt in _queue.GetConsumingEnumerable(_cts.Token))
+            foreach (var ev in session.History)
             {
-                await WriteEventAsync(writer, evt).ConfigureAwait(false);
+                await WriteEventAsync(resp, ev).ConfigureAwait(false);
+            }
+            lastIndex = session.History.Count;
+        }
+
+        while (!_cts.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(500, _cts.Token).ConfigureAwait(false);
+            }
+            catch (TaskCanceledException)
+            {
+                break;
+            }
+
+            if (_cts.IsCancellationRequested)
+                break;
+
+            if (SessionManager.TryGet(sessionId, out session) && session.History.Count > lastIndex)
+            {
+                for (var i = lastIndex; i < session.History.Count; i++)
+                {
+                    await WriteEventAsync(resp, session.History[i]).ConfigureAwait(false);
+                }
+                lastIndex = session.History.Count;
             }
         }
-        catch
-        {
-        }
-        finally
-        {
-            try { _context.Response.OutputStream.Close(); } catch { }
-            try { _context.Response.Close(); } catch { }
-        }
     }
 
-    private static async Task WriteEventAsync(StreamWriter writer, SessionEvent evt)
+    private static async Task WriteEventAsync(HttpListenerResponse resp, SessionEvent ev)
     {
-        var json = JsonSerializer.Serialize(new { evt.Type, evt.Timestamp, data = evt.Data });
-        await writer.WriteAsync($"event: {evt.Type}\n").ConfigureAwait(false);
-        await writer.WriteAsync($"data: {json}\n\n").ConfigureAwait(false);
-        await writer.FlushAsync().ConfigureAwait(false);
-    }
-
-    public void Enqueue(SessionEvent evt)
-    {
-        if (!_queue.IsAddingCompleted)
-        {
-            _queue.Add(evt);
-        }
-    }
-
-    public void Dispose()
-    {
-        try
-        {
-            _cts.Cancel();
-            _queue.CompleteAdding();
-        }
-        catch { }
+        var json = JsonSerializer.Serialize(ev);
+        var bytes = Encoding.UTF8.GetBytes($"event: {ev.Type}\ndata: {json}\n\n");
+        await resp.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+        await resp.OutputStream.FlushAsync().ConfigureAwait(false);
     }
 }
 
-public sealed class SessionEventStreamManager : IDisposable
+internal class SessionEventStreamManager
 {
-    private readonly ConcurrentDictionary<string, List<SessionEventStream>> _streams = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, List<EventStream>> _streams = new(StringComparer.OrdinalIgnoreCase);
 
-    public void AddStream(string session, HttpListenerContext ctx, IEnumerable<SessionEvent>? history = null)
+    public void Add(string session, HttpListenerContext ctx)
     {
-        var stream = new SessionEventStream(session, ctx, history);
-        var list = _streams.GetOrAdd(session, _ => new List<SessionEventStream>());
-        lock (list)
-        {
-            list.Add(stream);
-        }
-    }
-
-    public void Publish(string session, string type, object payload)
-    {
-        var evt = new SessionEvent(type, payload, DateTimeOffset.UtcNow);
-        if (_streams.TryGetValue(session, out var list))
-        {
-            List<SessionEventStream> dead = new();
-            lock (list)
-            {
-                foreach (var s in list)
-                {
-                    try { s.Enqueue(evt); }
-                    catch { dead.Add(s); }
-                }
-
-                if (dead.Count > 0)
-                {
-                    foreach (var d in dead)
-                    {
-                        list.Remove(d);
-                        d.Dispose();
-                    }
-                }
-            }
-        }
-    }
-
-    public void Dispose()
-    {
-        foreach (var list in _streams.Values)
-        {
-            lock (list)
-            {
-                foreach (var s in list) s.Dispose();
-                list.Clear();
-            }
-        }
-        _streams.Clear();
+        var evs = new EventStream(ctx);
+        var list = _streams.GetOrAdd(session, _ => new());
+        lock (list) list.Add(evs);
+        _ = evs.Run(session);
     }
 }
