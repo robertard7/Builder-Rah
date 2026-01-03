@@ -97,6 +97,14 @@ public sealed class ProviderApiHost : IDisposable
                 return;
             }
 
+            if (path.EndsWith("/api/session", StringComparison.OrdinalIgnoreCase) && ctx.Request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase))
+            {
+                var id = SessionManager.Instance.CreateSession();
+                _workflow.OverrideSession(id);
+                await WriteJsonAsync(ctx, new { ok = true, session = id }).ConfigureAwait(false);
+                return;
+            }
+
             if (path.EndsWith("/api/results", StringComparison.OrdinalIgnoreCase))
             {
                 await WriteJsonAsync(ctx, _workflow.GetOutputCards()).ConfigureAwait(false);
@@ -120,6 +128,20 @@ public sealed class ProviderApiHost : IDisposable
             if (path.EndsWith("/api/history", StringComparison.OrdinalIgnoreCase))
             {
                 await WriteJsonAsync(ctx, _workflow.GetHistorySnapshot()).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/logs", StringComparison.OrdinalIgnoreCase))
+            {
+                var snap = SessionManager.Instance.Snapshot(currentSession);
+                await WriteJsonAsync(ctx, new { ok = true, logs = snap.Logs, session = currentSession }).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/session/reset", StringComparison.OrdinalIgnoreCase) && ctx.Request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase))
+            {
+                var ok = SessionManager.Instance.Reset(currentSession);
+                await WriteJsonAsync(ctx, new { ok, session = currentSession }).ConfigureAwait(false);
                 return;
             }
 
