@@ -113,14 +113,18 @@ public sealed class ProviderApiHost : IDisposable
             {
                 var artifacts = _workflow.GetArtifacts();
                 var packages = _workflow.GetArtifactPackages();
-                await WriteJsonAsync(ctx, new { ok = true, artifacts, packages }).ConfigureAwait(false);
+                await WriteJsonAsync(ctx, new { ok = true, artifacts, packages, session = currentSession }).ConfigureAwait(false);
                 return;
             }
 
             if (path.EndsWith("/api/artifacts/download", StringComparison.OrdinalIgnoreCase))
             {
                 var artifacts = _workflow.GetArtifacts();
-                var zip = artifacts.LastOrDefault()?.ZipPath ?? _workflow.GetArtifactPackages().LastOrDefault();
+                var hash = ctx.Request.QueryString?["hash"] ?? "";
+                var selected = string.IsNullOrWhiteSpace(hash)
+                    ? artifacts.LastOrDefault()
+                    : artifacts.FirstOrDefault(a => string.Equals(a.Hash, hash, StringComparison.OrdinalIgnoreCase));
+                var zip = selected?.ZipPath ?? _workflow.GetArtifactPackages().LastOrDefault();
                 if (string.IsNullOrWhiteSpace(zip) || !System.IO.File.Exists(zip))
                 {
                     await WriteJsonAsync(ctx, new { ok = false, error = "not_found" }, HttpStatusCode.NotFound).ConfigureAwait(false);

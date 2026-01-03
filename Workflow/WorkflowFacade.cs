@@ -1485,7 +1485,10 @@ public sealed class WorkflowFacade
             return;
         }
 
-        var result = await _artifactGenerator.GenerateAsync(_cfg, intent, GetActiveAttachments(), _state.ToolOutputs, repo.RepoRoot, _state.SessionToken, ct).ConfigureAwait(false);
+        var spec = _state.LastJobSpecJson != null ? JobSpecParser.TryParse(_state.LastJobSpecJson) : null;
+        spec ??= JobSpec.Invalid("missing_jobspec");
+
+        var result = await _artifactGenerator.BuildProjectArtifacts(spec, _state.ToolOutputs, _cfg, GetActiveAttachments(), repo.RepoRoot, _state.SessionToken, ct).ConfigureAwait(false);
         if (!result.Ok)
         {
             _trace.Emit("[program:error] " + result.Message);
@@ -1496,42 +1499,42 @@ public sealed class WorkflowFacade
             _state.ArtifactPackages.Add(result.ZipPath);
         _state.ProgramArtifacts.Add(result);
 
-        var previewLines = result.Files.Take(5).Select(f => $"- {f.Path}");
-        var tree = result.TreePreview;
-        var card = new OutputCard
-        {
-            Kind = OutputCardKind.Program,
-            Title = "Program artifacts",
-            Summary = $"Generated {result.Files.Count} files",
-            Preview = string.Join("\n", previewLines),
-            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}\n\nFiles:\n{tree}",
-            Tags = new[] { "program", "artifact" },
-            CreatedUtc = DateTimeOffset.UtcNow,
-            Metadata = result.ZipPath
-        };
+        if (_state.ProgramArtifacts.Any(p => string.Equals(p.Hash, result.Hash, StringComparison.OrdinalIgnoreCase)))
+            return;
 
-        _state.OutputCards.Add(card);
-        OutputCardProduced?.Invoke(card);
         EmitArtifactCards(result);
-        var msg = card.ToDisplayText();
-        RecordAssistantMessage(msg);
-        UserFacingMessage?.Invoke(msg);
     }
 
     private void EmitArtifactCards(ProgramArtifactResult result)
     {
         if (result == null) return;
 
+        var summaryCard = new OutputCard
+        {
+            Kind = OutputCardKind.Program,
+            Title = "Program artifacts",
+            Summary = $"Generated {result.Files.Count} files (hash {result.Hash[..Math.Min(12, result.Hash.Length)]})",
+            Preview = string.Join("\n", result.Files.Take(5).Select(f => $"- {f.Path}")),
+            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}\nHash: {result.Hash}\n\nFiles:\n{result.TreePreview}",
+            Tags = new[] { "program", "artifact" },
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Metadata = result.ZipPath,
+            DownloadUrl = BuildDownloadUrl(result.Hash)
+        };
+        _state.OutputCards.Add(summaryCard);
+        OutputCardProduced?.Invoke(summaryCard);
+
         var treeCard = new OutputCard
         {
-            Kind = OutputCardKind.Tree,
+            Kind = OutputCardKind.ProgramTree,
             Title = "Project tree",
             Summary = $"Files: {result.Files.Count}",
             Preview = result.TreePreview,
             FullContent = result.TreePreview,
             Tags = new[] { "tree", "artifact" },
             CreatedUtc = DateTimeOffset.UtcNow,
-            Metadata = result.ZipPath
+            Metadata = result.ZipPath,
+            DownloadUrl = BuildDownloadUrl(result.Hash)
         };
         _state.OutputCards.Add(treeCard);
         OutputCardProduced?.Invoke(treeCard);
@@ -1540,14 +1543,15 @@ public sealed class WorkflowFacade
         {
             var fileCard = new OutputCard
             {
-                Kind = OutputCardKind.Code,
+                Kind = OutputCardKind.ProgramFile,
                 Title = preview.Path,
                 Summary = $"{preview.LineCount} lines ({preview.ContentType})",
                 Preview = preview.Preview,
                 FullContent = preview.Preview,
                 Tags = preview.Tags.Count > 0 ? preview.Tags : new[] { "code", "generated" },
                 CreatedUtc = DateTimeOffset.UtcNow,
-                Metadata = result.ZipPath
+                Metadata = result.ZipPath,
+                DownloadUrl = BuildDownloadUrl(result.Hash)
             };
             _state.OutputCards.Add(fileCard);
             OutputCardProduced?.Invoke(fileCard);
@@ -1557,19 +1561,42 @@ public sealed class WorkflowFacade
         {
             var zipCard = new OutputCard
             {
-                Kind = OutputCardKind.Archive,
+                Kind = OutputCardKind.ProgramZip,
                 Title = "Download ZIP",
                 Summary = Path.GetFileName(result.ZipPath),
                 Preview = "Download generated artifacts.",
                 FullContent = $"Path: {result.ZipPath}",
                 Tags = new[] { "zip", "artifact" },
                 CreatedUtc = DateTimeOffset.UtcNow,
-                Metadata = result.ZipPath
+                Metadata = result.ZipPath,
+                DownloadUrl = BuildDownloadUrl(result.Hash)
             };
             _state.OutputCards.Add(zipCard);
             OutputCardProduced?.Invoke(zipCard);
         }
+
+        _state.ProgramArtifacts.Add(result);
+        if (_state.OutputCards.All(c => c.Kind != OutputCardKind.Final))
+        {
+            var summary = $"Generated {result.Files.Count} files across {result.Files.Select(f => Path.GetDirectoryName(f.Path) ?? \"\").Distinct(StringComparer.OrdinalIgnoreCase).Count()} folders; zip ready at {result.ZipPath}.";
+            var summaryCardFinal = new OutputCard
+            {
+                Kind = OutputCardKind.Final,
+                Title = "Artifact summary",
+                Summary = summary,
+                Preview = summary,
+                FullContent = summary,
+                Tags = new[] { "summary", "artifact" },
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Metadata = result.ZipPath,
+                DownloadUrl = BuildDownloadUrl(result.Hash)
+            };
+            _state.OutputCards.Add(summaryCardFinal);
+            OutputCardProduced?.Invoke(summaryCardFinal);
+        }
     }
+
+    private string BuildDownloadUrl(string hash) => $"/api/artifacts/download?session={_state.SessionToken}&hash={hash}";
 
     private async Task<bool> HandleProgramOnlyFlowAsync(string userText, string jobSpecJson, CancellationToken ct)
     {
