@@ -22,7 +22,6 @@ public sealed class WorkflowFacade
     private readonly ExecutionOrchestrator _executor;
     private readonly ProgramArtifactGenerator _artifactGenerator = new();
     private readonly ProviderApiHost _apiHost;
-    private readonly SessionEventStreamManager _streams = new();
     private AppConfig _cfg;
     private IReadOnlyList<AttachmentInbox.AttachmentEntry> _attachments = Array.Empty<AttachmentInbox.AttachmentEntry>();
     private readonly WorkflowState _state = new();
@@ -78,9 +77,10 @@ public sealed class WorkflowFacade
         _executor.UserFacingMessage += msg =>
         {
             RecordAssistantMessage(msg);
+            SessionManager.AddEvent(_state.SessionToken, "assistant_message", msg);
             UserFacingMessage?.Invoke(msg);
         };
-        _apiHost = new ProviderApiHost(this, _streams);
+        _apiHost = new ProviderApiHost(this);
         SyncGraphToHub(_cfg);
         LogRepoBanner();
         StartApiHostIfEnabled();
@@ -95,9 +95,10 @@ public sealed class WorkflowFacade
         _executor.UserFacingMessage += msg =>
         {
             RecordAssistantMessage(msg);
+            SessionManager.AddEvent(_state.SessionToken, "assistant_message", msg);
             UserFacingMessage?.Invoke(msg);
         };
-        _apiHost = new ProviderApiHost(this, _streams);
+        _apiHost = new ProviderApiHost(this);
         SyncGraphToHub(_cfg);
         LogRepoBanner();
         StartApiHostIfEnabled();
@@ -106,13 +107,12 @@ public sealed class WorkflowFacade
     private void OnOutputCardProduced(OutputCard card)
     {
         if (card == null) return;
-        SessionManager.Instance.AppendCard(_state.SessionToken, card);
+        SessionManager.AppendCard(_state.SessionToken, card);
         OutputCardProduced?.Invoke(card);
-        _streams.Publish(_state.SessionToken, "output_card", card);
-        BroadcastEvent("history_update", new { type = "output_card", card.Title, card.Kind });
+        SessionManager.AddEvent(_state.SessionToken, "output_card", card);
     }
 
-    private void BroadcastEvent(string type, object payload) => _streams.Publish(_state.SessionToken, type, payload);
+    private void BroadcastEvent(string type, object payload) => SessionManager.AddEvent(_state.SessionToken, type, payload);
 
     private void StartApiHostIfEnabled()
     {
@@ -248,10 +248,11 @@ public sealed class WorkflowFacade
         if (cfg != null) _cfg = cfg;
         text ??= "";
 
+        SessionManager.AddEvent(_state.SessionToken, "user_input", text);
         _trace.Emit($"[chat] {text}");
         _state.Memory.Add("user", text);
         _state.MemoryStore.AddUserMessage(text);
-        SessionManager.Instance.AddHistoryEvent(_state.SessionToken, "user_message", new { text });
+        SessionManager.AddHistoryEvent(_state.SessionToken, "user_message", new { text });
         BroadcastEvent("history_update", new { type = "user_message", text });
         _recentlyCompleted = false;
 
@@ -320,7 +321,7 @@ public sealed class WorkflowFacade
             _state.MemoryStore.AddClarificationAnswer("unspecified", action.Payload);
             _state.PendingQuestion = null;
             PendingQuestionChanged?.Invoke(null);
-            SessionManager.Instance.AddHistoryEvent(_state.SessionToken, "clarifier_answer", new { answer = action.Payload });
+            SessionManager.AddHistoryEvent(_state.SessionToken, "clarifier_answer", new { answer = action.Payload });
             BroadcastEvent("clarifier", new { answer = action.Payload });
             BroadcastEvent("history_update", new { type = "clarifier_answer", answer = action.Payload });
             text = $"{_state.PendingUserRequest}\n\nAdditional detail: {string.Join("\n", _state.ClarificationAnswers)}";
@@ -442,7 +443,7 @@ public sealed class WorkflowFacade
 
             _state.PendingQuestion = question;
             PendingQuestionChanged?.Invoke(_state.PendingQuestion);
-            SessionManager.Instance.AddHistoryEvent(_state.SessionToken, "clarifier_question", new { question });
+            SessionManager.AddHistoryEvent(_state.SessionToken, "clarifier_question", new { question });
             BroadcastEvent("clarifier", new { question });
             BroadcastEvent("history_update", new { type = "clarifier_question", question });
             _trace.Emit("[route:wait_user] JobSpec incomplete; asking clarifications. missing=" + string.Join(",", missing));
@@ -484,7 +485,7 @@ public sealed class WorkflowFacade
             var names = string.Join(", ", docAttachments.Select(a => a.StoredName));
             _state.PendingQuestion = "Which file should I start with? " + names;
             PendingQuestionChanged?.Invoke(_state.PendingQuestion);
-            SessionManager.Instance.AddHistoryEvent(_state.SessionToken, "clarifier_question", new { question = _state.PendingQuestion });
+            SessionManager.AddHistoryEvent(_state.SessionToken, "clarifier_question", new { question = _state.PendingQuestion });
             BroadcastEvent("clarifier", new { question = _state.PendingQuestion });
             BroadcastEvent("history_update", new { type = "clarifier_question", question = _state.PendingQuestion });
             EmitWaitUser("Which file should I start with? " + names);
@@ -597,7 +598,7 @@ public sealed class WorkflowFacade
 
     public SessionSnapshot GetSessionSnapshot()
     {
-        return SessionManager.Instance.Snapshot(_state.SessionToken);
+        return SessionManager.Snapshot(_state.SessionToken);
     }
 
     public object GetPlanSnapshot()
@@ -626,8 +627,8 @@ public sealed class WorkflowFacade
         _state.PendingStepIndex = 0;
         _state.PlanConfirmed = true;
         if (recordHistory)
-            SessionManager.Instance.AddHistoryEvent(_state.SessionToken, "plan_updated", new { steps = steps.Select(s => s.Title).ToList() });
-        BroadcastEvent("plan", new { version = SessionManager.Instance.GetPlanVersions(_state.SessionToken).Count, steps });
+            SessionManager.AddHistoryEvent(_state.SessionToken, "plan_updated", new { steps = steps.Select(s => s.Title).ToList() });
+        BroadcastEvent("plan", new { version = SessionManager.GetPlanVersions(_state.SessionToken).Count, steps });
         BroadcastEvent("history_update", new { type = "plan_updated" });
         NotifyStatus("Planning");
     }
@@ -647,7 +648,7 @@ public sealed class WorkflowFacade
 
     public object GetHistorySnapshot()
     {
-        var snap = SessionManager.Instance.Snapshot(_state.SessionToken);
+        var snap = SessionManager.Snapshot(_state.SessionToken);
         return new
         {
             session = _state.SessionToken,
@@ -1268,7 +1269,7 @@ public sealed class WorkflowFacade
         _state.PlanConfirmed = false;
         _state.MemoryStore.AddPlanNote("Plan prepared with steps: " + string.Join(", ", plan.Steps.Select(s => s.ToolId)));
         PlanReady?.Invoke(PlanDefinition.FromToolPlan(_state.SessionToken, plan));
-        var version = SessionManager.Instance.AddPlanVersion(_state.SessionToken, plan, toolPlanText);
+        var version = SessionManager.AddPlanVersion(_state.SessionToken, plan, toolPlanText);
         BroadcastEvent("plan", new { version = version.Version, plan = version });
         NotifyStatus("Planning");
         return true;
@@ -1578,7 +1579,7 @@ public sealed class WorkflowFacade
     {
         if (result == null) return;
 
-        SessionManager.Instance.UpdateArtifacts(_state.SessionToken, _state.ArtifactPackages);
+        SessionManager.UpdateArtifacts(_state.SessionToken, _state.ArtifactPackages);
 
         var summaryCard = new OutputCard
         {
@@ -1594,7 +1595,7 @@ public sealed class WorkflowFacade
         };
         _state.OutputCards.Add(summaryCard);
         OutputCardProduced?.Invoke(summaryCard);
-        SessionManager.Instance.AddHistoryEvent(_state.SessionToken, "artifact_ready", new { result.Hash, result.ZipPath, count = result.Files.Count });
+        SessionManager.AddHistoryEvent(_state.SessionToken, "artifact_ready", new { result.Hash, result.ZipPath, count = result.Files.Count });
         BroadcastEvent("artifact_ready", new { result.Hash, result.ZipPath, count = result.Files.Count });
 
         var treeCard = new OutputCard
