@@ -238,6 +238,7 @@ public sealed class WorkflowFacade
 
         _trace.Emit($"[chat] {text}");
         _state.Memory.Add("user", text);
+        _state.MemoryStore.AddUserMessage(text);
         _recentlyCompleted = false;
 
         var action = UserReplyInterpreter.Interpret(_cfg, _state, text);
@@ -302,6 +303,7 @@ public sealed class WorkflowFacade
         if (action.Action == ReplyActionType.AnswerClarification && !string.IsNullOrWhiteSpace(action.Payload))
         {
             _state.ClarificationAnswers.Add(action.Payload);
+            _state.MemoryStore.AddClarificationAnswer("unspecified", action.Payload);
             _state.PendingQuestion = null;
             PendingQuestionChanged?.Invoke(null);
             text = $"{_state.PendingUserRequest}\n\nAdditional detail: {string.Join("\n", _state.ClarificationAnswers)}";
@@ -309,6 +311,11 @@ public sealed class WorkflowFacade
         }
         else
         {
+            if (action.Action == ReplyActionType.NewRequest && _state.LastIntent != null && !string.IsNullOrWhiteSpace(_state.PendingUserRequest))
+            {
+                text = $"{_state.PendingUserRequest}\nFollow-up: {text}";
+                _state.MemoryStore.AddPlanNote("Follow-up: " + text);
+            }
             _state.PendingUserRequest = text;
             _state.ClearClarifications();
             _state.PendingQuestion = null;
@@ -555,6 +562,21 @@ public sealed class WorkflowFacade
         return _state.OutputCards.Select(c => OutputCard.Truncate(c)).ToList();
     }
 
+    public IReadOnlyList<ProgramArtifactResult> GetArtifacts()
+    {
+        return _state.ProgramArtifacts.ToList();
+    }
+
+    public IReadOnlyList<string> GetArtifactPackages()
+    {
+        return _state.ArtifactPackages.ToList();
+    }
+
+    public SessionSnapshot GetSessionSnapshot()
+    {
+        return SessionManager.Instance.Snapshot(_state.SessionToken);
+    }
+
     public object GetPlanSnapshot()
     {
         var steps = _state.PendingToolPlan?.Steps?.Select(s => new
@@ -585,6 +607,18 @@ public sealed class WorkflowFacade
             session = _state.SessionToken
         };
     }
+
+    public object GetHistorySnapshot()
+    {
+        return new
+        {
+            session = _state.SessionToken,
+            memory = _state.MemoryStore.ToSnapshot(),
+            chat = _state.Memory.Summarize(20)
+        };
+    }
+
+    public string GetSessionToken() => _state.SessionToken;
 
     public void OverrideSession(string session)
     {
@@ -644,7 +678,7 @@ public sealed class WorkflowFacade
     {
         try
         {
-            var result = await IntentExtractor.ExtractAsync(_cfg, userText, GetActiveAttachments(), _state.Memory, ct).ConfigureAwait(false);
+            var result = await IntentExtractor.ExtractAsync(_cfg, userText, GetActiveAttachments(), _state.Memory, _state.MemoryStore, ct).ConfigureAwait(false);
             if (!result.Ok || result.Extraction == null)
             {
                 _trace.Emit("[intent:error] " + result.Error);
@@ -685,6 +719,7 @@ public sealed class WorkflowFacade
     {
         if (string.IsNullOrWhiteSpace(text)) return;
         _state.Memory.Add("assistant", text);
+        _state.MemoryStore.AddAssistantMessage(text);
     }
 
     private void EmitWaitUser(string reason, string? friendly = null, string? preview = null)
@@ -697,6 +732,8 @@ public sealed class WorkflowFacade
             RecordAssistantMessage(chat);
             UserFacingMessage?.Invoke(chat);
         }
+        if (!string.IsNullOrWhiteSpace(preview))
+            _state.MemoryStore.AddClarificationQuestion(preview);
     }
 
     private void SyncGraphToHub(AppConfig cfg)
@@ -1188,6 +1225,7 @@ public sealed class WorkflowFacade
         _state.GenerateArtifacts = _planNeedsArtifacts;
         _state.PendingQuestion = null;
         _state.PlanConfirmed = false;
+        _state.MemoryStore.AddPlanNote("Plan prepared with steps: " + string.Join(", ", plan.Steps.Select(s => s.ToolId)));
         PlanReady?.Invoke(PlanDefinition.FromToolPlan(_state.SessionToken, plan));
         NotifyStatus("Planning");
         return true;
@@ -1473,7 +1511,10 @@ public sealed class WorkflowFacade
             return;
         }
 
-        var result = await _artifactGenerator.GenerateAsync(_cfg, intent, GetActiveAttachments(), repo.RepoRoot, ct).ConfigureAwait(false);
+        var spec = _state.LastJobSpecJson != null ? JobSpecParser.TryParse(_state.LastJobSpecJson) : null;
+        spec ??= JobSpec.Invalid("missing_jobspec");
+
+        var result = await _artifactGenerator.BuildProjectArtifacts(spec, _state.ToolOutputs, _cfg, GetActiveAttachments(), repo.RepoRoot, _state.SessionToken, ct).ConfigureAwait(false);
         if (!result.Ok)
         {
             _trace.Emit("[program:error] " + result.Message);
@@ -1482,27 +1523,113 @@ public sealed class WorkflowFacade
 
         if (!string.IsNullOrWhiteSpace(result.ZipPath))
             _state.ArtifactPackages.Add(result.ZipPath);
+        _state.ProgramArtifacts.Add(result);
 
-        var previewLines = result.Files.Take(5).Select(f => $"- {f.Path}");
-        var tree = ProgramArtifactGenerator.BuildTreePreview(result.Files);
-        var card = new OutputCard
+        if (_state.ProgramArtifacts.Any(p => string.Equals(p.Hash, result.Hash, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        EmitArtifactCards(result);
+    }
+
+    private void EmitArtifactCards(ProgramArtifactResult result)
+    {
+        if (result == null) return;
+
+        SessionManager.Instance.UpdateArtifacts(_state.SessionToken, _state.ArtifactPackages);
+
+        var summaryCard = new OutputCard
         {
             Kind = OutputCardKind.Program,
             Title = "Program artifacts",
-            Summary = $"Generated {result.Files.Count} files",
-            Preview = string.Join("\n", previewLines),
-            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}\n\nFiles:\n{tree}",
+            Summary = $"Generated {result.Files.Count} files (hash {result.Hash[..Math.Min(12, result.Hash.Length)]})",
+            Preview = string.Join("\n", result.Files.Take(5).Select(f => $"- {f.Path}")),
+            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}\nHash: {result.Hash}\n\nFiles:\n{result.TreePreview}",
             Tags = new[] { "program", "artifact" },
             CreatedUtc = DateTimeOffset.UtcNow,
-            Metadata = result.ZipPath
+            Metadata = result.ZipPath,
+            DownloadUrl = BuildDownloadUrl(result.Hash)
         };
+        _state.OutputCards.Add(summaryCard);
+        OutputCardProduced?.Invoke(summaryCard);
+        SessionManager.Instance.AppendCard(_state.SessionToken, summaryCard);
 
-        _state.OutputCards.Add(card);
-        OutputCardProduced?.Invoke(card);
-        var msg = card.ToDisplayText();
-        RecordAssistantMessage(msg);
-        UserFacingMessage?.Invoke(msg);
+        var treeCard = new OutputCard
+        {
+            Kind = OutputCardKind.ProgramTree,
+            Title = "Project tree",
+            Summary = $"Files: {result.Files.Count}",
+            Preview = result.TreePreview,
+            FullContent = result.TreePreview,
+            Tags = new[] { "tree", "artifact" },
+            CreatedUtc = DateTimeOffset.UtcNow,
+            Metadata = result.ZipPath,
+            DownloadUrl = BuildDownloadUrl(result.Hash)
+        };
+        _state.OutputCards.Add(treeCard);
+        OutputCardProduced?.Invoke(treeCard);
+        SessionManager.Instance.AppendCard(_state.SessionToken, treeCard);
+
+        foreach (var preview in result.Previews)
+        {
+            var fileCard = new OutputCard
+            {
+                Kind = OutputCardKind.ProgramFile,
+                Title = preview.Path,
+                Summary = $"{preview.LineCount} lines ({preview.ContentType})",
+                Preview = preview.Preview,
+                FullContent = preview.Preview,
+                Tags = preview.Tags.Count > 0 ? preview.Tags : new[] { "code", "generated" },
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Metadata = result.ZipPath,
+                DownloadUrl = BuildDownloadUrl(result.Hash)
+            };
+            _state.OutputCards.Add(fileCard);
+            OutputCardProduced?.Invoke(fileCard);
+            SessionManager.Instance.AppendCard(_state.SessionToken, fileCard);
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.ZipPath))
+        {
+            var zipCard = new OutputCard
+            {
+                Kind = OutputCardKind.ProgramZip,
+                Title = "Download ZIP",
+                Summary = Path.GetFileName(result.ZipPath),
+                Preview = "Download generated artifacts.",
+                FullContent = $"Path: {result.ZipPath}",
+                Tags = new[] { "zip", "artifact" },
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Metadata = result.ZipPath,
+                DownloadUrl = BuildDownloadUrl(result.Hash)
+            };
+            _state.OutputCards.Add(zipCard);
+            OutputCardProduced?.Invoke(zipCard);
+            SessionManager.Instance.AppendCard(_state.SessionToken, zipCard);
+        }
+
+        _state.ProgramArtifacts.Add(result);
+        if (_state.OutputCards.All(c => c.Kind != OutputCardKind.Final))
+        {
+            var summary = $"Generated {result.Files.Count} files across {result.Files.Select(f => Path.GetDirectoryName(f.Path) ?? \"\").Distinct(StringComparer.OrdinalIgnoreCase).Count()} folders; zip ready at {result.ZipPath}.";
+            var summaryCardFinal = new OutputCard
+            {
+                Kind = OutputCardKind.Final,
+                Title = "Artifact summary",
+                Summary = summary,
+                Preview = summary,
+                FullContent = summary,
+                Tags = new[] { "summary", "artifact" },
+                CreatedUtc = DateTimeOffset.UtcNow,
+                Metadata = result.ZipPath,
+                DownloadUrl = BuildDownloadUrl(result.Hash)
+            };
+            _state.OutputCards.Add(summaryCardFinal);
+            OutputCardProduced?.Invoke(summaryCardFinal);
+            SessionManager.Instance.AppendCard(_state.SessionToken, summaryCardFinal);
+        }
     }
+
+    private string BuildDownloadUrl(string hash) => $"/api/artifacts/download?session={_state.SessionToken}&hash={hash}";
 
     private async Task<bool> HandleProgramOnlyFlowAsync(string userText, string jobSpecJson, CancellationToken ct)
     {
@@ -1557,6 +1684,7 @@ public sealed class WorkflowFacade
 
         var intent = _state.LastIntent;
         var missing = spec.GetMissingFields();
+        missing.RemoveAll(m => _state.MemoryStore.HasAnswerFor(m));
         var request = (spec.Request ?? intent?.Request ?? "").Trim();
         var goal = (spec.Goal ?? intent?.Goal ?? "").Trim();
         var context = string.IsNullOrWhiteSpace(spec.Context) ? intent?.Context ?? "" : spec.Context;

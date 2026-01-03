@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -77,7 +78,16 @@ public sealed class ProviderApiHost : IDisposable
         {
             var path = ctx.Request.Url?.AbsolutePath?.TrimEnd('/') ?? "";
             var session = ctx.Request.QueryString?["session"] ?? "";
-            if (!string.IsNullOrWhiteSpace(session))
+            var currentSession = _workflow.GetSessionToken();
+            var allowOverride = path.EndsWith("/api/jobs", StringComparison.OrdinalIgnoreCase);
+
+            if (!allowOverride && !string.IsNullOrWhiteSpace(session) && !string.Equals(session, currentSession, StringComparison.Ordinal))
+            {
+                await WriteJsonAsync(ctx, new { ok = false, error = "session_mismatch" }, HttpStatusCode.Forbidden).ConfigureAwait(false);
+                return;
+            }
+
+            if (allowOverride && !string.IsNullOrWhiteSpace(session))
                 _workflow.OverrideSession(session);
 
             if (path.EndsWith("/api/status", StringComparison.OrdinalIgnoreCase))
@@ -87,9 +97,24 @@ public sealed class ProviderApiHost : IDisposable
                 return;
             }
 
+            if (path.EndsWith("/api/session", StringComparison.OrdinalIgnoreCase) && ctx.Request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase))
+            {
+                var id = SessionManager.Instance.CreateSession();
+                _workflow.OverrideSession(id);
+                await WriteJsonAsync(ctx, new { ok = true, session = id }).ConfigureAwait(false);
+                return;
+            }
+
             if (path.EndsWith("/api/results", StringComparison.OrdinalIgnoreCase))
             {
                 await WriteJsonAsync(ctx, _workflow.GetOutputCards()).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/sessions", StringComparison.OrdinalIgnoreCase))
+            {
+                var sessions = SessionManager.Instance.ListSessions();
+                await WriteJsonAsync(ctx, new { ok = true, sessions }).ConfigureAwait(false);
                 return;
             }
 
@@ -101,8 +126,65 @@ public sealed class ProviderApiHost : IDisposable
 
             if (path.EndsWith("/api/artifacts", StringComparison.OrdinalIgnoreCase))
             {
-                var cards = _workflow.GetOutputCards().Where(c => c.Kind == OutputCardKind.Program).ToList();
-                await WriteJsonAsync(ctx, new { cards }).ConfigureAwait(false);
+                var artifacts = _workflow.GetArtifacts();
+                var packages = _workflow.GetArtifactPackages();
+                await WriteJsonAsync(ctx, new { ok = true, artifacts, packages, session = currentSession }).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/history", StringComparison.OrdinalIgnoreCase))
+            {
+                await WriteJsonAsync(ctx, _workflow.GetHistorySnapshot()).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/logs", StringComparison.OrdinalIgnoreCase))
+            {
+                var snap = SessionManager.Instance.Snapshot(currentSession);
+                await WriteJsonAsync(ctx, new { ok = true, logs = snap.Logs, session = currentSession }).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/session/reset", StringComparison.OrdinalIgnoreCase) && ctx.Request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase))
+            {
+                var ok = SessionManager.Instance.Reset(currentSession);
+                await WriteJsonAsync(ctx, new { ok, session = currentSession }).ConfigureAwait(false);
+                return;
+            }
+
+            if (path.EndsWith("/api/stream", StringComparison.OrdinalIgnoreCase))
+            {
+                ctx.Response.ContentType = "text/event-stream";
+                ctx.Response.Headers.Add("Cache-Control", "no-cache");
+                await using var writer = new StreamWriter(ctx.Response.OutputStream);
+                await writer.WriteAsync("event: ping\n");
+                await writer.WriteAsync($"data: {{\"session\":\"{currentSession}\"}}\n\n");
+                await writer.FlushAsync().ConfigureAwait(false);
+                ctx.Response.Close();
+                return;
+            }
+
+            if (path.EndsWith("/api/artifacts/download", StringComparison.OrdinalIgnoreCase))
+            {
+                var artifacts = _workflow.GetArtifacts();
+                var hash = ctx.Request.QueryString?["hash"] ?? "";
+                var selected = string.IsNullOrWhiteSpace(hash)
+                    ? artifacts.LastOrDefault()
+                    : artifacts.FirstOrDefault(a => string.Equals(a.Hash, hash, StringComparison.OrdinalIgnoreCase));
+                var zip = selected?.ZipPath ?? _workflow.GetArtifactPackages().LastOrDefault();
+                if (string.IsNullOrWhiteSpace(zip) || !System.IO.File.Exists(zip))
+                {
+                    await WriteJsonAsync(ctx, new { ok = false, error = "not_found" }, HttpStatusCode.NotFound).ConfigureAwait(false);
+                    return;
+                }
+
+                var bytes = await System.IO.File.ReadAllBytesAsync(zip, ct).ConfigureAwait(false);
+                ctx.Response.StatusCode = (int)HttpStatusCode.OK;
+                ctx.Response.ContentType = "application/zip";
+                ctx.Response.ContentLength64 = bytes.LongLength;
+                ctx.Response.AddHeader("Content-Disposition", $"attachment; filename=\"{System.IO.Path.GetFileName(zip)}\"");
+                await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length, ct).ConfigureAwait(false);
+                ctx.Response.Close();
                 return;
             }
 

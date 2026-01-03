@@ -1,0 +1,944 @@
+diff --git a/MainForm.cs b/MainForm.cs
+index 40df227..ad65fe1 100644
+--- a/MainForm.cs
++++ b/MainForm.cs
+@@ -3,6 +3,7 @@ using System;
+ using System.Collections.Generic;
+ using System.Drawing;
+ using System.IO;
++using System.Linq;
+ using System.Threading;
+ using System.Threading.Tasks;
+ using System.Windows.Forms;
+@@ -48,6 +49,9 @@ public sealed class MainForm : Form
+     private readonly SplitContainer _chatSplit;
+     private readonly ListBox _cardList;
+     private readonly RichTextBox _cardDetail;
++    private readonly TreeView _artifactTree;
++    private readonly RichTextBox _artifactPreview;
++    private readonly Dictionary<string, string> _filePreviews = new(StringComparer.OrdinalIgnoreCase);
+ 
+     public MainForm()
+     {
+@@ -232,6 +236,22 @@ public sealed class MainForm : Form
+             Font = new Font("Segoe UI", 9f)
+         };
+ 
++        _artifactTree = new TreeView
++        {
++            Dock = DockStyle.Fill,
++            HideSelection = false
++        };
++        _artifactTree.AfterSelect += (_, _) => ShowArtifactPreview();
++
++        _artifactPreview = new RichTextBox
++        {
++            Dock = DockStyle.Fill,
++            Multiline = true,
++            ReadOnly = true,
++            WordWrap = false,
++            Font = new Font("Consolas", 9f)
++        };
++
+         var outputSplit = new SplitContainer
+         {
+             Dock = DockStyle.Fill,
+@@ -243,7 +263,21 @@ public sealed class MainForm : Form
+         cardPanel.Controls.Add(_downloadButton);
+         cardPanel.Controls.Add(_cardList);
+         outputSplit.Panel1.Controls.Add(cardPanel);
+-        outputSplit.Panel2.Controls.Add(_cardDetail);
++        var artifactSplit = new SplitContainer
++        {
++            Dock = DockStyle.Fill,
++            Orientation = Orientation.Vertical,
++            Panel1MinSize = 150,
++            SplitterDistance = 220
++        };
++        artifactSplit.Panel1.Controls.Add(_artifactTree);
++        artifactSplit.Panel2.Controls.Add(_artifactPreview);
++
++        var detailTabs = new TabControl { Dock = DockStyle.Fill };
++        detailTabs.TabPages.Add(new TabPage("Details") { Controls = { _cardDetail } });
++        detailTabs.TabPages.Add(new TabPage("Artifacts") { Controls = { artifactSplit } });
++
++        outputSplit.Panel2.Controls.Add(detailTabs);
+ 
+         var auxTabs = new TabControl { Dock = DockStyle.Fill };
+         auxTabs.TabPages.Add(new TabPage("Trace") { Controls = { _traceBox } });
+@@ -426,6 +460,12 @@ public sealed class MainForm : Form
+             _cardList.SelectedIndex = _cardList.Items.Count - 1;
+             ShowSelectedCard();
+         }
++
++        if (card.Kind == OutputCardKind.ProgramFile && !string.IsNullOrWhiteSpace(card.Title))
++        {
++            _filePreviews[card.Title] = card.Preview;
++            AddPathToTree(card.Title);
++        }
+     }
+ 
+     private void ShowSelectedCard()
+@@ -439,7 +479,17 @@ public sealed class MainForm : Form
+ 
+         var card = _cards[_cardList.SelectedIndex];
+         _cardDetail.Text = card.ToDisplayText();
+-        _downloadButton.Enabled = card.Kind is OutputCardKind.Program or OutputCardKind.Archive or OutputCardKind.Tree;
++        _downloadButton.Enabled = card.Kind is OutputCardKind.Program or OutputCardKind.ProgramZip or OutputCardKind.ProgramTree;
++
++        if (card.Kind == OutputCardKind.ProgramTree)
++        {
++            BuildTreeFromPreview(card.Preview);
++        }
++        else if (card.Kind == OutputCardKind.ProgramFile && !string.IsNullOrWhiteSpace(card.Title))
++        {
++            AddPathToTree(card.Title);
++            _artifactPreview.Text = card.Preview;
++        }
+     }
+ 
+     private void DownloadSelectedArtifact()
+@@ -463,6 +513,83 @@ public sealed class MainForm : Form
+         }
+     }
+ 
++    private void BuildTreeFromPreview(string preview)
++    {
++        _artifactTree.BeginUpdate();
++        _artifactTree.Nodes.Clear();
++
++        var stack = new Stack<TreeNode>();
++        var lines = (preview ?? "").Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
++        foreach (var line in lines)
++        {
++            var trimmedEnd = line.TrimEnd();
++            var depth = line.TakeWhile(ch => ch == ' ').Count() / 2;
++            var name = trimmedEnd.Trim();
++            var isDir = name.EndsWith("/", StringComparison.Ordinal);
++            name = name.TrimEnd('/');
++            while (stack.Count > depth)
++                stack.Pop();
++
++            var path = stack.Count == 0 ? name : string.Join("/", stack.Reverse().Select(n => n.Text).Concat(new[] { name }));
++            var node = new TreeNode(name) { Tag = path };
++            if (stack.Count == 0)
++                _artifactTree.Nodes.Add(node);
++            else
++                stack.Peek().Nodes.Add(node);
++
++            if (isDir)
++                stack.Push(node);
++        }
++
++        _artifactTree.ExpandAll();
++        _artifactTree.EndUpdate();
++    }
++
++    private void AddPathToTree(string path)
++    {
++        if (string.IsNullOrWhiteSpace(path))
++            return;
++
++        var parts = path.Replace("\\", "/").Split('/', StringSplitOptions.RemoveEmptyEntries);
++        TreeNodeCollection current = _artifactTree.Nodes;
++        var built = new List<string>();
++        TreeNode? last = null;
++        foreach (var part in parts)
++        {
++            built.Add(part);
++            var existing = current.Cast<TreeNode>().FirstOrDefault(n => string.Equals(n.Text, part, StringComparison.OrdinalIgnoreCase));
++            if (existing == null)
++            {
++                existing = new TreeNode(part) { Tag = string.Join("/", built) };
++                current.Add(existing);
++            }
++            last = existing;
++            current = existing.Nodes;
++        }
++
++        if (last != null)
++            _artifactTree.SelectedNode = last;
++    }
++
++    private void ShowArtifactPreview()
++    {
++        var node = _artifactTree.SelectedNode;
++        if (node == null)
++        {
++            _artifactPreview.Text = "";
++            return;
++        }
++
++        var path = node.Tag as string ?? node.Text;
++        if (_filePreviews.TryGetValue(path, out var preview))
++        {
++            _artifactPreview.Text = preview;
++            return;
++        }
++
++        _artifactPreview.Text = "";
++    }
++
+     private void ToggleTracePane()
+     {
+         _chatSplit.Panel2Collapsed = !_chatSplit.Panel2Collapsed;
+diff --git a/Program.cs b/Program.cs
+index 5acadf5..a08296c 100644
+--- a/Program.cs
++++ b/Program.cs
+@@ -1,6 +1,7 @@
+ using System;
+ using System.Linq;
+ using System.Threading;
++using System.Threading.Tasks;
+ using System.Windows.Forms;
+ 
+ namespace RahBuilder;
+@@ -12,7 +13,7 @@ internal static class Program
+     {
+         if (args.Contains("--headless", StringComparer.OrdinalIgnoreCase))
+         {
+-            RunHeadless();
++            RunHeadless(args);
+             return;
+         }
+ 
+@@ -20,14 +21,56 @@ internal static class Program
+         Application.Run(new MainForm());
+     }
+ 
+-    private static void RunHeadless()
++    private static void RunHeadless(string[] args)
+     {
+         var writer = new RahOllamaOnly.Ui.TracePanelWriter();
+         var trace = new RahOllamaOnly.Tracing.RunTrace(new RahOllamaOnly.Tracing.TracePanelTraceSink(writer));
+         var cfg = RahBuilder.Settings.ConfigStore.Load();
+         var workflow = new RahBuilder.Workflow.WorkflowFacade(cfg, trace);
+-        trace.Emit("[headless] Provider API ready. Use /api/jobs to submit work.");
+-        Thread.Sleep(Timeout.Infinite);
+-        _ = workflow;
++        var textArg = GetArgument(args, "--text");
++        var outArg = GetArgument(args, "--output");
++
++        if (string.IsNullOrWhiteSpace(textArg))
++        {
++            trace.Emit("[headless] Provider API ready. Use /api/jobs to submit work.");
++            Thread.Sleep(Timeout.Infinite);
++            return;
++        }
++
++        var done = new ManualResetEventSlim(false);
++        workflow.OutputCardProduced += card =>
++        {
++            if (card.Kind == RahBuilder.Workflow.OutputCardKind.ProgramZip || card.Kind == RahBuilder.Workflow.OutputCardKind.Final)
++                done.Set();
++        };
++
++        Task.Run(() => workflow.RouteUserInput(cfg, textArg, CancellationToken.None));
++        done.Wait(TimeSpan.FromMinutes(5));
++
++        var artifacts = workflow.GetArtifacts().LastOrDefault();
++        if (artifacts != null && !string.IsNullOrWhiteSpace(outArg))
++        {
++            try
++            {
++                var target = System.IO.Path.Combine(outArg, System.IO.Path.GetFileName(artifacts.ZipPath));
++                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target)!);
++                System.IO.File.Copy(artifacts.ZipPath, target, true);
++                trace.Emit("[headless] saved artifact zip to " + target);
++            }
++            catch (Exception ex)
++            {
++                trace.Emit("[headless:error] " + ex.Message);
++            }
++        }
++    }
++
++    private static string? GetArgument(string[] args, string name)
++    {
++        for (int i = 0; i < args.Length; i++)
++        {
++            if (string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
++                return args[i + 1];
++        }
++        return null;
+     }
+ }
+diff --git a/README.md b/README.md
+index d051b5e..40aa300 100644
+--- a/README.md
++++ b/README.md
+@@ -4,24 +4,40 @@ This WinForms tool can now package generated program artifacts, expose them over
+ 
+ ## Artifact flow
+ 
+-1. Plans that include generation steps trigger the artifact generator.
+-2. Generated files are written under `Workflow/ProgramArtifacts/<timestamp>-<session>/`.
+-3. A zip of the project is created beside the folder.
+-4. Output cards include a project tree, file previews, and a download card.
++1. Plans that include generation steps trigger the artifact generator (or reuse cache).
++2. Generated files are written under `Workflow/ProgramArtifacts/<timestamp>-<session>-<hash>/`.
++3. A zip of the project is created beside the folder and cached by semantic hash.
++4. Output cards include a project tree, file previews, a summary card, and a download card.
+ 
+ ## API endpoints
+ 
+-- `GET /api/artifacts?session=<token>` — lists artifacts, tree previews, and zip paths for the active session.
+-- `GET /api/artifacts/download?session=<token>` — streams the most recent artifact zip for the session.
++- `GET /api/artifacts?session=<token>` — lists artifacts, tree previews, hashes, and zip paths for the active session.
++- `GET /api/artifacts/download?session=<token>&hash=<hash>` — streams the artifact zip (latest if hash omitted).
+ - `GET /api/output?session=<token>` — existing output cards (includes new artifact cards).
+ - `POST /api/jobs` with `{ "text": "...", "session": "<token>" }` — submit work; session overrides are allowed only here.
+ 
+ Sessions must match the workflow’s current session token for artifact endpoints; mismatches return `session_mismatch`.
+ 
++### Example (PowerShell)
++
++```pwsh
++Invoke-RestMethod "http://localhost:5050/api/jobs" -Method Post -Body '{\"text\":\"Build TODO API with tests\",\"session\":\"abc\"}' -ContentType "application/json"
++Invoke-RestMethod "http://localhost:5050/api/artifacts?session=abc"
++Invoke-WebRequest "http://localhost:5050/api/artifacts/download?session=abc" -OutFile artifacts.zip
++```
++
++### Example (curl)
++
++```bash
++curl -X POST http://localhost:5050/api/jobs -H "Content-Type: application/json" -d '{"text":"Build TODO API with tests","session":"abc"}'
++curl http://localhost:5050/api/artifacts?session=abc
++curl -o artifacts.zip "http://localhost:5050/api/artifacts/download?session=abc"
++```
++
+ ## UI updates
+ 
+-- Output tab shows project tree and file preview cards.
+-- “Download ZIP” saves the generated archive for the selected artifact card.
++- Output tab shows project tree and file preview cards using a tree view.
++- Select files in the tree to view previews; “Download ZIP” saves the generated archive for the selected artifact card.
+ 
+ ## Headless/script mode
+ 
+@@ -32,3 +48,17 @@ dotnet run -- --headless
+ ```
+ 
+ The provider API will start using your configured settings; submit jobs via `/api/jobs`.
++
++Generate artifacts directly without UI:
++
++```bash
++dotnet run -- --headless --text "Build TODO API with auth and tests" --output ./out
++```
++
++This runs the workflow once, waits for artifact completion, and copies the generated zip to `./out`.
++
++## Caching
++
++- Artifact sets are hashed by job spec, constraints, attachments, and tool outputs (SHA256).
++- Cache is stored under `Workflow/ProgramArtifacts/cache/cache.json`.
++- When a hash matches, the generator reuses the cached zip and previews instead of regenerating.
+diff --git a/Workflow/OutputCard.cs b/Workflow/OutputCard.cs
+index 49f2fb2..dbf3929 100644
+--- a/Workflow/OutputCard.cs
++++ b/Workflow/OutputCard.cs
+@@ -14,6 +14,9 @@ public enum OutputCardKind
+     Diff,
+     Final,
+     Program,
++    ProgramTree,
++    ProgramFile,
++    ProgramZip,
+     Tree,
+     Archive,
+     Error
+@@ -32,6 +35,7 @@ public sealed class OutputCard
+     public string ToolId { get; init; } = "";
+     public DateTimeOffset CreatedUtc { get; init; } = DateTimeOffset.UtcNow;
+     public string Metadata { get; init; } = "";
++    public string DownloadUrl { get; init; } = "";
+ 
+     public string ToDisplayText()
+     {
+@@ -46,6 +50,8 @@ public sealed class OutputCard
+             sb.AppendLine("Tags: " + string.Join(", ", Tags));
+         if (!string.IsNullOrWhiteSpace(Metadata))
+             sb.AppendLine("Meta: " + Metadata);
++        if (!string.IsNullOrWhiteSpace(DownloadUrl))
++            sb.AppendLine("Download: " + DownloadUrl);
+         if (!string.IsNullOrWhiteSpace(Summary))
+             sb.AppendLine("Summary: " + Summary);
+         if (!string.IsNullOrWhiteSpace(Preview))
+@@ -75,6 +81,7 @@ public sealed class OutputCard
+             ToolId = card.ToolId,
+             CreatedUtc = card.CreatedUtc,
+             Metadata = card.Metadata,
++            DownloadUrl = card.DownloadUrl,
+             Preview = Trim(card.Preview, maxPreview),
+             FullContent = Trim(card.FullContent, maxContent)
+         };
+diff --git a/Workflow/ProgramArtifactGenerator.cs b/Workflow/ProgramArtifactGenerator.cs
+index ef74020..fb68aea 100644
+--- a/Workflow/ProgramArtifactGenerator.cs
++++ b/Workflow/ProgramArtifactGenerator.cs
+@@ -4,6 +4,7 @@ using System.Collections.Generic;
+ using System.IO;
+ using System.IO.Compression;
+ using System.Linq;
++using System.Security.Cryptography;
+ using System.Text;
+ using System.Text.Json;
+ using System.Threading;
+@@ -25,19 +26,60 @@ public sealed record ProgramArtifactResult(
+     IReadOnlyList<ProgramArtifact> Files,
+     IReadOnlyList<ProgramArtifactPreview> Previews,
+     string TreePreview,
+-    IReadOnlyDictionary<string, string> FirstLines)
++    IReadOnlyDictionary<string, string> FirstLines,
++    string Hash)
+ {
+-    public static ProgramArtifactResult Failure(string message) => new(false, "", "", message, Array.Empty<ProgramArtifact>(), Array.Empty<ProgramArtifactPreview>(), "", new Dictionary<string, string>());
+-    public static ProgramArtifactResult Success(string folder, string zipPath, IReadOnlyList<ProgramArtifact> files, IReadOnlyList<ProgramArtifactPreview> previews, string treePreview, IReadOnlyDictionary<string, string> firstLines) => new(true, folder, zipPath, "ok", files, previews, treePreview, firstLines);
++    public static ProgramArtifactResult Failure(string message) => new(false, "", "", message, Array.Empty<ProgramArtifact>(), Array.Empty<ProgramArtifactPreview>(), "", new Dictionary<string, string>(), "");
++    public static ProgramArtifactResult Success(string folder, string zipPath, IReadOnlyList<ProgramArtifact> files, IReadOnlyList<ProgramArtifactPreview> previews, string treePreview, IReadOnlyDictionary<string, string> firstLines, string hash) => new(true, folder, zipPath, "ok", files, previews, treePreview, firstLines, hash);
+ }
+ 
++public sealed record ProgramArtifactCacheEntry(
++    string Hash,
++    string Folder,
++    string ZipPath,
++    string Tree,
++    IReadOnlyDictionary<string, string> FirstLines,
++    IReadOnlyList<ProgramArtifact> Files,
++    IReadOnlyList<ProgramArtifactPreview> Previews,
++    DateTimeOffset CreatedUtc);
++
+ public sealed class ProgramArtifactGenerator
+ {
+-    public async Task<ProgramArtifactResult> GenerateAsync(
++    private const string ArtifactsRoot = "Workflow/ProgramArtifacts";
++    private const string CacheFileName = "cache.json";
++
++    public Task<ProgramArtifactResult> GenerateAsync(
+         AppConfig cfg,
+         IntentExtraction intent,
+         IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments,
+-        IReadOnlyList<System.Text.Json.JsonElement> toolOutputs,
++        IReadOnlyList<JsonElement> toolOutputs,
++        string repoRoot,
++        string sessionToken,
++        CancellationToken ct)
++    {
++        var spec = intent == null
++            ? JobSpec.Invalid("intent_missing")
++            : JobSpec.FromJson(
++                JsonDocument.Parse($@"{{""mode"":""jobspec.v2"",""request"":""{Escape(intent.Request)}"",""goal"":""{Escape(intent.Goal)}"",""context"":""{Escape(intent.Context)}"",""actions"":{JsonSerializer.Serialize(intent.Actions ?? Array.Empty<string>())},""constraints"":{JsonSerializer.Serialize(intent.Constraints ?? Array.Empty<string>())},""state"":{{""ready"":true,""missing"":[]}}}}"),
++                "jobspec.v2",
++                intent.Request,
++                intent.Goal,
++                intent.Context,
++                intent.Actions?.ToList() ?? new List<string>(),
++                intent.Constraints?.ToList() ?? new List<string>(),
++                new List<JobSpecAttachment>(),
++                "",
++                true,
++                new List<string>());
++
++        return BuildProjectArtifacts(spec, toolOutputs, cfg, attachments, repoRoot, sessionToken, ct);
++    }
++
++    public async Task<ProgramArtifactResult> BuildProjectArtifacts(
++        JobSpec spec,
++        IReadOnlyList<JsonElement> toolOutputs,
++        AppConfig cfg,
++        IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments,
+         string repoRoot,
+         string sessionToken,
+         CancellationToken ct)
+@@ -45,6 +87,11 @@ public sealed class ProgramArtifactGenerator
+         if (string.IsNullOrWhiteSpace(repoRoot) || !Directory.Exists(repoRoot))
+             return ProgramArtifactResult.Failure("repo_root_invalid");
+ 
++        var hash = ComputeHash(spec, toolOutputs, attachments);
++        var cached = TryGetCachedArtifacts(repoRoot, hash);
++        if (cached != null)
++            return cached;
++
+         var artifacts = ExtractArtifacts(toolOutputs);
+         if (artifacts.Count == 0)
+         {
+@@ -52,7 +99,7 @@ public sealed class ProgramArtifactGenerator
+             if (prompt.Length == 0)
+                 return ProgramArtifactResult.Failure("program_prompt_missing");
+ 
+-            var input = BuildInput(intent, attachments);
++            var input = BuildPromptInput(spec, attachments);
+             string raw;
+             try
+             {
+@@ -66,12 +113,11 @@ public sealed class ProgramArtifactGenerator
+             artifacts = ParseArtifacts(raw);
+         }
+ 
+-        artifacts = EnsureScaffolding(artifacts, intent);
++        artifacts = EnsureScaffolding(artifacts, spec);
+         if (artifacts.Count == 0)
+             return ProgramArtifactResult.Failure("program_invalid_json");
+ 
+-        var targetRoot = BuildTargetFolder(repoRoot, sessionToken);
+-
++        var targetRoot = BuildTargetFolder(repoRoot, sessionToken, hash);
+         foreach (var file in artifacts)
+         {
+             var safePath = Sanitize(file.Path);
+@@ -91,29 +137,133 @@ public sealed class ProgramArtifactGenerator
+         var previews = BuildPreviews(artifacts);
+         var tree = BuildTreePreview(artifacts);
+         var firstLines = CollectFirstLines(artifacts);
+-        return ProgramArtifactResult.Success(targetRoot, zipPath, artifacts, previews, tree, firstLines);
++
++        var result = ProgramArtifactResult.Success(targetRoot, zipPath, artifacts, previews, tree, firstLines, hash);
++        RegisterArtifacts(repoRoot, result);
++        return result;
++    }
++
++    public ProgramArtifactResult? TryGetCachedArtifacts(string repoRoot, string hash)
++    {
++        if (string.IsNullOrWhiteSpace(repoRoot) || string.IsNullOrWhiteSpace(hash))
++            return null;
++
++        var cache = LoadCache(repoRoot);
++        if (!cache.TryGetValue(hash, out var entry))
++            return null;
++
++        if (string.IsNullOrWhiteSpace(entry.ZipPath) || !File.Exists(entry.ZipPath))
++            return null;
++
++        if (string.IsNullOrWhiteSpace(entry.Folder) || !Directory.Exists(entry.Folder))
++        {
++            var tempExtract = Path.Combine(Path.GetDirectoryName(entry.ZipPath) ?? repoRoot, Path.GetFileNameWithoutExtension(entry.ZipPath));
++            Directory.CreateDirectory(tempExtract);
++            ZipFile.ExtractToDirectory(entry.ZipPath, tempExtract, true);
++            entry = entry with { Folder = tempExtract };
++        }
++
++        return ProgramArtifactResult.Success(entry.Folder, entry.ZipPath, entry.Files, entry.Previews, entry.Tree, entry.FirstLines, entry.Hash);
++    }
++
++    public void RegisterArtifacts(string repoRoot, ProgramArtifactResult result)
++    {
++        if (!result.Ok || string.IsNullOrWhiteSpace(result.Hash))
++            return;
++
++        var cache = LoadCache(repoRoot);
++        cache[result.Hash] = new ProgramArtifactCacheEntry(
++            result.Hash,
++            result.Folder,
++            result.ZipPath,
++            result.TreePreview,
++            result.FirstLines,
++            result.Files,
++            result.Previews,
++            DateTimeOffset.UtcNow);
++        SaveCache(repoRoot, cache);
+     }
+ 
+-    private static string BuildInput(IntentExtraction intent, IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments)
++    private static Dictionary<string, ProgramArtifactCacheEntry> LoadCache(string repoRoot)
+     {
+-        var goal = intent?.Goal ?? "";
+-        var actions = intent?.Actions ?? Array.Empty<string>();
+-        var constraints = intent?.Constraints ?? Array.Empty<string>();
+-
+-        var sb = new System.Text.StringBuilder();
+-        sb.AppendLine("GOAL:" + goal);
+-        sb.AppendLine("ACTIONS:" + string.Join(", ", actions));
+-        sb.AppendLine("CONSTRAINTS:" + string.Join(", ", constraints));
++        var cachePath = GetCachePath(repoRoot);
++        try
++        {
++            if (!File.Exists(cachePath))
++                return new Dictionary<string, ProgramArtifactCacheEntry>(StringComparer.OrdinalIgnoreCase);
++
++            var json = File.ReadAllText(cachePath);
++            var entries = JsonSerializer.Deserialize<List<ProgramArtifactCacheEntry>>(json) ?? new List<ProgramArtifactCacheEntry>();
++            return entries.ToDictionary(e => e.Hash, e => e, StringComparer.OrdinalIgnoreCase);
++        }
++        catch
++        {
++            return new Dictionary<string, ProgramArtifactCacheEntry>(StringComparer.OrdinalIgnoreCase);
++        }
++    }
++
++    private static void SaveCache(string repoRoot, Dictionary<string, ProgramArtifactCacheEntry> cache)
++    {
++        var cachePath = GetCachePath(repoRoot);
++        var dir = Path.GetDirectoryName(cachePath);
++        if (!string.IsNullOrWhiteSpace(dir))
++            Directory.CreateDirectory(dir);
++
++        var json = JsonSerializer.Serialize(cache.Values.ToList(), new JsonSerializerOptions { WriteIndented = true });
++        File.WriteAllText(cachePath, json);
++    }
++
++    private static string GetCachePath(string repoRoot) =>
++        Path.Combine(repoRoot, ArtifactsRoot, "cache", CacheFileName);
++
++    private static string BuildPromptInput(JobSpec spec, IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments)
++    {
++        var sb = new StringBuilder();
++        sb.AppendLine("REQUEST:" + (spec?.Request ?? ""));
++        sb.AppendLine("GOAL:" + (spec?.Goal ?? ""));
++        sb.AppendLine("ACTIONS:" + string.Join(", ", spec?.Actions ?? Array.Empty<string>()));
++        sb.AppendLine("CONSTRAINTS:" + string.Join(", ", spec?.Constraints ?? Array.Empty<string>()));
+         sb.AppendLine("ATTACHMENTS:");
+         foreach (var a in attachments.Where(a => a != null))
+             sb.AppendLine($"- {a.StoredName} ({a.Kind})");
+         return sb.ToString();
+     }
+ 
+-    public static List<ProgramArtifact> ExtractArtifacts(IReadOnlyList<System.Text.Json.JsonElement> outputs)
++    private static string ComputeHash(JobSpec spec, IReadOnlyList<JsonElement> outputs, IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments)
++    {
++        var sb = new StringBuilder();
++        sb.Append(spec?.Request ?? "");
++        sb.Append(spec?.Goal ?? "");
++        sb.Append(spec?.Context ?? "");
++        foreach (var a in spec?.Actions ?? Array.Empty<string>()) sb.Append(a);
++        foreach (var c in spec?.Constraints ?? Array.Empty<string>()) sb.Append(c);
++        foreach (var att in spec?.Attachments ?? Array.Empty<JobSpecAttachment>())
++        {
++            sb.Append(att.StoredName);
++            sb.Append(att.Kind);
++            sb.Append(att.Status);
++            foreach (var t in att.Tags) sb.Append(t);
++        }
++        foreach (var a in attachments ?? Array.Empty<AttachmentInbox.AttachmentEntry>())
++        {
++            sb.Append(a.StoredName);
++            sb.Append(a.Kind);
++            sb.Append(a.SizeBytes);
++            sb.Append(a.Sha256);
++        }
++        foreach (var output in outputs ?? Array.Empty<JsonElement>())
++            sb.Append(output.GetRawText());
++
++        using var sha = SHA256.Create();
++        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
++        var hash = Convert.ToHexString(sha.ComputeHash(bytes));
++        return hash;
++    }
++
++    public static List<ProgramArtifact> ExtractArtifacts(IReadOnlyList<JsonElement> outputs)
+     {
+         var files = new List<ProgramArtifact>();
+-        foreach (var output in outputs ?? Array.Empty<System.Text.Json.JsonElement>())
++        foreach (var output in outputs ?? Array.Empty<JsonElement>())
+         {
+             if (output.ValueKind != JsonValueKind.Object)
+                 continue;
+@@ -121,13 +271,13 @@ public sealed class ProgramArtifactGenerator
+             if (output.TryGetProperty("files", out var filesEl) && filesEl.ValueKind == JsonValueKind.Array)
+             {
+                 foreach (var f in filesEl.EnumerateArray())
+-                    AddFile(files, f);
++                    AddProgramFile(files, f);
+             }
+ 
+             if (output.TryGetProperty("generatedFiles", out var gen) && gen.ValueKind == JsonValueKind.Array)
+             {
+                 foreach (var f in gen.EnumerateArray())
+-                    AddFile(files, f);
++                    AddProgramFile(files, f);
+             }
+ 
+             if (output.TryGetProperty("path", out var p) && p.ValueKind == JsonValueKind.String && output.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String)
+@@ -137,17 +287,6 @@ public sealed class ProgramArtifactGenerator
+         }
+ 
+         return files;
+-
+-        static void AddFile(List<ProgramArtifact> list, JsonElement element)
+-        {
+-            if (element.ValueKind != JsonValueKind.Object) return;
+-            var path = element.TryGetProperty("path", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() ?? "" : "";
+-            var content = element.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString() ?? "" : "";
+-            var tags = ReadTags(element);
+-
+-            if (!string.IsNullOrWhiteSpace(path))
+-                list.Add(new ProgramArtifact(path.Trim(), content, tags));
+-        }
+     }
+ 
+     private static List<ProgramArtifact> ParseArtifacts(string raw)
+@@ -167,7 +306,7 @@ public sealed class ProgramArtifactGenerator
+             if (root.TryGetProperty("files", out var filesEl) && filesEl.ValueKind == JsonValueKind.Array)
+             {
+                 foreach (var f in filesEl.EnumerateArray())
+-                    AddFile(files, f);
++                    AddProgramFile(files, f);
+             }
+ 
+             if (files.Count == 0 && root.TryGetProperty("readme", out var readme) && readme.ValueKind == JsonValueKind.String)
+@@ -181,13 +320,13 @@ public sealed class ProgramArtifactGenerator
+         }
+     }
+ 
+-    private static string BuildTargetFolder(string repoRoot, string sessionToken)
++    private static string BuildTargetFolder(string repoRoot, string sessionToken, string hash)
+     {
+         var session = SanitizeSegment(sessionToken);
+         if (session.Length == 0)
+             session = "session";
+ 
+-        var targetRoot = Path.Combine(repoRoot, "Workflow", "ProgramArtifacts", DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + session);
++        var targetRoot = Path.Combine(repoRoot, ArtifactsRoot, DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + session + "-" + hash[..8]);
+         Directory.CreateDirectory(targetRoot);
+         return targetRoot;
+     }
+@@ -275,13 +414,13 @@ public sealed class ProgramArtifactGenerator
+         return ext.Length == 0 ? "text" : ext;
+     }
+ 
+-    private static List<ProgramArtifact> EnsureScaffolding(List<ProgramArtifact> files, IntentExtraction? intent)
++    private static List<ProgramArtifact> EnsureScaffolding(List<ProgramArtifact> files, JobSpec? spec)
+     {
+         files ??= new List<ProgramArtifact>();
+ 
+         if (files.All(f => !string.Equals(Path.GetFileName(f.Path), "README.md", StringComparison.OrdinalIgnoreCase)))
+         {
+-            var goal = intent?.Goal ?? intent?.Request ?? "";
++            var goal = spec?.Goal ?? spec?.Request ?? "";
+             files.Add(new ProgramArtifact("README.md", $"# Project\n\n{goal}\n\nGenerated on {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm:ss} UTC.\n", new[] { "readme" }));
+         }
+ 
+@@ -337,6 +476,19 @@ public sealed class ProgramArtifactGenerator
+         return tags;
+     }
+ 
++    private static void AddProgramFile(List<ProgramArtifact> list, JsonElement element)
++    {
++        if (element.ValueKind != JsonValueKind.Object) return;
++        var path = element.TryGetProperty("path", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() ?? "" : "";
++        var content = element.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString() ?? "" : "";
++        var tags = ReadTags(element);
++
++        if (!string.IsNullOrWhiteSpace(path))
++            list.Add(new ProgramArtifact(path.Trim(), content, tags));
++    }
++
++    private static string Escape(string value) => (value ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"");
++
+     private sealed class Node
+     {
+         public string Name { get; }
+diff --git a/Workflow/ProgramArtifactGeneratorTests.cs b/Workflow/ProgramArtifactGeneratorTests.cs
+index 8f42885..f5b609b 100644
+--- a/Workflow/ProgramArtifactGeneratorTests.cs
++++ b/Workflow/ProgramArtifactGeneratorTests.cs
+@@ -1,6 +1,10 @@
+ #nullable enable
+ using System.Collections.Generic;
++using System.IO;
+ using System.Text.Json;
++using System.Threading;
++using System.Threading.Tasks;
++using RahBuilder.Settings;
+ using Xunit;
+ 
+ namespace RahBuilder.Workflow;
+@@ -39,4 +43,29 @@ public sealed class ProgramArtifactGeneratorTests
+         Assert.Equal("src/Auth.cs", artifacts[0].Path);
+         Assert.Contains("code", artifacts[0].Tags);
+     }
++
++    [Fact]
++    public async Task BuildProjectArtifacts_UsesCache()
++    {
++        var tempRoot = Path.Combine(Path.GetTempPath(), "rah-artifacts-" + Path.GetRandomFileName());
++        Directory.CreateDirectory(tempRoot);
++
++        var doc = JsonDocument.Parse(@"{""mode"":""jobspec.v2"",""request"":""test"",""goal"":""goal"",""context"":"""",""actions"":[""build""],""constraints"":[],""attachments"":[],""state"":{""ready"":true,""missing"":[]}}");
++        var spec = JobSpec.FromJson(doc, "jobspec.v2", "test", "goal", "", new List<string> { "build" }, new List<string>(), new List<JobSpecAttachment>(), null, true, new List<string>());
++
++        const string json = @"{ ""files"": [ { ""path"": ""src/Auth.cs"", ""content"": ""class C {}"", ""tags"": [""code""] } ] }";
++        using var outputDoc = JsonDocument.Parse(json);
++        var outputs = new List<JsonElement> { outputDoc.RootElement };
++
++        var gen = new ProgramArtifactGenerator();
++        var cfg = new AppConfig();
++
++        var result = await gen.BuildProjectArtifacts(spec, outputs, cfg, new List<AttachmentInbox.AttachmentEntry>(), tempRoot, "session", CancellationToken.None);
++        Assert.True(result.Ok);
++        Assert.True(File.Exists(result.ZipPath));
++
++        var cached = gen.TryGetCachedArtifacts(tempRoot, result.Hash);
++        Assert.NotNull(cached);
++        Assert.Equal(result.Hash, cached!.Hash);
++    }
+ }
+diff --git a/Workflow/ProviderApiHost.cs b/Workflow/ProviderApiHost.cs
+index 107db02..1672564 100644
+--- a/Workflow/ProviderApiHost.cs
++++ b/Workflow/ProviderApiHost.cs
+@@ -113,14 +113,18 @@ public sealed class ProviderApiHost : IDisposable
+             {
+                 var artifacts = _workflow.GetArtifacts();
+                 var packages = _workflow.GetArtifactPackages();
+-                await WriteJsonAsync(ctx, new { ok = true, artifacts, packages }).ConfigureAwait(false);
++                await WriteJsonAsync(ctx, new { ok = true, artifacts, packages, session = currentSession }).ConfigureAwait(false);
+                 return;
+             }
+ 
+             if (path.EndsWith("/api/artifacts/download", StringComparison.OrdinalIgnoreCase))
+             {
+                 var artifacts = _workflow.GetArtifacts();
+-                var zip = artifacts.LastOrDefault()?.ZipPath ?? _workflow.GetArtifactPackages().LastOrDefault();
++                var hash = ctx.Request.QueryString?["hash"] ?? "";
++                var selected = string.IsNullOrWhiteSpace(hash)
++                    ? artifacts.LastOrDefault()
++                    : artifacts.FirstOrDefault(a => string.Equals(a.Hash, hash, StringComparison.OrdinalIgnoreCase));
++                var zip = selected?.ZipPath ?? _workflow.GetArtifactPackages().LastOrDefault();
+                 if (string.IsNullOrWhiteSpace(zip) || !System.IO.File.Exists(zip))
+                 {
+                     await WriteJsonAsync(ctx, new { ok = false, error = "not_found" }, HttpStatusCode.NotFound).ConfigureAwait(false);
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 713924d..3cb0b83 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -1485,7 +1485,10 @@ public sealed class WorkflowFacade
+             return;
+         }
+ 
+-        var result = await _artifactGenerator.GenerateAsync(_cfg, intent, GetActiveAttachments(), _state.ToolOutputs, repo.RepoRoot, _state.SessionToken, ct).ConfigureAwait(false);
++        var spec = _state.LastJobSpecJson != null ? JobSpecParser.TryParse(_state.LastJobSpecJson) : null;
++        spec ??= JobSpec.Invalid("missing_jobspec");
++
++        var result = await _artifactGenerator.BuildProjectArtifacts(spec, _state.ToolOutputs, _cfg, GetActiveAttachments(), repo.RepoRoot, _state.SessionToken, ct).ConfigureAwait(false);
+         if (!result.Ok)
+         {
+             _trace.Emit("[program:error] " + result.Message);
+@@ -1496,42 +1499,42 @@ public sealed class WorkflowFacade
+             _state.ArtifactPackages.Add(result.ZipPath);
+         _state.ProgramArtifacts.Add(result);
+ 
+-        var previewLines = result.Files.Take(5).Select(f => $"- {f.Path}");
+-        var tree = result.TreePreview;
+-        var card = new OutputCard
+-        {
+-            Kind = OutputCardKind.Program,
+-            Title = "Program artifacts",
+-            Summary = $"Generated {result.Files.Count} files",
+-            Preview = string.Join("\n", previewLines),
+-            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}\n\nFiles:\n{tree}",
+-            Tags = new[] { "program", "artifact" },
+-            CreatedUtc = DateTimeOffset.UtcNow,
+-            Metadata = result.ZipPath
+-        };
++        if (_state.ProgramArtifacts.Any(p => string.Equals(p.Hash, result.Hash, StringComparison.OrdinalIgnoreCase)))
++            return;
+ 
+-        _state.OutputCards.Add(card);
+-        OutputCardProduced?.Invoke(card);
+         EmitArtifactCards(result);
+-        var msg = card.ToDisplayText();
+-        RecordAssistantMessage(msg);
+-        UserFacingMessage?.Invoke(msg);
+     }
+ 
+     private void EmitArtifactCards(ProgramArtifactResult result)
+     {
+         if (result == null) return;
+ 
++        var summaryCard = new OutputCard
++        {
++            Kind = OutputCardKind.Program,
++            Title = "Program artifacts",
++            Summary = $"Generated {result.Files.Count} files (hash {result.Hash[..Math.Min(12, result.Hash.Length)]})",
++            Preview = string.Join("\n", result.Files.Take(5).Select(f => $"- {f.Path}")),
++            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}\nHash: {result.Hash}\n\nFiles:\n{result.TreePreview}",
++            Tags = new[] { "program", "artifact" },
++            CreatedUtc = DateTimeOffset.UtcNow,
++            Metadata = result.ZipPath,
++            DownloadUrl = BuildDownloadUrl(result.Hash)
++        };
++        _state.OutputCards.Add(summaryCard);
++        OutputCardProduced?.Invoke(summaryCard);
++
+         var treeCard = new OutputCard
+         {
+-            Kind = OutputCardKind.Tree,
++            Kind = OutputCardKind.ProgramTree,
+             Title = "Project tree",
+             Summary = $"Files: {result.Files.Count}",
+             Preview = result.TreePreview,
+             FullContent = result.TreePreview,
+             Tags = new[] { "tree", "artifact" },
+             CreatedUtc = DateTimeOffset.UtcNow,
+-            Metadata = result.ZipPath
++            Metadata = result.ZipPath,
++            DownloadUrl = BuildDownloadUrl(result.Hash)
+         };
+         _state.OutputCards.Add(treeCard);
+         OutputCardProduced?.Invoke(treeCard);
+@@ -1540,14 +1543,15 @@ public sealed class WorkflowFacade
+         {
+             var fileCard = new OutputCard
+             {
+-                Kind = OutputCardKind.Code,
++                Kind = OutputCardKind.ProgramFile,
+                 Title = preview.Path,
+                 Summary = $"{preview.LineCount} lines ({preview.ContentType})",
+                 Preview = preview.Preview,
+                 FullContent = preview.Preview,
+                 Tags = preview.Tags.Count > 0 ? preview.Tags : new[] { "code", "generated" },
+                 CreatedUtc = DateTimeOffset.UtcNow,
+-                Metadata = result.ZipPath
++                Metadata = result.ZipPath,
++                DownloadUrl = BuildDownloadUrl(result.Hash)
+             };
+             _state.OutputCards.Add(fileCard);
+             OutputCardProduced?.Invoke(fileCard);
+@@ -1557,20 +1561,43 @@ public sealed class WorkflowFacade
+         {
+             var zipCard = new OutputCard
+             {
+-                Kind = OutputCardKind.Archive,
++                Kind = OutputCardKind.ProgramZip,
+                 Title = "Download ZIP",
+                 Summary = Path.GetFileName(result.ZipPath),
+                 Preview = "Download generated artifacts.",
+                 FullContent = $"Path: {result.ZipPath}",
+                 Tags = new[] { "zip", "artifact" },
+                 CreatedUtc = DateTimeOffset.UtcNow,
+-                Metadata = result.ZipPath
++                Metadata = result.ZipPath,
++                DownloadUrl = BuildDownloadUrl(result.Hash)
+             };
+             _state.OutputCards.Add(zipCard);
+             OutputCardProduced?.Invoke(zipCard);
+         }
++
++        _state.ProgramArtifacts.Add(result);
++        if (_state.OutputCards.All(c => c.Kind != OutputCardKind.Final))
++        {
++            var summary = $"Generated {result.Files.Count} files across {result.Files.Select(f => Path.GetDirectoryName(f.Path) ?? \"\").Distinct(StringComparer.OrdinalIgnoreCase).Count()} folders; zip ready at {result.ZipPath}.";
++            var summaryCardFinal = new OutputCard
++            {
++                Kind = OutputCardKind.Final,
++                Title = "Artifact summary",
++                Summary = summary,
++                Preview = summary,
++                FullContent = summary,
++                Tags = new[] { "summary", "artifact" },
++                CreatedUtc = DateTimeOffset.UtcNow,
++                Metadata = result.ZipPath,
++                DownloadUrl = BuildDownloadUrl(result.Hash)
++            };
++            _state.OutputCards.Add(summaryCardFinal);
++            OutputCardProduced?.Invoke(summaryCardFinal);
++        }
+     }
+ 
++    private string BuildDownloadUrl(string hash) => $"/api/artifacts/download?session={_state.SessionToken}&hash={hash}";
++
+     private async Task<bool> HandleProgramOnlyFlowAsync(string userText, string jobSpecJson, CancellationToken ct)
+     {
+         if (!_planNeedsArtifacts)
