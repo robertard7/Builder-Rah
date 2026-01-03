@@ -42,6 +42,7 @@ public sealed class MainForm : Form
     private readonly Button _stopButton;
     private readonly Button _editPlanButton;
     private readonly Button _previewPlanButton;
+    private readonly Button _downloadButton;
     private readonly Panel _clarifyPanel;
     private readonly Label _clarifyLabel;
     private readonly SplitContainer _chatSplit;
@@ -208,11 +209,19 @@ public sealed class MainForm : Form
 
         _cardList = new ListBox
         {
-            Dock = DockStyle.Left,
-            Width = 260,
+            Dock = DockStyle.Fill,
             HorizontalScrollbar = true
         };
         _cardList.SelectedIndexChanged += (_, _) => ShowSelectedCard();
+
+        _downloadButton = new Button
+        {
+            Text = "Download ZIP",
+            Dock = DockStyle.Top,
+            Height = 30,
+            Enabled = false
+        };
+        _downloadButton.Click += (_, _) => DownloadSelectedArtifact();
 
         _cardDetail = new RichTextBox
         {
@@ -230,7 +239,10 @@ public sealed class MainForm : Form
             Panel1MinSize = 200,
             SplitterDistance = 260
         };
-        outputSplit.Panel1.Controls.Add(_cardList);
+        var cardPanel = new Panel { Dock = DockStyle.Fill };
+        cardPanel.Controls.Add(_downloadButton);
+        cardPanel.Controls.Add(_cardList);
+        outputSplit.Panel1.Controls.Add(cardPanel);
         outputSplit.Panel2.Controls.Add(_cardDetail);
 
         var auxTabs = new TabControl { Dock = DockStyle.Fill };
@@ -410,16 +422,45 @@ public sealed class MainForm : Form
         _cards.Add(card);
         _cardList.Items.Add($"{card.Kind}: {card.Title}");
         if (_cardList.Items.Count > 0)
+        {
             _cardList.SelectedIndex = _cardList.Items.Count - 1;
-        _cardDetail.Text = card.ToDisplayText();
+            ShowSelectedCard();
+        }
     }
 
     private void ShowSelectedCard()
     {
         if (_cardList.SelectedIndex < 0 || _cardList.SelectedIndex >= _cards.Count)
+        {
+            _cardDetail.Text = "";
+            _downloadButton.Enabled = false;
+            return;
+        }
+
+        var card = _cards[_cardList.SelectedIndex];
+        _cardDetail.Text = card.ToDisplayText();
+        _downloadButton.Enabled = card.Kind is OutputCardKind.Program or OutputCardKind.Archive or OutputCardKind.Tree;
+    }
+
+    private void DownloadSelectedArtifact()
+    {
+        if (_cardList.SelectedIndex < 0 || _cardList.SelectedIndex >= _cards.Count)
             return;
 
-        _cardDetail.Text = _cards[_cardList.SelectedIndex].ToDisplayText();
+        var card = _cards[_cardList.SelectedIndex];
+        var zipPath = card.Metadata;
+        if (string.IsNullOrWhiteSpace(zipPath) || !File.Exists(zipPath))
+            return;
+
+        using var dialog = new SaveFileDialog
+        {
+            FileName = Path.GetFileName(zipPath),
+            Filter = "Zip archive|*.zip|All files|*.*"
+        };
+        if (dialog.ShowDialog(this) == DialogResult.OK && !string.IsNullOrWhiteSpace(dialog.FileName))
+        {
+            File.Copy(zipPath, dialog.FileName, overwrite: true);
+        }
     }
 
     private void ToggleTracePane()
