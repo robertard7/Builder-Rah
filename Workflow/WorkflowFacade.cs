@@ -572,6 +572,11 @@ public sealed class WorkflowFacade
         return _state.ArtifactPackages.ToList();
     }
 
+    public SessionSnapshot GetSessionSnapshot()
+    {
+        return SessionManager.Instance.Snapshot(_state.SessionToken);
+    }
+
     public object GetPlanSnapshot()
     {
         var steps = _state.PendingToolPlan?.Steps?.Select(s => new
@@ -1530,6 +1535,8 @@ public sealed class WorkflowFacade
     {
         if (result == null) return;
 
+        SessionManager.Instance.UpdateArtifacts(_state.SessionToken, _state.ArtifactPackages);
+
         var summaryCard = new OutputCard
         {
             Kind = OutputCardKind.Program,
@@ -1544,6 +1551,7 @@ public sealed class WorkflowFacade
         };
         _state.OutputCards.Add(summaryCard);
         OutputCardProduced?.Invoke(summaryCard);
+        SessionManager.Instance.AppendCard(_state.SessionToken, summaryCard);
 
         var treeCard = new OutputCard
         {
@@ -1559,6 +1567,7 @@ public sealed class WorkflowFacade
         };
         _state.OutputCards.Add(treeCard);
         OutputCardProduced?.Invoke(treeCard);
+        SessionManager.Instance.AppendCard(_state.SessionToken, treeCard);
 
         foreach (var preview in result.Previews)
         {
@@ -1576,6 +1585,7 @@ public sealed class WorkflowFacade
             };
             _state.OutputCards.Add(fileCard);
             OutputCardProduced?.Invoke(fileCard);
+            SessionManager.Instance.AppendCard(_state.SessionToken, fileCard);
         }
 
         if (!string.IsNullOrWhiteSpace(result.ZipPath))
@@ -1594,6 +1604,7 @@ public sealed class WorkflowFacade
             };
             _state.OutputCards.Add(zipCard);
             OutputCardProduced?.Invoke(zipCard);
+            SessionManager.Instance.AppendCard(_state.SessionToken, zipCard);
         }
 
         _state.ProgramArtifacts.Add(result);
@@ -1614,6 +1625,7 @@ public sealed class WorkflowFacade
             };
             _state.OutputCards.Add(summaryCardFinal);
             OutputCardProduced?.Invoke(summaryCardFinal);
+            SessionManager.Instance.AppendCard(_state.SessionToken, summaryCardFinal);
         }
     }
 
