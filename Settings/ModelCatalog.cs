@@ -42,7 +42,7 @@ public static class ModelCatalog
     public static readonly string[] DefaultOllamaModels =
     {
         "qwen2.5:7b-instruct",
-        "qwen2.5:14b-instruct",
+        "qwen2.5:0.5b-instruct",
         "mistral:latest",
         "llama3.1:8b",
         "phi3:mini",
