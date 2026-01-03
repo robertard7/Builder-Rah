@@ -117,6 +117,12 @@ public sealed class ProviderApiHost : IDisposable
                 return;
             }
 
+            if (path.EndsWith("/api/history", StringComparison.OrdinalIgnoreCase))
+            {
+                await WriteJsonAsync(ctx, _workflow.GetHistorySnapshot()).ConfigureAwait(false);
+                return;
+            }
+
             if (path.EndsWith("/api/artifacts/download", StringComparison.OrdinalIgnoreCase))
             {
                 var artifacts = _workflow.GetArtifacts();

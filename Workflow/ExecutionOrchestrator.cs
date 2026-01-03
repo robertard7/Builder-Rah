@@ -64,6 +64,11 @@ public sealed class ExecutionOrchestrator
         if (result.Output.HasValue)
         {
             _state.ToolOutputs.Add(result.Output.Value);
+            try
+            {
+                _state.MemoryStore.AddToolOutput(result.Output.Value.GetRawText());
+            }
+            catch { }
             var card = BuildOutputCard(result.Output.Value);
             if (card != null)
             {

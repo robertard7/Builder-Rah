@@ -22,6 +22,7 @@ public sealed class WorkflowState
     public bool PlanPaused { get; set; }
     public IntentExtraction? LastIntent { get; set; }
     public ChatMemory Memory { get; } = new();
+    public ConversationMemory MemoryStore { get; } = new();
     public HashSet<string> ConfirmedFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, string> ClarificationAsked { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> AskedMissingFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
