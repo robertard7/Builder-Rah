@@ -1,9 +1,8 @@
-﻿#nullable enable
+#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Text.Json;
 using System.Threading;
@@ -22,10 +21,15 @@ internal sealed class SessionEventStream : IDisposable
 
     public string Session { get; }
 
-    public SessionEventStream(string session, HttpListenerContext ctx)
+    public SessionEventStream(string session, HttpListenerContext ctx, IEnumerable<SessionEvent>? initial = null)
     {
         Session = session;
         _context = ctx;
+        if (initial != null)
+        {
+            foreach (var evt in initial)
+                _queue.Add(evt);
+        }
         _writerTask = Task.Run(() => WriterLoopAsync());
     }
 
@@ -87,9 +91,9 @@ public sealed class SessionEventStreamManager : IDisposable
 {
     private readonly ConcurrentDictionary<string, List<SessionEventStream>> _streams = new(StringComparer.OrdinalIgnoreCase);
 
-    public void AddStream(string session, HttpListenerContext ctx)
+    public void AddStream(string session, HttpListenerContext ctx, IEnumerable<SessionEvent>? history = null)
     {
-        var stream = new SessionEventStream(session, ctx);
+        var stream = new SessionEventStream(session, ctx, history);
         var list = _streams.GetOrAdd(session, _ => new List<SessionEventStream>());
         lock (list)
         {
