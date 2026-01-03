@@ -460,8 +460,8 @@ public sealed class WorkflowFacade
         _trace.Emit("[route:graph_ok] Mermaid workflow graph validated. (Planner dispatch not wired yet.)");
         if (routeDecision.Ok)
             _trace.Emit($"[route:selected] {routeDecision.SelectedRoute} (routes={routeDecision.RouteCount}) {routeDecision.Why}");
-        else
-            _trace.Emit("[route:error] " + routeDecision.Message);
+		else
+			_trace.Emit("[route:error] " + routeDecision.Why);
 
         if (!string.IsNullOrWhiteSpace(rawJson))
             _trace.Emit("[jobspec] " + Trunc(rawJson, 800));
@@ -600,23 +600,34 @@ public sealed class WorkflowFacade
         return SessionManager.Snapshot(_state.SessionToken);
     }
 
-    public object GetPlanSnapshot()
-    {
-        var steps = _state.PendingToolPlan?.Steps?.Select(s => new
-        {
-            s.Id,
-            s.ToolId,
-            Inputs = s.Inputs,
-            s.Why
-        }).ToList() ?? new List<object>();
+	public object GetPlanSnapshot()
+	{
+		var stepsList = new List<object>();
 
-        return new
-        {
-            session = _state.SessionToken,
-            steps,
-            ready = steps.Count > 0
-        };
-    }
+		var steps = _state.PendingToolPlan?.Steps;
+		if (steps != null)
+		{
+			foreach (var s in steps)
+			{
+				if (s == null) continue;
+
+				stepsList.Add(new
+				{
+					s.Id,
+					s.ToolId,
+					Inputs = s.Inputs,
+					s.Why
+				});
+			}
+		}
+
+		return new
+		{
+			session = _state.SessionToken,
+			steps = stepsList,
+			ready = stepsList.Count > 0
+		};
+	}
 
     public void UpdatePendingPlanFromClient(IReadOnlyList<PlanVersionStep> steps, bool recordHistory = true)
     {
@@ -1574,122 +1585,239 @@ public sealed class WorkflowFacade
         EmitArtifactCards(result);
     }
 
-    private void EmitArtifactCards(ProgramArtifactResult result)
-    {
-        if (result == null) return;
+	private void EmitArtifactCards(ProgramArtifactResult result)
+	{
+		if (result == null) return;
 
-        SessionManager.UpdateArtifacts(_state.SessionToken, _state.ArtifactPackages);
+		var hash = result.Hash ?? "";
+		var zipPath = result.ZipPath ?? "";
+		var folder = result.Folder ?? "";
+		var tree = result.TreePreview ?? "";
 
-        var summaryCard = new OutputCard
-        {
-            Kind = OutputCardKind.Program,
-            Title = "Program artifacts",
-            Summary = $"Generated {result.Files.Count} files (hash {result.Hash[..Math.Min(12, result.Hash.Length)]})",
-            Preview = string.Join("\n", result.Files.Take(5).Select(f => $"- {f.Path}")),
-            FullContent = $"Folder: {result.Folder}\nZip: {result.ZipPath}\nHash: {result.Hash}\n\nFiles:\n{result.TreePreview}",
-            Tags = new[] { "program", "artifact" },
-            CreatedUtc = DateTimeOffset.UtcNow,
-            Metadata = result.ZipPath,
-            DownloadUrl = BuildDownloadUrl(result.Hash)
-        };
-        _state.OutputCards.Add(summaryCard);
-        OutputCardProduced?.Invoke(summaryCard);
-        SessionManager.AddHistoryEvent(_state.SessionToken, "artifact_ready", new { result.Hash, result.ZipPath, count = result.Files.Count });
-        BroadcastEvent("artifact_ready", new { result.Hash, result.ZipPath, count = result.Files.Count });
+		// De-dupe: if we've already emitted cards for this artifact hash in this session, don't spam more.
+		if (!string.IsNullOrWhiteSpace(hash))
+		{
+			var expectedUrl = BuildDownloadUrl(hash);
+			if (_state.OutputCards.Any(c =>
+					(c.Kind == OutputCardKind.Program || c.Kind == OutputCardKind.ProgramTree || c.Kind == OutputCardKind.ProgramZip) &&
+					string.Equals(c.DownloadUrl ?? "", expectedUrl, StringComparison.OrdinalIgnoreCase)))
+			{
+				return;
+			}
+		}
 
-        var treeCard = new OutputCard
-        {
-            Kind = OutputCardKind.ProgramTree,
-            Title = "Project tree",
-            Summary = $"Files: {result.Files.Count}",
-            Preview = result.TreePreview,
-            FullContent = result.TreePreview,
-            Tags = new[] { "tree", "artifact" },
-            CreatedUtc = DateTimeOffset.UtcNow,
-            Metadata = result.ZipPath,
-            DownloadUrl = BuildDownloadUrl(result.Hash)
-        };
-        _state.OutputCards.Add(treeCard);
-        OutputCardProduced?.Invoke(treeCard);
+		SessionManager.UpdateArtifacts(_state.SessionToken, _state.ArtifactPackages);
 
-        foreach (var preview in result.Previews)
-        {
-            var fileCard = new OutputCard
-            {
-                Kind = OutputCardKind.ProgramFile,
-                Title = preview.Path,
-                Summary = $"{preview.LineCount} lines ({preview.ContentType})",
-                Preview = preview.Preview,
-                FullContent = preview.Preview,
-                Tags = preview.Tags.Count > 0 ? preview.Tags : new[] { "code", "generated" },
-                CreatedUtc = DateTimeOffset.UtcNow,
-                Metadata = result.ZipPath,
-                DownloadUrl = BuildDownloadUrl(result.Hash)
-            };
-            _state.OutputCards.Add(fileCard);
-            OutputCardProduced?.Invoke(fileCard);
-        }
+		void Emit(OutputCard card)
+		{
+			if (card == null) return;
+			_state.OutputCards.Add(card);
+			OnOutputCardProduced(card);
+		}
 
-        if (!string.IsNullOrWhiteSpace(result.ZipPath))
-        {
-            var zipCard = new OutputCard
-            {
-                Kind = OutputCardKind.ProgramZip,
-                Title = "Download ZIP",
-                Summary = Path.GetFileName(result.ZipPath),
-                Preview = "Download generated artifacts.",
-                FullContent = $"Path: {result.ZipPath}",
-                Tags = new[] { "zip", "artifact" },
-                CreatedUtc = DateTimeOffset.UtcNow,
-                Metadata = result.ZipPath,
-                DownloadUrl = BuildDownloadUrl(result.Hash)
-            };
-            _state.OutputCards.Add(zipCard);
-            OutputCardProduced?.Invoke(zipCard);
-            BroadcastEvent("artifact_zip_ready", new { result.Hash, result.ZipPath });
-        }
+		var fileCount = result.Files != null ? result.Files.Count : 0;
+		var hashShort = hash.Length > 12 ? hash.Substring(0, 12) : hash;
 
-        _state.ProgramArtifacts.Add(result);
-        if (_state.OutputCards.All(c => c.Kind != OutputCardKind.Final))
-        {
-            var summary = $"Generated {result.Files.Count} files across {result.Files.Select(f => Path.GetDirectoryName(f.Path) ?? \"\").Distinct(StringComparer.OrdinalIgnoreCase).Count()} folders; zip ready at {result.ZipPath}.";
-            var summaryCardFinal = new OutputCard
-            {
-                Kind = OutputCardKind.Final,
-                Title = "Artifact summary",
-                Summary = summary,
-                Preview = summary,
-                FullContent = summary,
-                Tags = new[] { "summary", "artifact" },
-                CreatedUtc = DateTimeOffset.UtcNow,
-                Metadata = result.ZipPath,
-                DownloadUrl = BuildDownloadUrl(result.Hash)
-            };
-            _state.OutputCards.Add(summaryCardFinal);
-            OutputCardProduced?.Invoke(summaryCardFinal);
-        }
-    }
+		var filePreviewLines = "";
+		try
+		{
+			filePreviewLines = result.Files != null
+				? string.Join("\n", result.Files.Take(5).Select(f => $"- {f.Path}"))
+				: "";
+		}
+		catch
+		{
+			filePreviewLines = "";
+		}
+
+		// Summary
+		var summaryCard = new OutputCard
+		{
+			Kind = OutputCardKind.Program,
+			Title = "Program artifacts",
+			Summary = $"Generated {fileCount} files (hash {hashShort})",
+			Preview = filePreviewLines,
+			FullContent = $"Folder: {folder}\nZip: {zipPath}\nHash: {hash}\n\nFiles:\n{tree}",
+			Tags = new[] { "program", "artifact" },
+			CreatedUtc = DateTimeOffset.UtcNow,
+			Metadata = zipPath,
+			DownloadUrl = string.IsNullOrWhiteSpace(hash) ? "" : BuildDownloadUrl(hash)
+		};
+		Emit(summaryCard);
+
+		SessionManager.AddHistoryEvent(_state.SessionToken, "artifact_ready", new { hash, zipPath, count = fileCount });
+		BroadcastEvent("artifact_ready", new { hash, zipPath, count = fileCount });
+
+		// Tree
+		var treeCard = new OutputCard
+		{
+			Kind = OutputCardKind.ProgramTree,
+			Title = "Project tree",
+			Summary = $"Files: {fileCount}",
+			Preview = tree,
+			FullContent = tree,
+			Tags = new[] { "tree", "artifact" },
+			CreatedUtc = DateTimeOffset.UtcNow,
+			Metadata = zipPath,
+			DownloadUrl = string.IsNullOrWhiteSpace(hash) ? "" : BuildDownloadUrl(hash)
+		};
+		Emit(treeCard);
+
+		SessionManager.AddHistoryEvent(_state.SessionToken, "artifact_tree_ready", new { hash, zipPath, count = fileCount });
+		BroadcastEvent("artifact_tree_ready", new { hash, zipPath, count = fileCount });
+
+		// File previews
+		if (result.Previews != null)
+		{
+			foreach (var preview in result.Previews)
+			{
+				if (preview == null) continue;
+
+				var tags = (preview.Tags != null && preview.Tags.Count > 0)
+					? preview.Tags
+					: new[] { "code", "generated" };
+
+				var fileCard = new OutputCard
+				{
+					Kind = OutputCardKind.ProgramFile,
+					Title = preview.Path ?? "",
+					Summary = $"{preview.LineCount} lines ({preview.ContentType})",
+					Preview = preview.Preview ?? "",
+					FullContent = preview.Preview ?? "",
+					Tags = tags,
+					CreatedUtc = DateTimeOffset.UtcNow,
+					Metadata = zipPath,
+					DownloadUrl = string.IsNullOrWhiteSpace(hash) ? "" : BuildDownloadUrl(hash)
+				};
+				Emit(fileCard);
+
+				SessionManager.AddHistoryEvent(_state.SessionToken, "artifact_file_preview", new
+				{
+					hash,
+					zipPath,
+					path = preview.Path ?? "",
+					lines = preview.LineCount,
+					contentType = preview.ContentType ?? ""
+				});
+				BroadcastEvent("artifact_file_preview", new
+				{
+					hash,
+					zipPath,
+					path = preview.Path ?? "",
+					lines = preview.LineCount,
+					contentType = preview.ContentType ?? ""
+				});
+			}
+		}
+
+		// ZIP download card
+		if (!string.IsNullOrWhiteSpace(zipPath))
+		{
+			var zipCard = new OutputCard
+			{
+				Kind = OutputCardKind.ProgramZip,
+				Title = "Download ZIP",
+				Summary = Path.GetFileName(zipPath),
+				Preview = "Download generated artifacts.",
+				FullContent = $"Path: {zipPath}",
+				Tags = new[] { "zip", "artifact" },
+				CreatedUtc = DateTimeOffset.UtcNow,
+				Metadata = zipPath,
+				DownloadUrl = string.IsNullOrWhiteSpace(hash) ? "" : BuildDownloadUrl(hash)
+			};
+			Emit(zipCard);
+
+			SessionManager.AddHistoryEvent(_state.SessionToken, "artifact_zip_ready", new { hash, zipPath });
+			BroadcastEvent("artifact_zip_ready", new { hash, zipPath });
+		}
+
+		// Final "artifact summary" card only if a Final card hasn't already been emitted
+		if (_state.OutputCards.All(c => c.Kind != OutputCardKind.Final))
+		{
+			int folderCount = 0;
+			try
+			{
+				folderCount = result.Files != null
+					? result.Files
+						.Select(f => Path.GetDirectoryName(f.Path) ?? "")
+						.Distinct(StringComparer.OrdinalIgnoreCase)
+						.Count()
+					: 0;
+			}
+			catch
+			{
+				folderCount = 0;
+			}
+
+			var summary = $"Generated {fileCount} files across {folderCount} folders; zip ready at {zipPath}.";
+			var summaryFinal = new OutputCard
+			{
+				Kind = OutputCardKind.Final,
+				Title = "Artifact summary",
+				Summary = summary,
+				Preview = summary,
+				FullContent = summary,
+				Tags = new[] { "summary", "artifact" },
+				CreatedUtc = DateTimeOffset.UtcNow,
+				Metadata = zipPath,
+				DownloadUrl = string.IsNullOrWhiteSpace(hash) ? "" : BuildDownloadUrl(hash)
+			};
+			Emit(summaryFinal);
+		}
+	}
 
     private string BuildDownloadUrl(string hash) => $"/api/artifacts/download?session={_state.SessionToken}&hash={hash}";
 
-    private async Task<bool> HandleProgramOnlyFlowAsync(string userText, string jobSpecJson, CancellationToken ct)
-    {
-        if (!_planNeedsArtifacts)
-            return false;
+	private async Task<bool> HandleProgramOnlyFlowAsync(string userText, string jobSpecJson, CancellationToken ct)
+	{
+		if (!_planNeedsArtifacts)
+			return false;
 
-        _trace.Emit("[program] No attachments required; generating program artifacts.");
-        _state.LastJobSpecJson = jobSpecJson;
-        _state.OriginalUserText = userText;
-        _state.ToolOutputs = new List<JsonElement>();
-        _state.GenerateArtifacts = true;
-        await MaybeGenerateArtifactsAsync(ct).ConfigureAwait(false);
-        await ProduceFinalResponseAsync(ct).ConfigureAwait(false);
-        _state.ClearPlan();
-        _planNeedsArtifacts = false;
-        PendingStepChanged?.Invoke("", false);
-        NotifyStatus("Done");
-        return true;
-    }
+		_trace.Emit("[program] No attachments required; generating program artifacts.");
+
+		var beforeArtifacts = _state.ProgramArtifacts != null ? _state.ProgramArtifacts.Count : 0;
+		var beforePackages = _state.ArtifactPackages != null ? _state.ArtifactPackages.Count : 0;
+
+		_state.LastJobSpecJson = jobSpecJson;
+		_state.OriginalUserText = userText;
+		_state.ToolOutputs = new List<JsonElement>();
+		_state.GenerateArtifacts = true;
+
+		await MaybeGenerateArtifactsAsync(ct).ConfigureAwait(false);
+
+		var afterArtifacts = _state.ProgramArtifacts != null ? _state.ProgramArtifacts.Count : 0;
+		var afterPackages = _state.ArtifactPackages != null ? _state.ArtifactPackages.Count : 0;
+
+		var artifactsGenerated = (afterArtifacts > beforeArtifacts) || (afterPackages > beforePackages);
+
+		// If artifact generation happened but cards weren't emitted (e.g., due to upstream logic), emit them now.
+		if (artifactsGenerated && _state.ProgramArtifacts != null && _state.ProgramArtifacts.Count > 0)
+		{
+			var latest = _state.ProgramArtifacts[_state.ProgramArtifacts.Count - 1];
+			if (latest != null && !string.IsNullOrWhiteSpace(latest.Hash))
+			{
+				var expectedUrl = BuildDownloadUrl(latest.Hash);
+				var already = _state.OutputCards.Any(c =>
+					(c.Kind == OutputCardKind.Program || c.Kind == OutputCardKind.ProgramTree || c.Kind == OutputCardKind.ProgramZip) &&
+					string.Equals(c.DownloadUrl ?? "", expectedUrl, StringComparison.OrdinalIgnoreCase));
+
+				if (!already)
+					EmitArtifactCards(latest);
+			}
+		}
+
+		// Produce final response only if a Final card hasn't already been emitted.
+		if (_state.OutputCards.All(c => c.Kind != OutputCardKind.Final))
+			await ProduceFinalResponseAsync(ct).ConfigureAwait(false);
+
+		_state.ClearPlan();
+		_planNeedsArtifacts = false;
+
+		PendingStepChanged?.Invoke("", false);
+		NotifyStatus("Done");
+
+		return artifactsGenerated;
+	}
 
     private static string EnsureNarrative(string resp)
     {
