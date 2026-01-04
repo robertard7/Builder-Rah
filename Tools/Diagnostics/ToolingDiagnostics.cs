@@ -12,8 +12,9 @@ public sealed record ToolingDiagnostics(
     string State,
     int BlueprintTotal,
     int BlueprintSelectable,
-    IReadOnlyList<string> SelectedBlueprints)
+    IReadOnlyList<string> SelectedBlueprints,
+    IReadOnlyDictionary<string, int> BlueprintTagBreakdown)
 {
     public static ToolingDiagnostics Empty { get; } =
-        new ToolingDiagnostics(0, 0, 0, Array.Empty<string>(), "tools inactive", 0, 0, Array.Empty<string>());
+        new ToolingDiagnostics(0, 0, 0, Array.Empty<string>(), "tools inactive", 0, 0, Array.Empty<string>(), new Dictionary<string, int>());
 }
