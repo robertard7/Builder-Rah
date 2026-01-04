@@ -31,6 +31,11 @@ public sealed class WorkflowState
     public List<string> ArtifactPackages { get; set; } = new();
     public List<ProgramArtifactResult> ProgramArtifacts { get; set; } = new();
     public bool PlanConfirmed { get; set; }
+    public string LastRoute { get; set; } = "";
+    public string LastRouteBeforeWait { get; set; } = "";
+    public string LastFlowSignature { get; set; } = "";
+    public bool ChatIntakeCompleted { get; set; }
+    public List<string> SelectedBlueprints { get; set; } = new();
 
     public void ClearPlan()
     {
@@ -47,6 +52,7 @@ public sealed class WorkflowState
         ArtifactPackages = new List<string>();
         ProgramArtifacts = new List<ProgramArtifactResult>();
         PlanConfirmed = false;
+        SelectedBlueprints = new List<string>();
     }
 
     public void ClearClarifications()
