@@ -1,11 +1,10 @@
+// Settings/Pages/OrchestratorSettingsPage.cs
 #nullable enable
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using RahBuilder.Settings;
-using RahBuilder.Tools.BlueprintTemplates;
 using RahBuilder.Ui;
 
 namespace RahBuilder.Settings.Pages;
@@ -16,26 +15,18 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
 
     private readonly AppConfig _config;
 
+    private bool _uiReady;
+    private bool _binding;
+
     private TextBox _mode = null!;
     private CheckBox _openAi = null!;
     private CheckBox _hf = null!;
     private CheckBox _ollama = null!;
+
     private DataGridView _grid = null!;
-    private Label _catalogStatus = null!;
-
     private TextBox _rolePurpose = null!;
-    private Label _rolePurposeLabel = null!;
-
-    private IReadOnlyList<BlueprintCatalogEntry> _catalogAll = Array.Empty<BlueprintCatalogEntry>();
-    private IReadOnlyList<BlueprintCatalogEntry> _catalogPublic = Array.Empty<BlueprintCatalogEntry>();
-
-    private sealed class PromptItem
-    {
-        public string Id { get; init; } = "";
-        public string Display { get; init; } = "";
-        public string Description { get; init; } = "";
-        public override string ToString() => Display;
-    }
+    private TextBox _promptText = null!;
+    private Label _status = null!;
 
     public OrchestratorSettingsPage(AppConfig config)
     {
@@ -45,30 +36,17 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
         _config.Orchestrator ??= new OrchestratorSettings();
         _config.Orchestrator.EnsureDefaults();
 
-        LoadCatalog();
         BuildUi();
         BindFromConfig();
     }
 
     public Control BuildPage(AppConfig config) => new OrchestratorSettingsPage(config);
 
-    private void LoadCatalog()
-    {
-        try
-        {
-            var folder = _config.General?.BlueprintTemplatesPath ?? "";
-            _catalogAll = BlueprintCatalog.Load(folder);
-            _catalogPublic = BlueprintCatalog.PublicOnly(_catalogAll);
-        }
-        catch
-        {
-            _catalogAll = Array.Empty<BlueprintCatalogEntry>();
-            _catalogPublic = Array.Empty<BlueprintCatalogEntry>();
-        }
-    }
-
     private void BuildUi()
     {
+        _uiReady = false;
+        _binding = true;
+
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -76,8 +54,8 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
             RowCount = 6,
             Padding = new Padding(10),
         };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
 
         // ===== Top controls
         var top = new TableLayoutPanel
@@ -92,11 +70,17 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
         top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         top.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        top.Controls.Add(new Label { Text = "Mode (single|multi)", AutoSize = true, Margin = new Padding(0, 6, 10, 6) }, 0, 0);
+        top.Controls.Add(new Label
+        {
+            Text = "Mode (single|multi)",
+            AutoSize = true,
+            Margin = new Padding(0, 6, 10, 6)
+        }, 0, 0);
 
         _mode = new TextBox { Dock = DockStyle.Fill };
         _mode.TextChanged += (_, __) =>
         {
+            if (!_uiReady || _binding) return;
             _config.Orchestrator.Mode = (_mode.Text ?? "").Trim();
             AutoSave.Touch("orchestrator.mode");
         };
@@ -106,6 +90,7 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
         _openAi = new CheckBox { Text = "Enable OpenAI pool", AutoSize = true };
         _openAi.CheckedChanged += (_, __) =>
         {
+            if (!_uiReady || _binding) return;
             _config.Orchestrator.EnableOpenAiPool = _openAi.Checked;
             AutoSave.Touch("orchestrator.pool.openai");
         };
@@ -113,6 +98,7 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
         _hf = new CheckBox { Text = "Enable HuggingFace pool", AutoSize = true };
         _hf.CheckedChanged += (_, __) =>
         {
+            if (!_uiReady || _binding) return;
             _config.Orchestrator.EnableHuggingFacePool = _hf.Checked;
             AutoSave.Touch("orchestrator.pool.hf");
         };
@@ -120,6 +106,7 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
         _ollama = new CheckBox { Text = "Enable Ollama pool", AutoSize = true };
         _ollama.CheckedChanged += (_, __) =>
         {
+            if (!_uiReady || _binding) return;
             _config.Orchestrator.EnableOllamaPool = _ollama.Checked;
             AutoSave.Touch("orchestrator.pool.ollama");
         };
@@ -128,20 +115,20 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
         top.Controls.Add(_hf, 1, 1);
         top.Controls.Add(_ollama, 2, 1);
 
-        _catalogStatus = new Label
+        _status = new Label
         {
             AutoSize = true,
             ForeColor = SystemColors.GrayText,
-            Margin = new Padding(0, 6, 10, 6)
+            Margin = new Padding(0, 6, 0, 0),
+            Text = ""
         };
-
-        top.Controls.Add(_catalogStatus, 0, 2);
-        top.SetColumnSpan(_catalogStatus, 4);
+        top.Controls.Add(_status, 0, 2);
+        top.SetColumnSpan(_status, 4);
 
         root.Controls.Add(top, 0, 0);
         root.SetColumnSpan(top, 2);
 
-        // ===== Grid
+        // ===== Grid (left)
         _grid = new DataGridView
         {
             Dock = DockStyle.Fill,
@@ -150,186 +137,241 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
             ReadOnly = true,
             MultiSelect = false,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
         };
 
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Role", FillWeight = 18, ReadOnly = true });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Provider", FillWeight = 18, ReadOnly = true });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Model", FillWeight = 32, ReadOnly = true });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Model", FillWeight = 24, ReadOnly = true });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Prompt (inline preview)", FillWeight = 40, ReadOnly = true });
 
-        var promptCol = new DataGridViewTextBoxColumn
+        _grid.SelectionChanged += (_, __) =>
         {
-            HeaderText = "Prompt (BlueprintTemplates)",
-            FillWeight = 32,
-            ReadOnly = true
+            if (!_uiReady || _binding) return;
+            SyncEditors();
         };
-        _grid.Columns.Add(promptCol);
-
-        _grid.SelectionChanged += (_, __) => SyncRolePurposeEditor();
 
         root.Controls.Add(_grid, 0, 1);
-        root.SetColumnSpan(_grid, 2);
+        root.SetRowSpan(_grid, 5);
 
-        // ===== Buttons
-        var buttons = new FlowLayoutPanel
+        // ===== Right side editors
+        var right = new TableLayoutPanel
         {
-            Dock = DockStyle.Bottom,
-            FlowDirection = FlowDirection.LeftToRight,
-            AutoSize = true,
-            WrapContents = false
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 6,
+            Padding = new Padding(8, 0, 0, 0)
         };
+        right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 40));
+        right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 60));
+        right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        right.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        var editRole = new Button { Text = "Edit Role…", AutoSize = true, Padding = new Padding(12, 6, 12, 6) };
-        editRole.Click += (_, __) => EditSelectedRole();
-
-        buttons.Controls.Add(editRole);
-
-        root.Controls.Add(buttons, 0, 2);
-        root.SetColumnSpan(buttons, 2);
-
-        var workflowNote = new Label
+        right.Controls.Add(new Label
         {
-            Text = "Blueprints are selected by workflow.",
+            Text = "Role Purpose (free text)",
             AutoSize = true,
-            ForeColor = SystemColors.GrayText,
-            Margin = new Padding(0, 6, 0, 6)
-        };
-        root.Controls.Add(workflowNote, 0, 3);
-        root.SetColumnSpan(workflowNote, 2);
-
-        // ===== Role Purpose editor (this is the missing thing you’re yelling about)
-        _rolePurposeLabel = new Label
-        {
-            Text = "Role Purpose (free text). This is what the role does and how it should interpret user intent.",
-            AutoSize = true,
-            Margin = new Padding(0, 8, 0, 4)
-        };
+            Margin = new Padding(0, 6, 0, 4)
+        }, 0, 0);
 
         _rolePurpose = new TextBox
         {
             Dock = DockStyle.Fill,
             Multiline = true,
-            ScrollBars = ScrollBars.Vertical,
-            Height = 110
+            ScrollBars = ScrollBars.Vertical
         };
-
         _rolePurpose.TextChanged += (_, __) =>
         {
+            if (!_uiReady || _binding) return;
             var role = SelectedRole();
             if (role == null) return;
 
             role.RolePurpose = _rolePurpose.Text ?? "";
             AutoSave.Touch($"orchestrator.rolePurpose.{role.Role}");
         };
+        right.Controls.Add(_rolePurpose, 0, 1);
 
-        root.Controls.Add(_rolePurposeLabel, 0, 4);
-        root.SetColumnSpan(_rolePurposeLabel, 2);
+        right.Controls.Add(new Label
+        {
+            Text = "Prompt (inline). Paste/type the full prompt here.",
+            AutoSize = true,
+            Margin = new Padding(0, 10, 0, 4)
+        }, 0, 2);
 
-        root.Controls.Add(_rolePurpose, 0, 5);
-        root.SetColumnSpan(_rolePurpose, 2);
+        _promptText = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            ScrollBars = ScrollBars.Vertical
+        };
+        _promptText.TextChanged += (_, __) =>
+        {
+            if (!_uiReady || _binding) return;
+            var role = SelectedRole();
+            if (role == null) return;
+
+            role.PromptText = _promptText.Text ?? "";
+            AutoSave.Touch($"orchestrator.promptText.{role.Role}");
+
+            // Keep selection and avoid loop: refresh preview only.
+            RefreshGrid(keepSelection: true);
+        };
+        right.Controls.Add(_promptText, 0, 3);
+
+        var buttons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            AutoSize = true,
+            WrapContents = false
+        };
+
+        var add = new Button { Text = "Add Role", AutoSize = true, Padding = new Padding(10, 6, 10, 6) };
+        add.Click += (_, __) =>
+        {
+            if (!_uiReady || _binding) return;
+
+            _config.Orchestrator.Roles.Add(new OrchestratorRoleConfig
+            {
+                Role = $"role{_config.Orchestrator.Roles.Count + 1}",
+                Provider = "Ollama",
+                Model = "",
+                PromptText = "",
+                RolePurpose = "",
+                PromptId = "default"
+            });
+
+            AutoSave.Touch("orchestrator.role.add");
+            RefreshGrid(selectLast: true);
+            SyncEditors();
+        };
+
+        var del = new Button { Text = "Delete Role", AutoSize = true, Padding = new Padding(10, 6, 10, 6) };
+        del.Click += (_, __) =>
+        {
+            if (!_uiReady || _binding) return;
+
+            var role = SelectedRole();
+            if (role == null) return;
+
+            _config.Orchestrator.Roles.Remove(role);
+            AutoSave.Touch("orchestrator.role.delete");
+            RefreshGrid(selectFirst: true);
+            SyncEditors();
+        };
+
+        var edit = new Button { Text = "Edit Provider/Model…", AutoSize = true, Padding = new Padding(10, 6, 10, 6) };
+        edit.Click += (_, __) =>
+        {
+            if (!_uiReady || _binding) return;
+            EditSelectedRole();
+        };
+
+        buttons.Controls.Add(add);
+        buttons.Controls.Add(del);
+        buttons.Controls.Add(edit);
+
+        right.Controls.Add(buttons, 0, 4);
+
+        right.Controls.Add(new Label
+        {
+            Text =
+                "Roles include: chat/router/planner/executor/reviewer/embed/vision.\n" +
+                "Set provider+model per role. Vision is for image describe/caption tools.\n" +
+                "PromptId still exists internally for legacy blueprint routing, but UI uses PromptText now.",
+            AutoSize = true,
+            ForeColor = SystemColors.GrayText,
+            Margin = new Padding(0, 6, 0, 0)
+        }, 0, 5);
+
+        root.Controls.Add(right, 1, 1);
+        root.SetRowSpan(right, 5);
 
         Controls.Add(root);
+
+        _binding = false;
+        _uiReady = true;
     }
 
     private void BindFromConfig()
     {
-        _mode.Text = _config.Orchestrator.Mode ?? "single";
-        _openAi.Checked = _config.Orchestrator.EnableOpenAiPool;
-        _hf.Checked = _config.Orchestrator.EnableHuggingFacePool;
-        _ollama.Checked = _config.Orchestrator.EnableOllamaPool;
-
-        RefreshCatalogStatus();
-        RefreshGrid();
-        SyncRolePurposeEditor();
-    }
-
-    private void RefreshCatalogStatus()
-    {
-        var folder = _config.General?.BlueprintTemplatesPath ?? "";
-        if (string.IsNullOrWhiteSpace(folder))
+        _binding = true;
+        try
         {
-            _catalogStatus.Text = "BlueprintTemplates Folder is empty. Set it in Settings → General.";
-            return;
+            _mode.Text = _config.Orchestrator.Mode ?? "single";
+            _openAi.Checked = _config.Orchestrator.EnableOpenAiPool;
+            _hf.Checked = _config.Orchestrator.EnableHuggingFacePool;
+            _ollama.Checked = _config.Orchestrator.EnableOllamaPool;
+
+            RefreshGrid(selectFirst: true);
+            SyncEditors();
         }
-
-        if (_catalogAll.Count == 0)
+        finally
         {
-            _catalogStatus.Text = "No BlueprintTemplates loaded. Check BlueprintTemplates Folder + manifest.json.";
-            return;
+            _binding = false;
         }
-
-        _catalogStatus.Text = $"BlueprintTemplates loaded: public={_catalogPublic.Count}, total={_catalogAll.Count}";
     }
 
-    private List<PromptItem> BuildPromptItemsForGrid()
+    private void RefreshGrid(bool selectFirst = false, bool selectLast = false, bool keepSelection = false)
     {
-        var currentIds = _config.Orchestrator.Roles
-            .Select(r => (r.PromptId ?? "").Trim())
-            .Where(s => !string.IsNullOrWhiteSpace(s) && !string.Equals(s, "default", StringComparison.OrdinalIgnoreCase))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // Always safe: this can be called from TextChanged handlers.
+        var keepRole = (string?)null;
+        if (keepSelection && _grid.SelectedRows.Count == 1)
+            keepRole = _grid.SelectedRows[0].Cells[0].Value?.ToString();
 
-        var items = _catalogPublic.Select(e => new PromptItem
+        _binding = true;
+        try
         {
-            Id = e.Id,
-            Display = e.Display,
-            Description = e.Description
-        }).ToList();
+            _grid.Rows.Clear();
 
-        items.Insert(0, new PromptItem { Id = "", Display = "(unset)", Description = "" });
+            foreach (var r in _config.Orchestrator.Roles)
+            {
+                var preview = (r.PromptText ?? "").Trim();
+                if (preview.Length > 60) preview = preview[..60] + "…";
+                if (string.IsNullOrWhiteSpace(preview)) preview = "(empty)";
 
-        foreach (var id in currentIds)
-        {
-            if (items.Any(x => string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase)))
-                continue;
+                _grid.Rows.Add(r.Role, r.Provider, r.Model, preview);
+            }
 
-            var e = _catalogAll.FirstOrDefault(x => string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase));
-            items.Add(e != null
-                ? new PromptItem { Id = e.Id, Display = $"[hidden] {e.Display}", Description = e.Description }
-                : new PromptItem { Id = id, Display = $"[missing] {id}", Description = "Not in manifest.json (manifest is authoritative)." });
+            if (_grid.Rows.Count == 0)
+            {
+                UpdateStatus(null);
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(keepRole))
+            {
+                foreach (DataGridViewRow row in _grid.Rows)
+                {
+                    if (string.Equals(row.Cells[0].Value?.ToString(), keepRole, StringComparison.OrdinalIgnoreCase))
+                    {
+                        row.Selected = true;
+                        UpdateStatus(keepRole);
+                        return;
+                    }
+                }
+            }
+
+            if (selectLast) _grid.Rows[^1].Selected = true;
+            else if (selectFirst) _grid.Rows[0].Selected = true;
+            else if (_grid.SelectedRows.Count == 0) _grid.Rows[0].Selected = true;
+
+            UpdateStatus(SelectedRole()?.Role);
         }
-
-        return items
-            .Take(1)
-            .Concat(items.Skip(1).OrderBy(x => x.Display, StringComparer.OrdinalIgnoreCase))
-            .ToList();
-    }
-
-    private void RefreshGrid()
-    {
-        _grid.Rows.Clear();
-
-        foreach (var r in _config.Orchestrator.Roles)
+        finally
         {
-            var promptId = (r.PromptId ?? "").Trim();
-            if (string.Equals(promptId, "default", StringComparison.OrdinalIgnoreCase))
-                promptId = "(workflow)";
-
-            _grid.Rows.Add(r.Role, r.Provider, r.Model, promptId);
+            _binding = false;
         }
-
-        if (_grid.Rows.Count > 0)
-            _grid.Rows[0].Selected = true;
     }
 
-    private void ApplyPromptChangeFromGrid(int rowIndex)
+    private void UpdateStatus(string? selectedRole)
     {
-        var roleName = _grid.Rows[rowIndex].Cells[0].Value?.ToString() ?? "";
-        var role = _config.Orchestrator.Roles.FirstOrDefault(r =>
-            string.Equals(r.Role, roleName, StringComparison.OrdinalIgnoreCase));
-        if (role == null) return;
-
-        var newId = _grid.Rows[rowIndex].Cells[3].Value?.ToString() ?? "";
-        role.PromptId = string.IsNullOrWhiteSpace(newId) ? "default" : newId.Trim();
-
-        AutoSave.Touch("orchestrator.prompt.combo");
-    }
-
-    private string FindDescription(string id)
-    {
-        if (string.IsNullOrWhiteSpace(id)) return "";
-        var e = _catalogAll.FirstOrDefault(x => string.Equals(x.Id, id.Trim(), StringComparison.OrdinalIgnoreCase));
-        return e?.Description ?? "";
+        var count = _config.Orchestrator.Roles?.Count ?? 0;
+        _status.Text = selectedRole == null
+            ? $"Roles: {count} (no selection)"
+            : $"Roles: {count} | Selected: {selectedRole}";
     }
 
     private OrchestratorRoleConfig? SelectedRole()
@@ -340,22 +382,47 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
             string.Equals(r.Role, roleName, StringComparison.OrdinalIgnoreCase));
     }
 
-    private void SyncRolePurposeEditor()
+    private void SyncEditors()
     {
         var role = SelectedRole();
         if (role == null)
         {
-            _rolePurpose.Enabled = false;
-            _rolePurpose.Text = "";
+            _binding = true;
+            try
+            {
+                _rolePurpose.Enabled = false;
+                _promptText.Enabled = false;
+                _rolePurpose.Text = "";
+                _promptText.Text = "";
+                UpdateStatus(null);
+            }
+            finally
+            {
+                _binding = false;
+            }
             return;
         }
 
-        _rolePurpose.Enabled = true;
+        _binding = true;
+        try
+        {
+            _rolePurpose.Enabled = true;
+            _promptText.Enabled = true;
 
-        // avoid feedback loop
-        var text = role.RolePurpose ?? "";
-        if (!string.Equals(_rolePurpose.Text, text, StringComparison.Ordinal))
-            _rolePurpose.Text = text;
+            var rp = role.RolePurpose ?? "";
+            if (!string.Equals(_rolePurpose.Text, rp, StringComparison.Ordinal))
+                _rolePurpose.Text = rp;
+
+            var pt = role.PromptText ?? "";
+            if (!string.Equals(_promptText.Text, pt, StringComparison.Ordinal))
+                _promptText.Text = pt;
+
+            UpdateStatus(role.Role);
+        }
+        finally
+        {
+            _binding = false;
+        }
     }
 
     private void EditSelectedRole()
@@ -367,8 +434,8 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
         {
             Text = $"Edit Role: {role.Role}",
             StartPosition = FormStartPosition.CenterParent,
-            Width = 700,
-            Height = 220,
+            Width = 720,
+            Height = 240,
             MinimizeBox = false,
             MaximizeBox = false
         };
@@ -385,7 +452,7 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
 
         var provider = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
         provider.Items.AddRange(new object[] { "OpenAI", "HuggingFace", "Ollama" });
-        provider.SelectedItem = role.Provider;
+        provider.SelectedItem = string.IsNullOrWhiteSpace(role.Provider) ? "Ollama" : role.Provider;
 
         var model = new TextBox { Dock = DockStyle.Fill, Text = role.Model ?? "" };
 
@@ -413,30 +480,7 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
         role.Model = (model.Text ?? "").Trim();
 
         AutoSave.Touch("orchestrator.role.edit");
-        RefreshGrid();
-    }
-
-    private void EditSelectedPrompt()
-    {
-        var role = SelectedRole();
-        if (role == null) return;
-
-        // Reload catalog in case user changed BlueprintTemplates Folder on General page.
-        LoadCatalog();
-        RefreshCatalogStatus();
-
-        using var dlg = new BlueprintPromptPickerForm(
-            title: $"BlueprintTemplates: {role.Role}",
-            catalog: _catalogAll,
-            roleName: role.Role,
-            currentId: role.PromptId);
-
-        if (dlg.ShowDialog(this) != DialogResult.OK) return;
-
-        var chosen = (dlg.SelectedPromptId ?? "").Trim();
-        role.PromptId = string.IsNullOrWhiteSpace(chosen) ? "default" : chosen;
-
-        AutoSave.Touch("orchestrator.prompt.picker");
-        RefreshGrid();
+        RefreshGrid(keepSelection: true);
+        SyncEditors();
     }
 }
