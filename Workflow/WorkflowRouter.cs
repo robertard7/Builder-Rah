@@ -32,6 +32,9 @@ public sealed class WorkflowRouter
         bool chatIntakeCompleted,
         string stateHash)
     {
+        if (string.IsNullOrWhiteSpace(userText))
+            return RouteDecision.Error("You must start with user chat input.");
+
         var g = mermaid ?? "";
         var v = ValidateGraph(g);
         if (!v.Ok)

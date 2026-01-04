@@ -103,7 +103,7 @@ public sealed class ProgramArtifactGenerator
             string raw;
             try
             {
-                raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, input, ct).ConfigureAwait(false);
+                raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, input, ct, Array.Empty<string>(), "program_artifacts").ConfigureAwait(false);
             }
             catch (Exception ex)
             {

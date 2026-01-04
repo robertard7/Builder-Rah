@@ -109,7 +109,7 @@ public static class ToolStepRunner
 
             var userText = $"storedName: {att.StoredName}\nsha256: {att.Sha256}\nbase64: {base64}";
 
-            var resp = await LlmInvoker.InvokeChatAsync(cfg, "Vision", systemPrompt, userText, ct).ConfigureAwait(false);
+            var resp = await LlmInvoker.InvokeChatAsync(cfg, "Vision", systemPrompt, userText, ct, Array.Empty<string>(), "vision.describe.image").ConfigureAwait(false);
             JsonDocument doc;
             try
             {
@@ -158,4 +158,3 @@ public static class ToolStepRunner
         }
     }
 }
-

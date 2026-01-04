@@ -19,7 +19,9 @@ public static class WorkflowGraph
         "route:select_blueprints",
         "route:assemble_prompt",
         "route:plan_tools",
-        "route:execute"
+        "route:execute",
+        "route:wait_user",
+        "route:loop_detect"
     };
 
     public static RouterValidation Validate(string? mermaid)
