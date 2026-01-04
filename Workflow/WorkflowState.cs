@@ -36,6 +36,8 @@ public sealed class WorkflowState
     public string LastFlowSignature { get; set; } = "";
     public bool ChatIntakeCompleted { get; set; }
     public List<string> SelectedBlueprints { get; set; } = new();
+    public string WaitLoopKey { get; set; } = "";
+    public int WaitLoopCount { get; set; }
 
     public void ClearPlan()
     {

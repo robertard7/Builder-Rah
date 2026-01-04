@@ -89,7 +89,7 @@ public static class IntentExtractor
         string raw;
         try
         {
-            raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, combined, ct).ConfigureAwait(false);
+            raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, combined, ct, Array.Empty<string>(), "intent_extract").ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -102,7 +102,7 @@ public static class IntentExtractor
             var repairPrompt = prompt + "\nReturn ONLY JSON for the schema; fix formatting.";
             try
             {
-                raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", repairPrompt, combined, ct).ConfigureAwait(false);
+                raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", repairPrompt, combined, ct, Array.Empty<string>(), "intent_extract_retry").ConfigureAwait(false);
             }
             catch (Exception ex)
             {

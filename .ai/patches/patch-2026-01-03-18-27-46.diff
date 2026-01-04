@@ -1,0 +1,598 @@
+diff --git a/Settings/Pages/ToolingDiagnosticsPage.cs b/Settings/Pages/ToolingDiagnosticsPage.cs
+index 0212502..0d4e86e 100644
+--- a/Settings/Pages/ToolingDiagnosticsPage.cs
++++ b/Settings/Pages/ToolingDiagnosticsPage.cs
+@@ -37,10 +37,14 @@ public sealed class ToolingDiagnosticsPage : UserControl, ISettingsPageProvider
+         }
+ 
+         var selected = diag.SelectedBlueprints.Any() ? string.Join(", ", diag.SelectedBlueprints) : "(none)";
++        var breakdown = diag.BlueprintTagBreakdown != null && diag.BlueprintTagBreakdown.Any()
++            ? string.Join(", ", diag.BlueprintTagBreakdown.Select(kv => $"{kv.Key}:{kv.Value}"))
++            : "(none)";
+         _status.Text =
+             $"Tools: {diag.ActiveToolCount}/{diag.ToolCount} active (prompts={diag.PromptCount}, missing={diag.MissingPrompts.Count}){Environment.NewLine}" +
+             $"Blueprints: {diag.BlueprintSelectable}/{diag.BlueprintTotal} selectable{Environment.NewLine}" +
+-            $"Selected Blueprints: {selected}";
++            $"Selected Blueprints: {selected}{Environment.NewLine}" +
++            $"Selection breakdown: {breakdown}";
+     }
+ 
+     public Control BuildPage(AppConfig config) => new ToolingDiagnosticsPage(config);
+diff --git a/Tools/Diagnostics/ToolingDiagnostics.cs b/Tools/Diagnostics/ToolingDiagnostics.cs
+index 29e2338..92f400b 100644
+--- a/Tools/Diagnostics/ToolingDiagnostics.cs
++++ b/Tools/Diagnostics/ToolingDiagnostics.cs
+@@ -12,8 +12,9 @@ public sealed record ToolingDiagnostics(
+     string State,
+     int BlueprintTotal,
+     int BlueprintSelectable,
+-    IReadOnlyList<string> SelectedBlueprints)
++    IReadOnlyList<string> SelectedBlueprints,
++    IReadOnlyDictionary<string, int> BlueprintTagBreakdown)
+ {
+     public static ToolingDiagnostics Empty { get; } =
+-        new ToolingDiagnostics(0, 0, 0, Array.Empty<string>(), "tools inactive", 0, 0, Array.Empty<string>());
++        new ToolingDiagnostics(0, 0, 0, Array.Empty<string>(), "tools inactive", 0, 0, Array.Empty<string>(), new Dictionary<string, int>());
+ }
+diff --git a/Tools/Diagnostics/ToolingValidator.cs b/Tools/Diagnostics/ToolingValidator.cs
+index 5f1d910..bd1b127 100644
+--- a/Tools/Diagnostics/ToolingValidator.cs
++++ b/Tools/Diagnostics/ToolingValidator.cs
+@@ -35,7 +35,8 @@ public static class ToolingValidator
+             State: state,
+             BlueprintTotal: 0,
+             BlueprintSelectable: 0,
+-            SelectedBlueprints: Array.Empty<string>()
++            SelectedBlueprints: Array.Empty<string>(),
++            BlueprintTagBreakdown: new Dictionary<string, int>()
+         );
+     }
+ }
+diff --git a/Workflow/BlueprintSelector.cs b/Workflow/BlueprintSelector.cs
+index 032e8f5..a94f45c 100644
+--- a/Workflow/BlueprintSelector.cs
++++ b/Workflow/BlueprintSelector.cs
+@@ -15,10 +15,11 @@ public sealed record BlueprintSelectionResult(
+     int AvailableCount,
+     int SelectableCount,
+     IReadOnlyList<BlueprintSelectionItem> Selected,
+-    IReadOnlyList<BlueprintSelectionItem> Rejected)
++    IReadOnlyList<BlueprintSelectionItem> Rejected,
++    IReadOnlyDictionary<string, int> SelectionBreakdown)
+ {
+     public static BlueprintSelectionResult Empty(string why) =>
+-        new("blueprint.select.v1", 0, 0, Array.Empty<BlueprintSelectionItem>(), new[] { new BlueprintSelectionItem("", why) });
++        new("blueprint.select.v1", 0, 0, Array.Empty<BlueprintSelectionItem>(), new[] { new BlueprintSelectionItem("", why) }, new Dictionary<string, int>());
+ }
+ 
+ public static class BlueprintSelector
+@@ -39,6 +40,7 @@ public static class BlueprintSelector
+ 
+         var selected = new List<BlueprintSelectionItem>();
+         var rejected = new List<BlueprintSelectionItem>();
++        var breakdown = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+ 
+         var tokens = BuildTokens(transcript, attachments, mode, executionTarget);
+         var windowsHost = string.Equals(executionTarget, "WindowsHost", StringComparison.OrdinalIgnoreCase);
+@@ -80,10 +82,31 @@ public static class BlueprintSelector
+                 ? $"priority={item.Entry.Priority}"
+                 : $"tags={string.Join(",", item.Hits)} priority={item.Entry.Priority}";
+             selected.Add(new BlueprintSelectionItem(item.Entry.Id, reason));
++            foreach (var tag in item.Entry.Tags ?? Array.Empty<string>())
++            {
++                var t = tag ?? "";
++                if (t.Length == 0) continue;
++                breakdown[t] = breakdown.TryGetValue(t, out var c) ? c + 1 : 1;
++            }
++        }
++
++        if (selected.Count == 0 && (attachments?.Count ?? 0) > 0)
++        {
++            var attachmentBlueprint = catalog.FirstOrDefault(e => string.Equals(e.Id, "attachment.ingest.v1", StringComparison.OrdinalIgnoreCase));
++            if (attachmentBlueprint != null)
++            {
++                selected.Add(new BlueprintSelectionItem(attachmentBlueprint.Id, "fallback:attachments_present"));
++                foreach (var tag in attachmentBlueprint.Tags ?? Array.Empty<string>())
++                {
++                    var t = tag ?? "";
++                    if (t.Length == 0) continue;
++                    breakdown[t] = breakdown.TryGetValue(t, out var c) ? c + 1 : 1;
++                }
++            }
+         }
+ 
+         var selectableCount = selected.Count + rejected.Count;
+-        return new BlueprintSelectionResult("blueprint.select.v1", catalog.Count, selectableCount, selected, rejected);
++        return new BlueprintSelectionResult("blueprint.select.v1", catalog.Count, selectableCount, selected, rejected, breakdown);
+     }
+ 
+     private static HashSet<string> BuildTokens(string transcript, IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments, ConversationMode mode, string executionTarget)
+diff --git a/Workflow/IntentExtractor.cs b/Workflow/IntentExtractor.cs
+index 288ef3e..397704e 100644
+--- a/Workflow/IntentExtractor.cs
++++ b/Workflow/IntentExtractor.cs
+@@ -89,7 +89,7 @@ public static class IntentExtractor
+         string raw;
+         try
+         {
+-            raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, combined, ct).ConfigureAwait(false);
++            raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, combined, ct, Array.Empty<string>(), "intent_extract").ConfigureAwait(false);
+         }
+         catch (Exception ex)
+         {
+@@ -102,7 +102,7 @@ public static class IntentExtractor
+             var repairPrompt = prompt + "\nReturn ONLY JSON for the schema; fix formatting.";
+             try
+             {
+-                raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", repairPrompt, combined, ct).ConfigureAwait(false);
++                raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", repairPrompt, combined, ct, Array.Empty<string>(), "intent_extract_retry").ConfigureAwait(false);
+             }
+             catch (Exception ex)
+             {
+diff --git a/Workflow/LlmInvoker.cs b/Workflow/LlmInvoker.cs
+index a332fcf..dedda5f 100644
+--- a/Workflow/LlmInvoker.cs
++++ b/Workflow/LlmInvoker.cs
+@@ -1,6 +1,7 @@
+ #nullable enable
+ using System;
+-using System.Linq;
++using System.Collections.Generic;
++using System.Linq;
+ using System.Net.Http;
+ using System.Net.Http.Headers;
+ using System.Text;
+@@ -11,20 +12,23 @@ using RahBuilder.Settings;
+ 
+ namespace RahOllamaOnly.Tools;
+ 
+-public static class LlmInvoker
+-{
+-    private static readonly HttpClient _http = new HttpClient();
+-
+-    public static async Task<string> InvokeChatAsync(
+-        AppConfig cfg,
+-        string role,
+-        string systemPrompt,
+-        string userText,
+-        CancellationToken ct)
+-    {
+-        if (cfg == null) throw new ArgumentNullException(nameof(cfg));
+-        role = (role ?? "").Trim();
+-        if (role.Length == 0) throw new InvalidOperationException("Role is required.");
++public static class LlmInvoker
++{
++    private static readonly HttpClient _http = new HttpClient();
++    public static Action<string>? AuditLogger { get; set; }
++
++    public static async Task<string> InvokeChatAsync(
++        AppConfig cfg,
++        string role,
++        string systemPrompt,
++        string userText,
++        CancellationToken ct,
++        IEnumerable<string>? blueprintIds = null,
++        string? reason = null)
++    {
++        if (cfg == null) throw new ArgumentNullException(nameof(cfg));
++        role = (role ?? "").Trim();
++        if (role.Length == 0) throw new InvalidOperationException("Role is required.");
+ 
+         var rc = cfg.Orchestrator?.Roles?
+             .FirstOrDefault(r => string.Equals(r.Role ?? "", role, StringComparison.OrdinalIgnoreCase));
+@@ -32,11 +36,28 @@ public static class LlmInvoker
+         if (rc == null)
+             throw new InvalidOperationException($"[digest:error] Role '{role}' is not configured (Orchestrator.Roles).");
+ 
+-        var provider = (rc.Provider ?? "").Trim();
+-        var model = (rc.Model ?? "").Trim();
+-
+-        if (model.Length == 0)
+-            throw new InvalidOperationException($"[digest:error] {provider} model is not set for role '{role}' (Orchestrator.Roles[*].Model).");
++        var provider = (rc.Provider ?? "").Trim();
++        var model = (rc.Model ?? "").Trim();
++
++        if (model.Length == 0)
++            throw new InvalidOperationException($"[digest:error] {provider} model is not set for role '{role}' (Orchestrator.Roles[*].Model).");
++
++        try
++        {
++            var payload = new
++            {
++                mode = "audit.model_call.v1",
++                role,
++                provider,
++                model,
++                selectedBlueprintIDs = blueprintIds?.ToArray() ?? Array.Empty<string>(),
++                reasonSummary = reason ?? ""
++            };
++            AuditLogger?.Invoke(JsonSerializer.Serialize(payload));
++        }
++        catch
++        {
++        }
+ 
+         if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+             return await InvokeOllamaAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
+diff --git a/Workflow/ProgramArtifactGenerator.cs b/Workflow/ProgramArtifactGenerator.cs
+index fb68aea..e726ec8 100644
+--- a/Workflow/ProgramArtifactGenerator.cs
++++ b/Workflow/ProgramArtifactGenerator.cs
+@@ -103,7 +103,7 @@ public sealed class ProgramArtifactGenerator
+             string raw;
+             try
+             {
+-                raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, input, ct).ConfigureAwait(false);
++                raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, input, ct, Array.Empty<string>(), "program_artifacts").ConfigureAwait(false);
+             }
+             catch (Exception ex)
+             {
+diff --git a/Workflow/SemanticIntentParser.cs b/Workflow/SemanticIntentParser.cs
+index e854f39..ff53504 100644
+--- a/Workflow/SemanticIntentParser.cs
++++ b/Workflow/SemanticIntentParser.cs
+@@ -53,12 +53,12 @@ public static class SemanticIntentParser
+         sb.AppendLine("USER_TEXT:");
+         sb.AppendLine(userText ?? "");
+ 
+-        var raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, sb.ToString(), ct).ConfigureAwait(false);
++        var raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, sb.ToString(), ct, Array.Empty<string>(), "semantic_intent").ConfigureAwait(false);
+         var parsed = TryParse(raw);
+         if (parsed == null)
+         {
+             var retryPrompt = prompt + "\nReturn ONLY JSON. Fix invalid formatting.";
+-            raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", retryPrompt, sb.ToString(), ct).ConfigureAwait(false);
++            raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", retryPrompt, sb.ToString(), ct, Array.Empty<string>(), "semantic_intent_retry").ConfigureAwait(false);
+             parsed = TryParse(raw) ?? new IntentExtraction("intent.v1", userText ?? "", "", "", new List<string>(), new List<string>(), "invalid_json", new List<string> { "invalid_json" }, false);
+         }
+ 
+diff --git a/Workflow/ToolPlanRunner.cs b/Workflow/ToolPlanRunner.cs
+index f32efe0..a5b500b 100644
+--- a/Workflow/ToolPlanRunner.cs
++++ b/Workflow/ToolPlanRunner.cs
+@@ -13,22 +13,33 @@ public static class ToolPlanRunner
+         if (blueprintPrompts == null || blueprintPrompts.Count == 0)
+             throw new InvalidOperationException("No blueprints selected for prompt assembly.");
+ 
++        var seen = new HashSet<string>(StringComparer.Ordinal);
+         var sb = new StringBuilder();
+ 
+         if (!string.IsNullOrWhiteSpace(rolePrompt))
+-            sb.AppendLine(rolePrompt.Trim());
++        {
++            var rp = rolePrompt.Trim();
++            if (seen.Add(rp))
++                sb.AppendLine(rp);
++        }
+ 
+         foreach (var bp in blueprintPrompts.Where(p => !string.IsNullOrWhiteSpace(p)))
+         {
++            var trimmed = bp.Trim();
++            if (!seen.Add(trimmed))
++                continue;
+             sb.AppendLine();
+             sb.AppendLine("BLUEPRINT:");
+-            sb.AppendLine(bp.Trim());
++            sb.AppendLine(trimmed);
+         }
+ 
+         if (!string.IsNullOrWhiteSpace(basePrompt))
+         {
++            var bp = basePrompt.Trim();
++            if (!seen.Add(bp))
++                return sb.ToString().Trim();
+             sb.AppendLine();
+-            sb.AppendLine(basePrompt.Trim());
++            sb.AppendLine(bp);
+         }
+ 
+         return sb.ToString().Trim();
+diff --git a/Workflow/ToolStepRunner.cs b/Workflow/ToolStepRunner.cs
+index 2370cc8..7c6dfca 100644
+--- a/Workflow/ToolStepRunner.cs
++++ b/Workflow/ToolStepRunner.cs
+@@ -109,7 +109,7 @@ public static class ToolStepRunner
+ 
+             var userText = $"storedName: {att.StoredName}\nsha256: {att.Sha256}\nbase64: {base64}";
+ 
+-            var resp = await LlmInvoker.InvokeChatAsync(cfg, "Vision", systemPrompt, userText, ct).ConfigureAwait(false);
++            var resp = await LlmInvoker.InvokeChatAsync(cfg, "Vision", systemPrompt, userText, ct, Array.Empty<string>(), "vision.describe.image").ConfigureAwait(false);
+             JsonDocument doc;
+             try
+             {
+@@ -158,4 +158,3 @@ public static class ToolStepRunner
+         }
+     }
+ }
+-
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 9a2fc60..9afc946 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -73,37 +73,39 @@ public sealed class WorkflowFacade
+     {
+         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
+         _cfg = ConfigStore.Load();
+-        _executor = new ExecutionOrchestrator(_state, _trace);
+-        _executor.OutputCardProduced += OnOutputCardProduced;
+-        _executor.UserFacingMessage += msg =>
+-        {
+-            RecordAssistantMessage(msg);
+-            SessionManager.AddEvent(_state.SessionToken, "assistant_message", msg);
+-            UserFacingMessage?.Invoke(msg);
+-        };
+-        _apiHost = new ProviderApiHost(this);
+-        SyncGraphToHub(_cfg);
+-        LogRepoBanner();
+-        StartApiHostIfEnabled();
+-    }
++        _executor = new ExecutionOrchestrator(_state, _trace);
++        _executor.OutputCardProduced += OnOutputCardProduced;
++        _executor.UserFacingMessage += msg =>
++        {
++            RecordAssistantMessage(msg);
++            SessionManager.AddEvent(_state.SessionToken, "assistant_message", msg);
++            UserFacingMessage?.Invoke(msg);
++        };
++        LlmInvoker.AuditLogger = msg => _trace.Emit("[model:audit] " + msg);
++        _apiHost = new ProviderApiHost(this);
++        SyncGraphToHub(_cfg);
++        LogRepoBanner();
++        StartApiHostIfEnabled();
++    }
+ 
+     public WorkflowFacade(AppConfig cfg, RunTrace trace)
+     {
+         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
+         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
+-        _executor = new ExecutionOrchestrator(_state, _trace);
+-        _executor.OutputCardProduced += OnOutputCardProduced;
+-        _executor.UserFacingMessage += msg =>
+-        {
+-            RecordAssistantMessage(msg);
+-            SessionManager.AddEvent(_state.SessionToken, "assistant_message", msg);
+-            UserFacingMessage?.Invoke(msg);
+-        };
+-        _apiHost = new ProviderApiHost(this);
+-        SyncGraphToHub(_cfg);
+-        LogRepoBanner();
+-        StartApiHostIfEnabled();
+-    }
++        _executor = new ExecutionOrchestrator(_state, _trace);
++        _executor.OutputCardProduced += OnOutputCardProduced;
++        _executor.UserFacingMessage += msg =>
++        {
++            RecordAssistantMessage(msg);
++            SessionManager.AddEvent(_state.SessionToken, "assistant_message", msg);
++            UserFacingMessage?.Invoke(msg);
++        };
++        LlmInvoker.AuditLogger = msg => _trace.Emit("[model:audit] " + msg);
++        _apiHost = new ProviderApiHost(this);
++        SyncGraphToHub(_cfg);
++        LogRepoBanner();
++        StartApiHostIfEnabled();
++    }
+ 
+     private void OnOutputCardProduced(OutputCard card)
+     {
+@@ -243,16 +245,22 @@ public sealed class WorkflowFacade
+ 
+     public Task RouteUserInput(string text, CancellationToken ct) => RouteUserInput(_cfg, text, ct);
+ 
+-    public async Task RouteUserInput(AppConfig cfg, string text, CancellationToken ct)
+-    {
+-        if (cfg != null) _cfg = cfg;
+-        text ??= "";
+-
+-        SessionManager.AddEvent(_state.SessionToken, "user_input", text);
+-        _trace.Emit($"[chat] {text}");
+-        _state.Memory.Add("user", text);
+-        _state.MemoryStore.AddUserMessage(text);
+-        SessionManager.AddHistoryEvent(_state.SessionToken, "user_message", new { text });
++    public async Task RouteUserInput(AppConfig cfg, string text, CancellationToken ct)
++    {
++        if (cfg != null) _cfg = cfg;
++        text ??= "";
++
++        if (string.IsNullOrWhiteSpace(text))
++        {
++            EmitWaitUser("You must start with user chat input.");
++            return;
++        }
++
++        SessionManager.AddEvent(_state.SessionToken, "user_input", text);
++        _trace.Emit($"[chat] {text}");
++        _state.Memory.Add("user", text);
++        _state.MemoryStore.AddUserMessage(text);
++        SessionManager.AddHistoryEvent(_state.SessionToken, "user_message", new { text });
+         BroadcastEvent("history_update", new { type = "user_message", text });
+         _recentlyCompleted = false;
+ 
+@@ -735,9 +743,9 @@ public sealed class WorkflowFacade
+ 
+         _trace.Emit("[digest] running Job Spec Digest");
+ 
+-        try
+-        {
+-            var result = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, userText, ct).ConfigureAwait(false);
++        try
++        {
++            var result = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, userText, ct, _state.SelectedBlueprints, "jobspec_digest").ConfigureAwait(false);
+ 
+             if (string.IsNullOrWhiteSpace(result))
+             {
+@@ -753,7 +761,7 @@ public sealed class WorkflowFacade
+             {
+                 _trace.Emit("[digest:retry] Digest invalid JSON; requesting repair.");
+                 var retryPrompt = prompt + "\n\nYou returned invalid JSON. Output ONLY valid JSON for the schema.";
+-                result = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", retryPrompt, userText, ct).ConfigureAwait(false);
++                result = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", retryPrompt, userText, ct, _state.SelectedBlueprints, "jobspec_digest_retry").ConfigureAwait(false);
+                 _trace.Emit("[digest:raw] " + Trunc(result, 1200));
+                 spec = JobSpecParser.TryParse(result);
+                 if (spec == null)
+@@ -824,6 +832,24 @@ public sealed class WorkflowFacade
+     {
+         _state.LastRouteBeforeWait = _state.LastRoute;
+         _state.LastRoute = "route:wait_user";
++        var loopKey = $"{_state.LastFlowSignature}|{reason}|{preview}|{_state.PendingQuestion}|{_state.PendingToolPlan?.Steps?.Count ?? 0}|{_state.PendingStepIndex}";
++        if (string.Equals(loopKey, _state.WaitLoopKey, StringComparison.Ordinal))
++            _state.WaitLoopCount++;
++        else
++        {
++            _state.WaitLoopKey = loopKey;
++            _state.WaitLoopCount = 1;
++        }
++
++        if (_state.WaitLoopCount > 1)
++        {
++            MarkRoute("route:loop_detect");
++            var warn = "Loop detected — please revise request or abort.";
++            _trace.Emit("[route:loop_detect] " + warn);
++            RecordAssistantMessage(warn);
++            UserFacingMessage?.Invoke(warn);
++        }
++
+         var msg = WaitUserGate.GateMessage(reason, preview, _cfg.General.ConversationMode);
+         _trace.Emit(msg);
+         var chat = friendly ?? reason;
+@@ -911,8 +937,13 @@ public sealed class WorkflowFacade
+                     : (missingPrompts.Count == 0 ? "tools active" : "tools gated (missing prompts)"),
+                 BlueprintTotal: selection.AvailableCount,
+                 BlueprintSelectable: selection.SelectableCount,
+-                SelectedBlueprints: selection.Selected.Select(s => s.Id).ToList());
++                SelectedBlueprints: selection.Selected.Select(s => s.Id).ToList(),
++                BlueprintTagBreakdown: selection.SelectionBreakdown);
+             ToolingDiagnosticsHub.Publish(diag);
++            var breakdown = selection.SelectionBreakdown.Count == 0
++                ? "(none)"
++                : string.Join(", ", selection.SelectionBreakdown.Select(kv => $"{kv.Key}:{kv.Value}"));
++            _trace.Emit($"[blueprint:coverage] Blueprints available: {selection.AvailableCount}; selected: {selection.Selected.Count}; Selection breakdown: {breakdown}");
+         }
+         catch
+         {
+@@ -1104,6 +1135,16 @@ public sealed class WorkflowFacade
+ 
+         _state.SelectedBlueprints = selection.Selected.Select(s => s.Id).ToList();
+         PublishBlueprintDiagnostics(selection);
++        var blueprintAudit = new
++        {
++            selection.Mode,
++            selected = selection.Selected.Select(s => new { s.Id, s.Why }).ToList(),
++            rejected = selection.Rejected.Select(r => new { r.Id, r.Why }).ToList(),
++            breakdown = selection.SelectionBreakdown,
++            available = selection.AvailableCount,
++            selectable = selection.SelectableCount
++        };
++        _trace.Emit("[blueprint:json] " + JsonSerializer.Serialize(blueprintAudit));
+         if (selection.Selected.Count > 0)
+         {
+             _trace.Emit("[blueprint:selected] " + string.Join(", ", selection.Selected.Select(s => $"{s.Id}({s.Why})")));
+@@ -1216,13 +1257,8 @@ public sealed class WorkflowFacade
+ 
+     private string LoadRolePrompt(string roleName)
+     {
+-        var role = _cfg.Orchestrator?.Roles?.FirstOrDefault(r => string.Equals(r.Role, roleName, StringComparison.OrdinalIgnoreCase));
+-        var promptId = role?.PromptId ?? "";
+-        if (string.IsNullOrWhiteSpace(promptId) || string.Equals(promptId, "default", StringComparison.OrdinalIgnoreCase))
+-            return _cfg.General.ToolPlanPrompt ?? "";
+-
+-        var prompt = LoadBlueprintPrompts(new[] { promptId }).FirstOrDefault();
+-        return string.IsNullOrWhiteSpace(prompt) ? (_cfg.General.ToolPlanPrompt ?? "") : prompt;
++        // Lock down role prompt to the base ToolPlanPrompt; ignore UI dropdown overrides.
++        return _cfg.General.ToolPlanPrompt ?? "";
+     }
+ 
+     private bool EnsureProvidersConfigured()
+@@ -1425,12 +1461,12 @@ public sealed class WorkflowFacade
+         try
+         {
+             MarkRoute("route:plan_tools");
+-            toolPlanText = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, sb.ToString(), ct).ConfigureAwait(false);
++            toolPlanText = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, sb.ToString(), ct, _state.SelectedBlueprints, "tool_plan").ConfigureAwait(false);
+         }
+         catch (Exception ex)
+         {
+             _trace.Emit("[toolplan:error] invoke failed: " + ex.Message);
+-            EmitWaitUser("ToolPlan invocation failed. Reply with: edit <rewrite your request>");
++            EmitWaitUser("ToolPlan invocation failed. Reply with: edit <rewrite your request>");
+             return false;
+         }
+ 
+@@ -1442,13 +1478,13 @@ public sealed class WorkflowFacade
+             _trace.Emit("[toolplan:retry] invalid JSON, requesting repair.");
+             try
+             {
+-                var repairPrompt = prompt + "\n\nYou returned invalid JSON. Output ONLY valid tool_plan.v1 JSON.";
+-                toolPlanText = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", repairPrompt, sb.ToString(), ct).ConfigureAwait(false);
+-                _trace.Emit("[toolplan:raw] " + Trunc(toolPlanText, 1200));
+-                plan = ToolPlanParser.TryParse(toolPlanText);
+-            }
+-            catch (Exception ex)
+-            {
++                var repairPrompt = prompt + "\n\nYou returned invalid JSON. Output ONLY valid tool_plan.v1 JSON.";
++                toolPlanText = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", repairPrompt, sb.ToString(), ct, _state.SelectedBlueprints, "tool_plan_retry").ConfigureAwait(false);
++                _trace.Emit("[toolplan:raw] " + Trunc(toolPlanText, 1200));
++                plan = ToolPlanParser.TryParse(toolPlanText);
++            }
++            catch (Exception ex)
++            {
+                 _trace.Emit("[toolplan:error] retry failed: " + ex.Message);
+             }
+         }
+@@ -1694,10 +1730,10 @@ public sealed class WorkflowFacade
+         sb.AppendLine(JsonSerializer.Serialize(_state.ToolOutputs));
+ 
+         string resp;
+-        try
+-        {
+-            resp = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, sb.ToString(), ct).ConfigureAwait(false);
+-        }
++        try
++        {
++            resp = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, sb.ToString(), ct, _state.SelectedBlueprints, "final_response").ConfigureAwait(false);
++        }
+         catch (Exception ex)
+         {
+             _trace.Emit("[final:error] " + ex.Message);
+diff --git a/Workflow/WorkflowGraph.cs b/Workflow/WorkflowGraph.cs
+index 491ce0e..2e4574c 100644
+--- a/Workflow/WorkflowGraph.cs
++++ b/Workflow/WorkflowGraph.cs
+@@ -19,7 +19,9 @@ public static class WorkflowGraph
+         "route:select_blueprints",
+         "route:assemble_prompt",
+         "route:plan_tools",
+-        "route:execute"
++        "route:execute",
++        "route:wait_user",
++        "route:loop_detect"
+     };
+ 
+     public static RouterValidation Validate(string? mermaid)
+diff --git a/Workflow/WorkflowRouter.cs b/Workflow/WorkflowRouter.cs
+index 4661eef..dcaea50 100644
+--- a/Workflow/WorkflowRouter.cs
++++ b/Workflow/WorkflowRouter.cs
+@@ -32,6 +32,9 @@ public sealed class WorkflowRouter
+         bool chatIntakeCompleted,
+         string stateHash)
+     {
++        if (string.IsNullOrWhiteSpace(userText))
++            return RouteDecision.Error("You must start with user chat input.");
++
+         var g = mermaid ?? "";
+         var v = ValidateGraph(g);
+         if (!v.Ok)
+diff --git a/Workflow/WorkflowState.cs b/Workflow/WorkflowState.cs
+index 27d0348..6de5e0a 100644
+--- a/Workflow/WorkflowState.cs
++++ b/Workflow/WorkflowState.cs
+@@ -36,6 +36,8 @@ public sealed class WorkflowState
+     public string LastFlowSignature { get; set; } = "";
+     public bool ChatIntakeCompleted { get; set; }
+     public List<string> SelectedBlueprints { get; set; } = new();
++    public string WaitLoopKey { get; set; } = "";
++    public int WaitLoopCount { get; set; }
+ 
+     public void ClearPlan()
+     {
