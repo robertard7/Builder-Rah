@@ -9,8 +9,11 @@ public sealed record ToolingDiagnostics(
     int PromptCount,
     int ActiveToolCount,
     IReadOnlyList<string> MissingPrompts,
-    string State)
+    string State,
+    int BlueprintTotal,
+    int BlueprintSelectable,
+    IReadOnlyList<string> SelectedBlueprints)
 {
     public static ToolingDiagnostics Empty { get; } =
-        new ToolingDiagnostics(0, 0, 0, Array.Empty<string>(), "tools inactive");
+        new ToolingDiagnostics(0, 0, 0, Array.Empty<string>(), "tools inactive", 0, 0, Array.Empty<string>());
 }
