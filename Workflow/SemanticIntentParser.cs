@@ -53,12 +53,12 @@ public static class SemanticIntentParser
         sb.AppendLine("USER_TEXT:");
         sb.AppendLine(userText ?? "");
 
-        var raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, sb.ToString(), ct).ConfigureAwait(false);
+        var raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", prompt, sb.ToString(), ct, Array.Empty<string>(), "semantic_intent").ConfigureAwait(false);
         var parsed = TryParse(raw);
         if (parsed == null)
         {
             var retryPrompt = prompt + "\nReturn ONLY JSON. Fix invalid formatting.";
-            raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", retryPrompt, sb.ToString(), ct).ConfigureAwait(false);
+            raw = await LlmInvoker.InvokeChatAsync(cfg, "Orchestrator", retryPrompt, sb.ToString(), ct, Array.Empty<string>(), "semantic_intent_retry").ConfigureAwait(false);
             parsed = TryParse(raw) ?? new IntentExtraction("intent.v1", userText ?? "", "", "", new List<string>(), new List<string>(), "invalid_json", new List<string> { "invalid_json" }, false);
         }
 

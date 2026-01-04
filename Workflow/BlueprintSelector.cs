@@ -15,10 +15,11 @@ public sealed record BlueprintSelectionResult(
     int AvailableCount,
     int SelectableCount,
     IReadOnlyList<BlueprintSelectionItem> Selected,
-    IReadOnlyList<BlueprintSelectionItem> Rejected)
+    IReadOnlyList<BlueprintSelectionItem> Rejected,
+    IReadOnlyDictionary<string, int> SelectionBreakdown)
 {
     public static BlueprintSelectionResult Empty(string why) =>
-        new("blueprint.select.v1", 0, 0, Array.Empty<BlueprintSelectionItem>(), new[] { new BlueprintSelectionItem("", why) });
+        new("blueprint.select.v1", 0, 0, Array.Empty<BlueprintSelectionItem>(), new[] { new BlueprintSelectionItem("", why) }, new Dictionary<string, int>());
 }
 
 public static class BlueprintSelector
@@ -39,6 +40,7 @@ public static class BlueprintSelector
 
         var selected = new List<BlueprintSelectionItem>();
         var rejected = new List<BlueprintSelectionItem>();
+        var breakdown = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         var tokens = BuildTokens(transcript, attachments, mode, executionTarget);
         var windowsHost = string.Equals(executionTarget, "WindowsHost", StringComparison.OrdinalIgnoreCase);
@@ -80,10 +82,31 @@ public static class BlueprintSelector
                 ? $"priority={item.Entry.Priority}"
                 : $"tags={string.Join(",", item.Hits)} priority={item.Entry.Priority}";
             selected.Add(new BlueprintSelectionItem(item.Entry.Id, reason));
+            foreach (var tag in item.Entry.Tags ?? Array.Empty<string>())
+            {
+                var t = tag ?? "";
+                if (t.Length == 0) continue;
+                breakdown[t] = breakdown.TryGetValue(t, out var c) ? c + 1 : 1;
+            }
+        }
+
+        if (selected.Count == 0 && (attachments?.Count ?? 0) > 0)
+        {
+            var attachmentBlueprint = catalog.FirstOrDefault(e => string.Equals(e.Id, "attachment.ingest.v1", StringComparison.OrdinalIgnoreCase));
+            if (attachmentBlueprint != null)
+            {
+                selected.Add(new BlueprintSelectionItem(attachmentBlueprint.Id, "fallback:attachments_present"));
+                foreach (var tag in attachmentBlueprint.Tags ?? Array.Empty<string>())
+                {
+                    var t = tag ?? "";
+                    if (t.Length == 0) continue;
+                    breakdown[t] = breakdown.TryGetValue(t, out var c) ? c + 1 : 1;
+                }
+            }
         }
 
         var selectableCount = selected.Count + rejected.Count;
-        return new BlueprintSelectionResult("blueprint.select.v1", catalog.Count, selectableCount, selected, rejected);
+        return new BlueprintSelectionResult("blueprint.select.v1", catalog.Count, selectableCount, selected, rejected, breakdown);
     }
 
     private static HashSet<string> BuildTokens(string transcript, IReadOnlyList<AttachmentInbox.AttachmentEntry> attachments, ConversationMode mode, string executionTarget)

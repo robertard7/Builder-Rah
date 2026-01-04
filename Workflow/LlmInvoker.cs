@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -14,13 +15,16 @@ namespace RahOllamaOnly.Tools;
 public static class LlmInvoker
 {
     private static readonly HttpClient _http = new HttpClient();
+    public static Action<string>? AuditLogger { get; set; }
 
     public static async Task<string> InvokeChatAsync(
         AppConfig cfg,
         string role,
         string systemPrompt,
         string userText,
-        CancellationToken ct)
+        CancellationToken ct,
+        IEnumerable<string>? blueprintIds = null,
+        string? reason = null)
     {
         if (cfg == null) throw new ArgumentNullException(nameof(cfg));
         role = (role ?? "").Trim();
@@ -37,6 +41,23 @@ public static class LlmInvoker
 
         if (model.Length == 0)
             throw new InvalidOperationException($"[digest:error] {provider} model is not set for role '{role}' (Orchestrator.Roles[*].Model).");
+
+        try
+        {
+            var payload = new
+            {
+                mode = "audit.model_call.v1",
+                role,
+                provider,
+                model,
+                selectedBlueprintIDs = blueprintIds?.ToArray() ?? Array.Empty<string>(),
+                reasonSummary = reason ?? ""
+            };
+            AuditLogger?.Invoke(JsonSerializer.Serialize(payload));
+        }
+        catch
+        {
+        }
 
         if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
             return await InvokeOllamaAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);

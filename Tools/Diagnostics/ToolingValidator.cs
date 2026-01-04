@@ -35,7 +35,8 @@ public static class ToolingValidator
             State: state,
             BlueprintTotal: 0,
             BlueprintSelectable: 0,
-            SelectedBlueprints: Array.Empty<string>()
+            SelectedBlueprints: Array.Empty<string>(),
+            BlueprintTagBreakdown: new Dictionary<string, int>()
         );
     }
 }

@@ -37,10 +37,14 @@ public sealed class ToolingDiagnosticsPage : UserControl, ISettingsPageProvider
         }
 
         var selected = diag.SelectedBlueprints.Any() ? string.Join(", ", diag.SelectedBlueprints) : "(none)";
+        var breakdown = diag.BlueprintTagBreakdown != null && diag.BlueprintTagBreakdown.Any()
+            ? string.Join(", ", diag.BlueprintTagBreakdown.Select(kv => $"{kv.Key}:{kv.Value}"))
+            : "(none)";
         _status.Text =
             $"Tools: {diag.ActiveToolCount}/{diag.ToolCount} active (prompts={diag.PromptCount}, missing={diag.MissingPrompts.Count}){Environment.NewLine}" +
             $"Blueprints: {diag.BlueprintSelectable}/{diag.BlueprintTotal} selectable{Environment.NewLine}" +
-            $"Selected Blueprints: {selected}";
+            $"Selected Blueprints: {selected}{Environment.NewLine}" +
+            $"Selection breakdown: {breakdown}";
     }
 
     public Control BuildPage(AppConfig config) => new ToolingDiagnosticsPage(config);
