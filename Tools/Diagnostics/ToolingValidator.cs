@@ -32,7 +32,10 @@ public static class ToolingValidator
             PromptCount: prompts.AllToolIds.Count,
             ActiveToolCount: active < 0 ? 0 : active,
             MissingPrompts: missing,
-            State: state
+            State: state,
+            BlueprintTotal: 0,
+            BlueprintSelectable: 0,
+            SelectedBlueprints: Array.Empty<string>()
         );
     }
 }

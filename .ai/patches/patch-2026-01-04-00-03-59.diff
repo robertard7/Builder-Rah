@@ -1,0 +1,1425 @@
+diff --git a/Settings/OrchestratorSettings.cs b/Settings/OrchestratorSettings.cs
+index c60923d..e1cd6dc 100644
+--- a/Settings/OrchestratorSettings.cs
++++ b/Settings/OrchestratorSettings.cs
+@@ -71,13 +71,13 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
+ 
+     private void BuildUi()
+     {
+-        var root = new TableLayoutPanel
+-        {
+-            Dock = DockStyle.Fill,
+-            ColumnCount = 2,
+-            RowCount = 5,
+-            Padding = new Padding(10),
+-        };
++        var root = new TableLayoutPanel
++        {
++            Dock = DockStyle.Fill,
++            ColumnCount = 2,
++            RowCount = 6,
++            Padding = new Padding(10),
++        };
+         root.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+ 
+@@ -144,64 +144,34 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
+         root.SetColumnSpan(top, 2);
+ 
+         // ===== Grid
+-        _grid = new DataGridView
+-        {
+-            Dock = DockStyle.Fill,
+-            AllowUserToAddRows = false,
+-            AllowUserToDeleteRows = false,
+-            ReadOnly = false,
+-            MultiSelect = false,
+-            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+-            RowHeadersVisible = false
+-        };
+-
+-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Role", FillWeight = 18, ReadOnly = true });
+-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Provider", FillWeight = 18, ReadOnly = true });
+-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Model", FillWeight = 32, ReadOnly = true });
+-
+-        var promptCol = new DataGridViewComboBoxColumn
+-        {
+-            HeaderText = "Prompt (BlueprintTemplates)",
+-            FillWeight = 32,
+-            DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
+-            FlatStyle = FlatStyle.Flat
+-        };
+-        _grid.Columns.Add(promptCol);
+-
+-        // --- COMMIT FIXES (this is the part that stops “set but not really set”)
+-        _grid.CurrentCellDirtyStateChanged += (_, __) =>
+-        {
+-            if (_grid.IsCurrentCellDirty)
+-                CommitGridEdits();
+-        };
+-
+-        _grid.CellEndEdit += (_, __) => CommitGridEdits();
+-
+-        _grid.CellValueChanged += (_, e) =>
+-        {
+-            if (e.RowIndex < 0) return;
+-            // Prompt column change
+-            if (e.ColumnIndex == 3)
+-                ApplyPromptChangeFromGrid(e.RowIndex);
+-        };
+-
+-        _grid.DataError += (_, __) =>
+-        {
+-            // swallow ComboBox invalid-value popups (manifest authoritative)
+-        };
+-
+-        _grid.CellToolTipTextNeeded += (_, e) =>
+-        {
+-            if (e.RowIndex < 0 || e.ColumnIndex != 3) return;
+-            var id = _grid.Rows[e.RowIndex].Cells[3].Value?.ToString() ?? "";
+-            e.ToolTipText = FindDescription(id);
+-        };
+-
+-        _grid.SelectionChanged += (_, __) => SyncRolePurposeEditor();
+-
+-        root.Controls.Add(_grid, 0, 1);
+-        root.SetColumnSpan(_grid, 2);
++        _grid = new DataGridView
++        {
++            Dock = DockStyle.Fill,
++            AllowUserToAddRows = false,
++            AllowUserToDeleteRows = false,
++            ReadOnly = true,
++            MultiSelect = false,
++            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
++            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
++            RowHeadersVisible = false
++        };
++
++        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Role", FillWeight = 18, ReadOnly = true });
++        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Provider", FillWeight = 18, ReadOnly = true });
++        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Model", FillWeight = 32, ReadOnly = true });
++
++        var promptCol = new DataGridViewTextBoxColumn
++        {
++            HeaderText = "Prompt (BlueprintTemplates)",
++            FillWeight = 32,
++            ReadOnly = true
++        };
++        _grid.Columns.Add(promptCol);
++
++        _grid.SelectionChanged += (_, __) => SyncRolePurposeEditor();
++
++        root.Controls.Add(_grid, 0, 1);
++        root.SetColumnSpan(_grid, 2);
+ 
+         // ===== Buttons
+         var buttons = new FlowLayoutPanel
+@@ -212,31 +182,33 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
+             WrapContents = false
+         };
+ 
+-        var editRole = new Button { Text = "Edit Role…", AutoSize = true, Padding = new Padding(12, 6, 12, 6) };
+-        editRole.Click += (_, __) =>
+-        {
+-            CommitGridEdits();
+-            EditSelectedRole();
+-        };
+-
+-        var editPrompt = new Button { Text = "Prompt…", AutoSize = true, Padding = new Padding(12, 6, 12, 6) };
+-        editPrompt.Click += (_, __) =>
+-        {
+-            CommitGridEdits();
+-            EditSelectedPrompt();
+-        };
+-
+-        buttons.Controls.Add(editRole);
+-        buttons.Controls.Add(editPrompt);
+-
+-        root.Controls.Add(buttons, 0, 2);
+-        root.SetColumnSpan(buttons, 2);
+-
+-        // ===== Role Purpose editor
+-        _rolePurposeLabel = new Label
+-        {
+-            Text = "Role Purpose (free text). This is what the role does and how it should interpret user intent.",
+-            AutoSize = true,
++        var editRole = new Button { Text = "Edit Role…", AutoSize = true, Padding = new Padding(12, 6, 12, 6) };
++        editRole.Click += (_, __) =>
++        {
++            CommitGridEdits();
++            EditSelectedRole();
++        };
++
++        buttons.Controls.Add(editRole);
++
++        root.Controls.Add(buttons, 0, 2);
++        root.SetColumnSpan(buttons, 2);
++
++        var workflowNote = new Label
++        {
++            Text = "Blueprints are selected by workflow.",
++            AutoSize = true,
++            ForeColor = SystemColors.GrayText,
++            Margin = new Padding(0, 6, 0, 6)
++        };
++        root.Controls.Add(workflowNote, 0, 3);
++        root.SetColumnSpan(workflowNote, 2);
++
++        // ===== Role Purpose editor
++        _rolePurposeLabel = new Label
++        {
++            Text = "Role Purpose (free text). This is what the role does and how it should interpret user intent.",
++            AutoSize = true,
+             Margin = new Padding(0, 8, 0, 4)
+         };
+ 
+@@ -248,24 +220,24 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
+             Height = 110
+         };
+ 
+-        _rolePurpose.TextChanged += (_, __) =>
+-        {
+-            if (_bindingRolePurpose) return;
+-
+-            var role = SelectedRole();
+-            if (role == null) return;
+-
+-            role.RolePurpose = _rolePurpose.Text ?? "";
+-            AutoSave.Touch($"orchestrator.rolePurpose.{role.Role}");
+-        };
+-
+-        root.Controls.Add(_rolePurposeLabel, 0, 3);
+-        root.SetColumnSpan(_rolePurposeLabel, 2);
+-
+-        root.Controls.Add(_rolePurpose, 0, 4);
+-        root.SetColumnSpan(_rolePurpose, 2);
+-
+-        Controls.Add(root);
++        _rolePurpose.TextChanged += (_, __) =>
++        {
++            if (_bindingRolePurpose) return;
++
++            var role = SelectedRole();
++            if (role == null) return;
++
++            role.RolePurpose = _rolePurpose.Text ?? "";
++            AutoSave.Touch($"orchestrator.rolePurpose.{role.Role}");
++        };
++
++        root.Controls.Add(_rolePurposeLabel, 0, 4);
++        root.SetColumnSpan(_rolePurposeLabel, 2);
++
++        root.Controls.Add(_rolePurpose, 0, 5);
++        root.SetColumnSpan(_rolePurpose, 2);
++
++        Controls.Add(root);
+     }
+ 
+     private void CommitGridEdits()
+@@ -350,25 +322,19 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
+             .ToList();
+     }
+ 
+-    private void RefreshGrid()
+-    {
+-        CommitGridEdits();
+-        _grid.Rows.Clear();
+-
+-        var promptItems = BuildPromptItemsForGrid();
+-        var promptCol = (DataGridViewComboBoxColumn)_grid.Columns[3];
+-        promptCol.DataSource = promptItems;
+-        promptCol.DisplayMember = nameof(PromptItem.Display);
+-        promptCol.ValueMember = nameof(PromptItem.Id);
+-
+-        foreach (var r in _config.Orchestrator.Roles)
+-        {
+-            var promptId = (r.PromptId ?? "").Trim();
+-            if (string.Equals(promptId, "default", StringComparison.OrdinalIgnoreCase))
+-                promptId = "";
+-
+-            _grid.Rows.Add(r.Role, r.Provider, r.Model, promptId);
+-        }
++    private void RefreshGrid()
++    {
++        CommitGridEdits();
++        _grid.Rows.Clear();
++
++        foreach (var r in _config.Orchestrator.Roles)
++        {
++            var promptId = (r.PromptId ?? "").Trim();
++            if (string.Equals(promptId, "default", StringComparison.OrdinalIgnoreCase))
++                promptId = "(workflow)";
++
++            _grid.Rows.Add(r.Role, r.Provider, r.Model, promptId);
++        }
+ 
+         if (_grid.Rows.Count > 0)
+         {
+diff --git a/Settings/Pages/OrchestratorSettingsPage.cs b/Settings/Pages/OrchestratorSettingsPage.cs
+index 8dc72af..f460c6f 100644
+--- a/Settings/Pages/OrchestratorSettingsPage.cs
++++ b/Settings/Pages/OrchestratorSettingsPage.cs
+@@ -69,13 +69,13 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
+ 
+     private void BuildUi()
+     {
+-        var root = new TableLayoutPanel
+-        {
+-            Dock = DockStyle.Fill,
+-            ColumnCount = 2,
+-            RowCount = 5,
+-            Padding = new Padding(10),
+-        };
++        var root = new TableLayoutPanel
++        {
++            Dock = DockStyle.Fill,
++            ColumnCount = 2,
++            RowCount = 6,
++            Padding = new Padding(10),
++        };
+         root.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+ 
+@@ -142,59 +142,34 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
+         root.SetColumnSpan(top, 2);
+ 
+         // ===== Grid
+-        _grid = new DataGridView
+-        {
+-            Dock = DockStyle.Fill,
+-            AllowUserToAddRows = false,
+-            AllowUserToDeleteRows = false,
+-            ReadOnly = false,
+-            MultiSelect = false,
+-            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+-        };
+-
+-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Role", FillWeight = 18, ReadOnly = true });
+-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Provider", FillWeight = 18, ReadOnly = true });
+-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Model", FillWeight = 32, ReadOnly = true });
+-
+-        var promptCol = new DataGridViewComboBoxColumn
+-        {
+-            HeaderText = "Prompt (BlueprintTemplates)",
+-            FillWeight = 32,
+-            DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
+-            FlatStyle = FlatStyle.Flat
+-        };
+-        _grid.Columns.Add(promptCol);
+-
+-        _grid.CurrentCellDirtyStateChanged += (_, __) =>
+-        {
+-            if (_grid.IsCurrentCellDirty)
+-                _grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+-        };
+-
+-        _grid.CellValueChanged += (_, e) =>
+-        {
+-            if (e.RowIndex < 0 || e.ColumnIndex != 3) return;
+-            ApplyPromptChangeFromGrid(e.RowIndex);
+-        };
+-
+-        _grid.DataError += (_, __) =>
+-        {
+-            // swallow ComboBox invalid-value popups
+-        };
+-
+-        _grid.CellToolTipTextNeeded += (_, e) =>
+-        {
+-            if (e.RowIndex < 0 || e.ColumnIndex != 3) return;
+-            var id = _grid.Rows[e.RowIndex].Cells[3].Value?.ToString() ?? "";
+-            e.ToolTipText = FindDescription(id);
+-        };
+-
+-        _grid.SelectionChanged += (_, __) => SyncRolePurposeEditor();
+-
+-        root.Controls.Add(_grid, 0, 1);
+-        root.SetColumnSpan(_grid, 2);
+-
++        _grid = new DataGridView
++        {
++            Dock = DockStyle.Fill,
++            AllowUserToAddRows = false,
++            AllowUserToDeleteRows = false,
++            ReadOnly = true,
++            MultiSelect = false,
++            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
++            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
++        };
++
++        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Role", FillWeight = 18, ReadOnly = true });
++        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Provider", FillWeight = 18, ReadOnly = true });
++        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Model", FillWeight = 32, ReadOnly = true });
++
++        var promptCol = new DataGridViewTextBoxColumn
++        {
++            HeaderText = "Prompt (BlueprintTemplates)",
++            FillWeight = 32,
++            ReadOnly = true
++        };
++        _grid.Columns.Add(promptCol);
++
++        _grid.SelectionChanged += (_, __) => SyncRolePurposeEditor();
++
++        root.Controls.Add(_grid, 0, 1);
++        root.SetColumnSpan(_grid, 2);
++
+         // ===== Buttons
+         var buttons = new FlowLayoutPanel
+         {
+@@ -204,29 +179,35 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
+             WrapContents = false
+         };
+ 
+-        var editRole = new Button { Text = "Edit Role…", AutoSize = true, Padding = new Padding(12, 6, 12, 6) };
+-        editRole.Click += (_, __) => EditSelectedRole();
+-
+-        var editPrompt = new Button { Text = "Prompt…", AutoSize = true, Padding = new Padding(12, 6, 12, 6) };
+-        editPrompt.Click += (_, __) => EditSelectedPrompt();
+-
+-        buttons.Controls.Add(editRole);
+-        buttons.Controls.Add(editPrompt);
+-
+-        root.Controls.Add(buttons, 0, 2);
+-        root.SetColumnSpan(buttons, 2);
+-
+-        // ===== Role Purpose editor (this is the missing thing you’re yelling about)
+-        _rolePurposeLabel = new Label
+-        {
+-            Text = "Role Purpose (free text). This is what the role does and how it should interpret user intent.",
+-            AutoSize = true,
+-            Margin = new Padding(0, 8, 0, 4)
+-        };
+-
+-        _rolePurpose = new TextBox
+-        {
+-            Dock = DockStyle.Fill,
++        var editRole = new Button { Text = "Edit Role…", AutoSize = true, Padding = new Padding(12, 6, 12, 6) };
++        editRole.Click += (_, __) => EditSelectedRole();
++
++        buttons.Controls.Add(editRole);
++
++        root.Controls.Add(buttons, 0, 2);
++        root.SetColumnSpan(buttons, 2);
++
++        var workflowNote = new Label
++        {
++            Text = "Blueprints are selected by workflow.",
++            AutoSize = true,
++            ForeColor = SystemColors.GrayText,
++            Margin = new Padding(0, 6, 0, 6)
++        };
++        root.Controls.Add(workflowNote, 0, 3);
++        root.SetColumnSpan(workflowNote, 2);
++
++        // ===== Role Purpose editor (this is the missing thing you’re yelling about)
++        _rolePurposeLabel = new Label
++        {
++            Text = "Role Purpose (free text). This is what the role does and how it should interpret user intent.",
++            AutoSize = true,
++            Margin = new Padding(0, 8, 0, 4)
++        };
++
++        _rolePurpose = new TextBox
++        {
++            Dock = DockStyle.Fill,
+             Multiline = true,
+             ScrollBars = ScrollBars.Vertical,
+             Height = 110
+@@ -237,15 +218,15 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
+             var role = SelectedRole();
+             if (role == null) return;
+ 
+-            role.RolePurpose = _rolePurpose.Text ?? "";
+-            AutoSave.Touch($"orchestrator.rolePurpose.{role.Role}");
+-        };
+-
+-        root.Controls.Add(_rolePurposeLabel, 0, 3);
+-        root.SetColumnSpan(_rolePurposeLabel, 2);
+-
+-        root.Controls.Add(_rolePurpose, 0, 4);
+-        root.SetColumnSpan(_rolePurpose, 2);
++            role.RolePurpose = _rolePurpose.Text ?? "";
++            AutoSave.Touch($"orchestrator.rolePurpose.{role.Role}");
++        };
++
++        root.Controls.Add(_rolePurposeLabel, 0, 4);
++        root.SetColumnSpan(_rolePurposeLabel, 2);
++
++        root.Controls.Add(_rolePurpose, 0, 5);
++        root.SetColumnSpan(_rolePurpose, 2);
+ 
+         Controls.Add(root);
+     }
+@@ -314,28 +295,22 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
+             .ToList();
+     }
+ 
+-    private void RefreshGrid()
+-    {
+-        _grid.Rows.Clear();
+-
+-        var promptItems = BuildPromptItemsForGrid();
+-        var promptCol = (DataGridViewComboBoxColumn)_grid.Columns[3];
+-        promptCol.DataSource = promptItems;
+-        promptCol.DisplayMember = nameof(PromptItem.Display);
+-        promptCol.ValueMember = nameof(PromptItem.Id);
+-
+-        foreach (var r in _config.Orchestrator.Roles)
+-        {
+-            var promptId = (r.PromptId ?? "").Trim();
+-            if (string.Equals(promptId, "default", StringComparison.OrdinalIgnoreCase))
+-                promptId = "";
+-
+-            _grid.Rows.Add(r.Role, r.Provider, r.Model, promptId);
+-        }
+-
+-        if (_grid.Rows.Count > 0)
+-            _grid.Rows[0].Selected = true;
+-    }
++    private void RefreshGrid()
++    {
++        _grid.Rows.Clear();
++
++        foreach (var r in _config.Orchestrator.Roles)
++        {
++            var promptId = (r.PromptId ?? "").Trim();
++            if (string.Equals(promptId, "default", StringComparison.OrdinalIgnoreCase))
++                promptId = "(workflow)";
++
++            _grid.Rows.Add(r.Role, r.Provider, r.Model, promptId);
++        }
++
++        if (_grid.Rows.Count > 0)
++            _grid.Rows[0].Selected = true;
++    }
+ 
+     private void ApplyPromptChangeFromGrid(int rowIndex)
+     {
+diff --git a/Settings/Pages/ToolingDiagnosticsPage.cs b/Settings/Pages/ToolingDiagnosticsPage.cs
+index b376e96..0212502 100644
+--- a/Settings/Pages/ToolingDiagnosticsPage.cs
++++ b/Settings/Pages/ToolingDiagnosticsPage.cs
+@@ -1,28 +1,47 @@
+ #nullable enable
+-using System.Windows.Forms;
+-
+-namespace RahBuilder.Settings.Pages;
+-
+-using RahBuilder.Settings;
+-
+-public sealed class ToolingDiagnosticsPage : UserControl, ISettingsPageProvider
+-{
+-    public new string Name => "Tooling Diagnostics";
+-
+-    private readonly AppConfig _config;
+-
+-    public ToolingDiagnosticsPage(AppConfig config)
+-    {
+-        _config = config;
+-        Dock = DockStyle.Fill;
+-
+-        Controls.Add(new Label
+-        {
+-            Dock = DockStyle.Fill,
+-            Text = "Diagnostics placeholder (wire real counts + validation state next).",
+-            AutoSize = false
+-        });
+-    }
+-
+-    public Control BuildPage(AppConfig config) => new ToolingDiagnosticsPage(config);
+-}
++using System;
++using System.Linq;
++using System.Windows.Forms;
++using RahOllamaOnly.Tools.Diagnostics;
++
++namespace RahBuilder.Settings.Pages;
++
++public sealed class ToolingDiagnosticsPage : UserControl, ISettingsPageProvider
++{
++    public new string Name => "Tooling Diagnostics";
++
++    private readonly Label _status;
++
++    public ToolingDiagnosticsPage(AppConfig config)
++    {
++        Dock = DockStyle.Fill;
++
++        _status = new Label
++        {
++            Dock = DockStyle.Fill,
++            AutoSize = false,
++            Text = "Loading diagnostics…"
++        };
++
++        Controls.Add(_status);
++        UpdateStatus(ToolingDiagnosticsHub.Latest);
++        ToolingDiagnosticsHub.Updated += UpdateStatus;
++    }
++
++    private void UpdateStatus(ToolingDiagnostics diag)
++    {
++        if (InvokeRequired)
++        {
++            BeginInvoke(new Action(() => UpdateStatus(diag)));
++            return;
++        }
++
++        var selected = diag.SelectedBlueprints.Any() ? string.Join(", ", diag.SelectedBlueprints) : "(none)";
++        _status.Text =
++            $"Tools: {diag.ActiveToolCount}/{diag.ToolCount} active (prompts={diag.PromptCount}, missing={diag.MissingPrompts.Count}){Environment.NewLine}" +
++            $"Blueprints: {diag.BlueprintSelectable}/{diag.BlueprintTotal} selectable{Environment.NewLine}" +
++            $"Selected Blueprints: {selected}";
++    }
++
++    public Control BuildPage(AppConfig config) => new ToolingDiagnosticsPage(config);
++}
+diff --git a/Tools/Diagnostics/ToolingDiagnostics.cs b/Tools/Diagnostics/ToolingDiagnostics.cs
+index bc6f79d..29e2338 100644
+--- a/Tools/Diagnostics/ToolingDiagnostics.cs
++++ b/Tools/Diagnostics/ToolingDiagnostics.cs
+@@ -4,13 +4,16 @@ using System.Collections.Generic;
+ 
+ namespace RahOllamaOnly.Tools.Diagnostics;
+ 
+-public sealed record ToolingDiagnostics(
+-    int ToolCount,
+-    int PromptCount,
+-    int ActiveToolCount,
+-    IReadOnlyList<string> MissingPrompts,
+-    string State)
+-{
+-    public static ToolingDiagnostics Empty { get; } =
+-        new ToolingDiagnostics(0, 0, 0, Array.Empty<string>(), "tools inactive");
+-}
++public sealed record ToolingDiagnostics(
++    int ToolCount,
++    int PromptCount,
++    int ActiveToolCount,
++    IReadOnlyList<string> MissingPrompts,
++    string State,
++    int BlueprintTotal,
++    int BlueprintSelectable,
++    IReadOnlyList<string> SelectedBlueprints)
++{
++    public static ToolingDiagnostics Empty { get; } =
++        new ToolingDiagnostics(0, 0, 0, Array.Empty<string>(), "tools inactive", 0, 0, Array.Empty<string>());
++}
+diff --git a/Tools/Diagnostics/ToolingValidator.cs b/Tools/Diagnostics/ToolingValidator.cs
+index 3b47d63..5f1d910 100644
+--- a/Tools/Diagnostics/ToolingValidator.cs
++++ b/Tools/Diagnostics/ToolingValidator.cs
+@@ -23,16 +23,19 @@ public static class ToolingValidator
+         }
+ 
+         var active = toolIds.Count - missing.Count;
+-        var state = (toolIds.Count > 0)
+-            ? (missing.Count == 0 ? "tools active" : "tools gated (missing prompts)")
+-            : "tools inactive";
+-
+-        return new ToolingDiagnostics(
+-            ToolCount: toolIds.Count,
+-            PromptCount: prompts.AllToolIds.Count,
+-            ActiveToolCount: active < 0 ? 0 : active,
+-            MissingPrompts: missing,
+-            State: state
+-        );
+-    }
+-}
++        var state = (toolIds.Count > 0)
++            ? (missing.Count == 0 ? "tools active" : "tools gated (missing prompts)")
++            : "tools inactive";
++
++        return new ToolingDiagnostics(
++            ToolCount: toolIds.Count,
++            PromptCount: prompts.AllToolIds.Count,
++            ActiveToolCount: active < 0 ? 0 : active,
++            MissingPrompts: missing,
++            State: state,
++            BlueprintTotal: 0,
++            BlueprintSelectable: 0,
++            SelectedBlueprints: Array.Empty<string>()
++        );
++    }
++}
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 879b5e8..9a2fc60 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -2,16 +2,17 @@
+ using System;
+ using System.Collections.Generic;
+ using System.IO;
+-using System.Linq;
+-using System.Text;
+-using System.Text.Json;
+-using System.Threading;
+-using System.Threading.Tasks;
+-using RahBuilder.Settings;
+-using RahBuilder.Tools.BlueprintTemplates;
+-using RahOllamaOnly.Tools;
+-using RahOllamaOnly.Tools.Prompt;
+-using RahOllamaOnly.Tracing;
++using System.Linq;
++using System.Text;
++using System.Text.Json;
++using System.Threading;
++using System.Threading.Tasks;
++using RahBuilder.Settings;
++using RahBuilder.Tools.BlueprintTemplates;
++using RahOllamaOnly.Tools;
++using RahOllamaOnly.Tools.Diagnostics;
++using RahOllamaOnly.Tools.Prompt;
++using RahOllamaOnly.Tracing;
+ 
+ namespace RahBuilder.Workflow;
+ 
+@@ -327,23 +328,48 @@ public sealed class WorkflowFacade
+             _trace.Emit("[clarify] received answer, re-running digest.");
+         }
+         else
+-        {
+-            if (action.Action == ReplyActionType.NewRequest && _state.LastIntent != null && !string.IsNullOrWhiteSpace(_state.PendingUserRequest))
+-            {
+-                text = $"{_state.PendingUserRequest}\nFollow-up: {text}";
+-                _state.MemoryStore.AddPlanNote("Follow-up: " + text);
++        {
++            if (action.Action == ReplyActionType.NewRequest && _state.LastIntent != null && !string.IsNullOrWhiteSpace(_state.PendingUserRequest))
++            {
++                text = $"{_state.PendingUserRequest}\nFollow-up: {text}";
++                _state.MemoryStore.AddPlanNote("Follow-up: " + text);
+             }
+             _state.PendingUserRequest = text;
+             _state.ClearClarifications();
+-            _state.PendingQuestion = null;
+-            PendingQuestionChanged?.Invoke(null);
+-        }
+-
+-        var repoScope = RepoScope.Resolve(_cfg);
+-        _trace.Emit(repoScope.Message);
+-        if (!repoScope.Ok)
+-        {
+-            EmitWaitUser("Set RepoRoot in Settings -> General.RepoRoot, then retry.");
++            _state.PendingQuestion = null;
++            PendingQuestionChanged?.Invoke(null);
++        }
++
++        var previousRoute = _state.LastRoute;
++        var flowSignature = BuildFlowSignature(text);
++        var unchangedFlow = string.Equals(_state.LastFlowSignature, flowSignature, StringComparison.Ordinal);
++        _state.LastFlowSignature = flowSignature;
++
++        if (unchangedFlow && string.Equals(previousRoute, "route:wait_user", StringComparison.OrdinalIgnoreCase))
++        {
++            _trace.Emit("[wait_user:resume] Input unchanged; resuming without re-digest.");
++            if (_state.PendingToolPlan != null)
++            {
++                EmitToolPlanWait();
++                return;
++            }
++
++            if (!string.IsNullOrWhiteSpace(_state.PendingQuestion))
++            {
++                EmitWaitUser(_state.PendingQuestion, _state.PendingQuestion);
++                return;
++            }
++
++            EmitWaitUser("Still waiting on new input to continue.");
++            return;
++        }
++
++        MarkRoute("route:chat_intake");
++        var repoScope = RepoScope.Resolve(_cfg);
++        _trace.Emit(repoScope.Message);
++        if (!repoScope.Ok)
++        {
++            EmitWaitUser("Set RepoRoot in Settings -> General.RepoRoot, then retry.");
+             NotifyStatus("Repo invalid");
+             return;
+         }
+@@ -354,13 +380,14 @@ public sealed class WorkflowFacade
+         RepoScope.CheckGit(repoScope, _trace);
+ 
+         SyncGraphToHub(_cfg);
+-
+-        await RunIntentExtractionAsync(text, ct).ConfigureAwait(true);
+-        await RunSemanticIntentAsync(text, ct).ConfigureAwait(true);
+-
+-        // No silent fallbacks.
+-        if (!_cfg.General.GraphDriven)
+-        {
++
++        await RunIntentExtractionAsync(text, ct).ConfigureAwait(true);
++        await RunSemanticIntentAsync(text, ct).ConfigureAwait(true);
++        MarkRoute("route:digest_intent");
++
++        // No silent fallbacks.
++        if (!_cfg.General.GraphDriven)
++        {
+             _trace.Emit("[route:disabled] GraphDriven is OFF (General.GraphDriven=false). No routing performed.");
+             return;
+         }
+@@ -449,26 +476,46 @@ public sealed class WorkflowFacade
+             EmitWaitUser(question, question);
+             NotifyStatus("Waiting clarification");
+             return;
+-        }
+-
+-        _forceEditBecauseInvalidJson = false;
+-
+-        var rawJson = spec.Raw?.RootElement.GetRawText() ?? "";
+-        var routeDecision = _router.Decide(mermaid, text);
+-
+-        _trace.Emit("[digest:ok] JobSpec complete. Handing off to Planner (not wired in this phase).");
+-        _trace.Emit("[route:graph_ok] Mermaid workflow graph validated. (Planner dispatch not wired yet.)");
+-        if (routeDecision.Ok)
+-            _trace.Emit($"[route:selected] {routeDecision.SelectedRoute} (routes={routeDecision.RouteCount}) {routeDecision.Why}");
+-		else
+-			_trace.Emit("[route:error] " + routeDecision.Why);
+-
+-        if (!string.IsNullOrWhiteSpace(rawJson))
+-            _trace.Emit("[jobspec] " + Trunc(rawJson, 800));
+-
+-        var activeAttachments = GetActiveAttachments();
+-        if (activeAttachments.Count == 0)
+-        {
++        }
++
++        _forceEditBecauseInvalidJson = false;
++
++        var rawJson = spec.Raw?.RootElement.GetRawText() ?? "";
++        _state.LastJobSpecJson = rawJson;
++        var routeDecision = _router.Decide(
++            mermaid,
++            text,
++            _cfg.General.ConversationMode,
++            _state.ChatIntakeCompleted,
++            _state.LastFlowSignature);
++
++        _trace.Emit("[digest:ok] JobSpec complete. Handing off to Planner (not wired in this phase).");
++        _trace.Emit("[route:graph_ok] Mermaid workflow graph validated. (Planner dispatch not wired yet.)");
++        if (routeDecision.Ok)
++        {
++            _trace.Emit($"[route:selected] {routeDecision.SelectedRoute} (routes={routeDecision.RouteCount}) {routeDecision.Why}");
++            MarkRoute(NormalizeRouteName(routeDecision.SelectedRoute));
++        }
++        else
++        {
++            _trace.Emit("[route:error] " + routeDecision.Why);
++            EmitWaitUser(routeDecision.Why, routeDecision.Why);
++            return;
++        }
++
++        if (!string.IsNullOrWhiteSpace(rawJson))
++            _trace.Emit("[jobspec] " + Trunc(rawJson, 800));
++
++        var blueprintSelection = RunBlueprintSelection(text);
++        if (blueprintSelection.Selected.Count == 0)
++        {
++            EmitWaitUser("No blueprints matched the request. Update the workflow or adjust the request.", "No matching blueprints found.");
++            return;
++        }
++
++        var activeAttachments = GetActiveAttachments();
++        if (activeAttachments.Count == 0)
++        {
+             if (_planNeedsArtifacts && await HandleProgramOnlyFlowAsync(text, rawJson, ct).ConfigureAwait(true))
+                 return;
+ 
+@@ -771,21 +818,24 @@ public sealed class WorkflowFacade
+         if (string.IsNullOrWhiteSpace(text)) return;
+         _state.Memory.Add("assistant", text);
+         _state.MemoryStore.AddAssistantMessage(text);
+-    }
+-
+-    private void EmitWaitUser(string reason, string? friendly = null, string? preview = null)
+-    {
+-        var msg = WaitUserGate.GateMessage(reason, preview, _cfg.General.ConversationMode);
+-        _trace.Emit(msg);
+-        var chat = friendly ?? reason;
+-        if (!string.IsNullOrWhiteSpace(chat))
+-        {
+-            RecordAssistantMessage(chat);
+-            UserFacingMessage?.Invoke(chat);
+-        }
+-        if (!string.IsNullOrWhiteSpace(preview))
+-            _state.MemoryStore.AddClarificationQuestion(preview);
+-    }
++    }
++
++    private void EmitWaitUser(string reason, string? friendly = null, string? preview = null)
++    {
++        _state.LastRouteBeforeWait = _state.LastRoute;
++        _state.LastRoute = "route:wait_user";
++        var msg = WaitUserGate.GateMessage(reason, preview, _cfg.General.ConversationMode);
++        _trace.Emit(msg);
++        var chat = friendly ?? reason;
++        if (!string.IsNullOrWhiteSpace(chat))
++        {
++            RecordAssistantMessage(chat);
++            UserFacingMessage?.Invoke(chat);
++        }
++        UserFacingMessage?.Invoke(msg);
++        if (!string.IsNullOrWhiteSpace(preview))
++            _state.MemoryStore.AddClarificationQuestion(preview);
++    }
+ 
+     private void SyncGraphToHub(AppConfig cfg)
+     {
+@@ -806,12 +856,68 @@ public sealed class WorkflowFacade
+             _trace.Emit($"[graph] published hash={MermaidGraphHub.CurrentHash}");
+     }
+ 
+-    private static string ComputeHash(string s)
+-    {
+-        using var sha = System.Security.Cryptography.SHA256.Create();
+-        var bytes = System.Text.Encoding.UTF8.GetBytes(s ?? "");
+-        return Convert.ToHexString(sha.ComputeHash(bytes));
+-    }
++    private static string ComputeHash(string s)
++    {
++        using var sha = System.Security.Cryptography.SHA256.Create();
++        var bytes = System.Text.Encoding.UTF8.GetBytes(s ?? "");
++        return Convert.ToHexString(sha.ComputeHash(bytes));
++    }
++
++    private void MarkRoute(string route)
++    {
++        var normalized = NormalizeRouteName(route);
++        if (string.IsNullOrWhiteSpace(normalized)) return;
++        _state.LastRoute = normalized;
++        if (normalized.Equals("route:chat_intake", StringComparison.OrdinalIgnoreCase))
++            _state.ChatIntakeCompleted = true;
++    }
++
++    private static string NormalizeRouteName(string route)
++    {
++        if (string.IsNullOrWhiteSpace(route)) return "";
++        return route.StartsWith("route:", StringComparison.OrdinalIgnoreCase) ? route : "route:" + route;
++    }
++
++    private string BuildFlowSignature(string userText)
++    {
++        var attachments = GetActiveAttachments();
++        var sb = new StringBuilder();
++        sb.Append(userText ?? "");
++        sb.Append("|mode=").Append(_cfg.General.ConversationMode);
++        sb.Append("|attachments=").Append(attachments.Count);
++        foreach (var a in attachments.OrderBy(a => a.StoredName, StringComparer.OrdinalIgnoreCase))
++            sb.Append("|").Append(a.StoredName).Append(":").Append(a.Kind);
++        return ComputeHash(sb.ToString());
++    }
++
++    private void PublishBlueprintDiagnostics(BlueprintSelectionResult selection)
++    {
++        try
++        {
++            var missingPrompts = new List<string>();
++            foreach (var id in _toolManifest.ToolsById.Keys)
++            {
++                if (!_toolPrompts.Has(id))
++                    missingPrompts.Add(id);
++            }
++
++            var diag = new ToolingDiagnostics(
++                ToolCount: _toolManifest.ToolsById.Count,
++                PromptCount: _toolPrompts.AllToolIds.Count,
++                ActiveToolCount: Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count),
++                MissingPrompts: missingPrompts,
++                State: _toolManifest.ToolsById.Count == 0
++                    ? "tools inactive"
++                    : (missingPrompts.Count == 0 ? "tools active" : "tools gated (missing prompts)"),
++                BlueprintTotal: selection.AvailableCount,
++                BlueprintSelectable: selection.SelectableCount,
++                SelectedBlueprints: selection.Selected.Select(s => s.Id).ToList());
++            ToolingDiagnosticsHub.Publish(diag);
++        }
++        catch
++        {
++        }
++    }
+ 
+     private static string NormalizeAttachmentKind(string kind)
+     {
+@@ -982,15 +1088,40 @@ public sealed class WorkflowFacade
+         sb.AppendLine("REQUEST:");
+         sb.Append(userText ?? "");
+ 
+-        _trace.Emit($"[digest:attachments] {activeAttachments.Count} attached (active)");
+-        return sb.ToString();
+-    }
+-
+-    private AttachmentBlueprintInfo? LoadAttachmentBlueprint()
+-    {
+-        var folder = (_cfg.General.BlueprintTemplatesPath ?? "").Trim();
+-        if (string.IsNullOrWhiteSpace(folder))
+-            return null;
++        _trace.Emit($"[digest:attachments] {activeAttachments.Count} attached (active)");
++        return sb.ToString();
++    }
++
++    private BlueprintSelectionResult RunBlueprintSelection(string userText)
++    {
++        var transcript = _state.Memory.Summarize(12);
++        var selection = BlueprintSelector.Select(
++            _cfg,
++            $"{transcript}\n{userText}",
++            _cfg.General.ConversationMode,
++            GetActiveAttachments(),
++            _cfg.General.ExecutionTarget);
++
++        _state.SelectedBlueprints = selection.Selected.Select(s => s.Id).ToList();
++        PublishBlueprintDiagnostics(selection);
++        if (selection.Selected.Count > 0)
++        {
++            _trace.Emit("[blueprint:selected] " + string.Join(", ", selection.Selected.Select(s => $"{s.Id}({s.Why})")));
++            MarkRoute("route:select_blueprints");
++        }
++        else
++        {
++            _trace.Emit("[blueprint:empty] " + string.Join(", ", selection.Rejected.Select(r => $"{r.Id}:{r.Why}")));
++        }
++
++        return selection;
++    }
++
++    private AttachmentBlueprintInfo? LoadAttachmentBlueprint()
++    {
++        var folder = (_cfg.General.BlueprintTemplatesPath ?? "").Trim();
++        if (string.IsNullOrWhiteSpace(folder))
++            return null;
+ 
+         try
+         {
+@@ -1030,24 +1161,74 @@ public sealed class WorkflowFacade
+         }
+     }
+ 
+-    private static string ResolveTemplatePath(string blueprintTemplatesFolder, string fileFromManifest)
+-    {
+-        if (string.IsNullOrWhiteSpace(fileFromManifest)) return "";
+-
+-        var f = fileFromManifest.Replace('\\', '/').Trim();
++    private static string ResolveTemplatePath(string blueprintTemplatesFolder, string fileFromManifest)
++    {
++        if (string.IsNullOrWhiteSpace(fileFromManifest)) return "";
++
++        var f = fileFromManifest.Replace('\\', '/').Trim();
+         if (f.StartsWith("BlueprintTemplates/", StringComparison.OrdinalIgnoreCase))
+             f = f.Substring("BlueprintTemplates/".Length);
+ 
+         if (Path.IsPathRooted(f))
+-            return f;
+-
+-        return Path.Combine(blueprintTemplatesFolder, f.Replace('/', Path.DirectorySeparatorChar));
+-    }
+-
+-    private bool EnsureProvidersConfigured()
+-    {
+-        var missing = new List<string>();
+-        var roles = _cfg.Orchestrator?.Roles ?? new List<OrchestratorRoleConfig>();
++            return f;
++
++        return Path.Combine(blueprintTemplatesFolder, f.Replace('/', Path.DirectorySeparatorChar));
++    }
++
++    private List<string> LoadBlueprintPrompts(IReadOnlyList<string> ids)
++    {
++        var results = new List<string>();
++        var folder = (_cfg.General.BlueprintTemplatesPath ?? "").Trim();
++        if (string.IsNullOrWhiteSpace(folder) || ids == null || ids.Count == 0)
++            return results;
++
++        IReadOnlyList<BlueprintCatalogEntry> catalog;
++        try
++        {
++            catalog = BlueprintCatalog.Load(folder);
++        }
++        catch
++        {
++            return results;
++        }
++
++        foreach (var id in ids)
++        {
++            if (string.IsNullOrWhiteSpace(id)) continue;
++            var entry = catalog.FirstOrDefault(e => string.Equals(e.Id, id, StringComparison.OrdinalIgnoreCase));
++            if (entry == null) continue;
++
++            var path = ResolveTemplatePath(folder, entry.File);
++            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
++                continue;
++
++            try
++            {
++                var text = File.ReadAllText(path);
++                if (!string.IsNullOrWhiteSpace(text))
++                    results.Add(text.Trim());
++            }
++            catch { }
++        }
++
++        return results;
++    }
++
++    private string LoadRolePrompt(string roleName)
++    {
++        var role = _cfg.Orchestrator?.Roles?.FirstOrDefault(r => string.Equals(r.Role, roleName, StringComparison.OrdinalIgnoreCase));
++        var promptId = role?.PromptId ?? "";
++        if (string.IsNullOrWhiteSpace(promptId) || string.Equals(promptId, "default", StringComparison.OrdinalIgnoreCase))
++            return _cfg.General.ToolPlanPrompt ?? "";
++
++        var prompt = LoadBlueprintPrompts(new[] { promptId }).FirstOrDefault();
++        return string.IsNullOrWhiteSpace(prompt) ? (_cfg.General.ToolPlanPrompt ?? "") : prompt;
++    }
++
++    private bool EnsureProvidersConfigured()
++    {
++        var missing = new List<string>();
++        var roles = _cfg.Orchestrator?.Roles ?? new List<OrchestratorRoleConfig>();
+ 
+         foreach (var role in roles)
+         {
+@@ -1163,21 +1344,43 @@ public sealed class WorkflowFacade
+         public List<string> DocumentTools { get; init; } = new();
+     }
+ 
+-    private async Task<bool> BuildToolPlanAsync(string userText, string jobSpecJson, CancellationToken ct)
+-    {
+-        var prompt = (_cfg.General.ToolPlanPrompt ?? "").Trim();
+-        if (prompt.Length == 0)
+-        {
+-            _trace.Emit("[toolplan:error] ToolPlanPrompt is empty (General.ToolPlanPrompt).");
+-            EmitWaitUser("ToolPlan prompt is empty. Update Settings -> General -> Tool Plan Prompt.");
+-            return false;
+-        }
+-
+-        var blueprint = LoadAttachmentBlueprint();
+-        var activeAttachments = GetActiveAttachments();
+-        var sb = new StringBuilder();
+-        sb.AppendLine("SCHEMA: tool_plan.v1 (mode,tweakFirst,steps[id,toolId,inputs{storedName},why])");
+-        sb.AppendLine("ALLOWED_TOOLS: file.read.text, vision.describe.image");
++    private async Task<bool> BuildToolPlanAsync(string userText, string jobSpecJson, CancellationToken ct)
++    {
++        var basePrompt = (_cfg.General.ToolPlanPrompt ?? "").Trim();
++        if (basePrompt.Length == 0)
++        {
++            _trace.Emit("[toolplan:error] ToolPlanPrompt is empty (General.ToolPlanPrompt).");
++            EmitWaitUser("ToolPlan prompt is empty. Update Settings -> General -> Tool Plan Prompt.");
++            return false;
++        }
++
++        var blueprintPrompts = LoadBlueprintPrompts(_state.SelectedBlueprints);
++        if (blueprintPrompts.Count == 0)
++        {
++            _trace.Emit("[toolplan:error] Blueprint selection produced no prompts.");
++            EmitWaitUser("No blueprints are available for this request. Update the workflow graph.");
++            return false;
++        }
++
++        var rolePrompt = LoadRolePrompt("Orchestrator");
++        string prompt;
++        try
++        {
++            prompt = ToolPlanRunner.AssemblePrompt(rolePrompt, blueprintPrompts, basePrompt);
++        }
++        catch (Exception ex)
++        {
++            _trace.Emit("[toolplan:error] " + ex.Message);
++            EmitWaitUser("Blueprint assembly failed. Update workflow graph or selection.");
++            return false;
++        }
++
++        MarkRoute("route:assemble_prompt");
++        var blueprint = LoadAttachmentBlueprint();
++        var activeAttachments = GetActiveAttachments();
++        var sb = new StringBuilder();
++        sb.AppendLine("SCHEMA: tool_plan.v1 (mode,tweakFirst,steps[id,toolId,inputs{storedName},why])");
++        sb.AppendLine("ALLOWED_TOOLS: file.read.text, vision.describe.image");
+         sb.AppendLine("STRICT: JSON only, no markdown, no prose, no invented tools.");
+         sb.AppendLine("CHANGE_STRATEGY: " + ComputeChangeStrategy(_state.PendingUserRequest));
+         sb.AppendLine();
+@@ -1217,15 +1420,16 @@ public sealed class WorkflowFacade
+             sb.AppendLine("imageTools: " + string.Join(", ", blueprint.ImageTools));
+             sb.AppendLine("documentTools: " + string.Join(", ", blueprint.DocumentTools));
+         }
+-
+-        string toolPlanText;
+-        try
+-        {
+-            toolPlanText = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, sb.ToString(), ct).ConfigureAwait(false);
+-        }
+-        catch (Exception ex)
+-        {
+-            _trace.Emit("[toolplan:error] invoke failed: " + ex.Message);
++
++        string toolPlanText;
++        try
++        {
++            MarkRoute("route:plan_tools");
++            toolPlanText = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, sb.ToString(), ct).ConfigureAwait(false);
++        }
++        catch (Exception ex)
++        {
++            _trace.Emit("[toolplan:error] invoke failed: " + ex.Message);
+             EmitWaitUser("ToolPlan invocation failed. Reply with: edit <rewrite your request>");
+             return false;
+         }
+@@ -1390,25 +1594,26 @@ public sealed class WorkflowFacade
+         NotifyStatus("Planning");
+     }
+ 
+-    private async Task ExecuteCurrentStepAsync(CancellationToken ct, bool approveAll = false)
+-    {
+-        if (_state.PendingToolPlan == null)
+-        {
+-            EmitWaitUser("No tool plan to execute.");
++    private async Task ExecuteCurrentStepAsync(CancellationToken ct, bool approveAll = false)
++    {
++        if (_state.PendingToolPlan == null)
++        {
++            EmitWaitUser("No tool plan to execute.");
+             NotifyStatus();
+             return;
+         }
+         if (!_state.PlanConfirmed)
+         {
+-            EmitWaitUser("Please confirm the plan before execution.");
+-            return;
+-        }
+-
+-        _state.PlanPaused = false;
+-        while (true)
+-        {
+-            if (_state.PendingStepIndex < 0 || _state.PendingStepIndex >= _state.PendingToolPlan.Steps.Count)
+-            {
++            EmitWaitUser("Please confirm the plan before execution.");
++            return;
++        }
++
++        MarkRoute("route:execute");
++        _state.PlanPaused = false;
++        while (true)
++        {
++            if (_state.PendingStepIndex < 0 || _state.PendingStepIndex >= _state.PendingToolPlan.Steps.Count)
++            {
+                 EmitWaitUser("Tool plan step index invalid.");
+                 _state.ClearPlan();
+                 NotifyStatus();
+diff --git a/Workflow/WorkflowRouter.cs b/Workflow/WorkflowRouter.cs
+index 37cb9b2..4661eef 100644
+--- a/Workflow/WorkflowRouter.cs
++++ b/Workflow/WorkflowRouter.cs
+@@ -1,102 +1,95 @@
+ #nullable enable
+ using System;
+ using System.Collections.Generic;
+-using System.Text.RegularExpressions;
+-
+-namespace RahBuilder.Workflow;
+-
+-/// <summary>
+-/// Graph-driven routing.
++using RahBuilder.Settings;
++
++namespace RahBuilder.Workflow;
++
++/// <summary>
++/// Graph-driven routing.
+ /// Phase 1: validate Mermaid and deterministically select a route node.
+ /// No legacy fallback. No heuristics. No per-app behavior.
+ /// </summary>
+-public sealed class WorkflowRouter
+-{
+-    // Match route tags like:
+-    //   X[route: PLAN]
+-    //   X["route: PLAN"]
+-    //   X[route:PLAN]
+-    private static readonly Regex RouteTagRx =
+-        new(@"\[[^\]]*route\s*:\s*(?<name>[A-Za-z0-9_.\-\/]+)[^\]]*\]",
+-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+-
+-    public RouterValidation ValidateGraph(string? mermaid)
+-    {
+-        var g = mermaid ?? "";
+-
+-        // Accept [router], ["router"], [entry], ["entry"] anywhere in node brackets.
+-        var hasEntry = Regex.IsMatch(
+-            g,
+-            @"\[[^\]]*(router|entry)[^\]]*\]",
+-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+-
+-        var hasWaitGate = g.IndexOf("wait_user", StringComparison.OrdinalIgnoreCase) >= 0;
+-
+-        // IMPORTANT FIX:
+-        // Don't require literal "[route:" because graphs often use ["route: PLAN"].
+-        var hasRoute = RouteTagRx.Matches(g).Count > 0;
+-
+-        if (!hasEntry)
+-            return RouterValidation.Invalid("Router graph missing entry node tag [router] or [entry].");
+-        if (!hasRoute)
+-            return RouterValidation.Invalid("Router graph missing at least one route node tag [route: Name].");
+-        if (!hasWaitGate)
+-            return RouterValidation.Invalid("Router graph missing wait_user gate.");
+-
+-        return RouterValidation.Valid();
+-    }
+-
+-    /// <summary>
+-    /// Phase 1 routing: deterministic selection.
+-    /// Returns the first route node in the graph (stable ordering by appearance).
+-    /// </summary>
+-    public RouteDecision Decide(string? mermaid, string? userText)
+-    {
+-        var g = mermaid ?? "";
+-        var v = ValidateGraph(g);
+-        if (!v.Ok)
+-            return RouteDecision.Error(v.Message);
+-
+-        var routes = ExtractRouteNames(g);
+-        if (routes.Count == 0)
+-            return RouteDecision.Error("No route nodes found after validation.");
+-
+-        var chosen = routes[0];
+-
+-        return new RouteDecision(
+-            Ok: true,
+-            SelectedRoute: chosen,
+-            RouteCount: routes.Count,
++public sealed class WorkflowRouter
++{
++    private string _lastRoute = "";
++    private string _lastStateHash = "";
++    private int _repeatCount;
++
++    public RouterValidation ValidateGraph(string? mermaid)
++    {
++        return WorkflowGraph.Validate(mermaid);
++    }
++
++    /// <summary>
++    /// Phase 1 routing: deterministic selection.
++    /// Returns the first route node in the graph (stable ordering by appearance).
++    /// </summary>
++    public RouteDecision Decide(
++        string? mermaid,
++        string? userText,
++        ConversationMode mode,
++        bool chatIntakeCompleted,
++        string stateHash)
++    {
++        var g = mermaid ?? "";
++        var v = ValidateGraph(g);
++        if (!v.Ok)
++            return RouteDecision.Error(v.Message);
++
++        var routes = WorkflowGraph.ExtractRouteNames(g);
++        if (routes.Count == 0)
++            return RouteDecision.Error("No route nodes found after validation.");
++
++        var chosen = routes[0];
++        if (mode == ConversationMode.Conversational)
++        {
++            if (!IsChatIntake(chosen))
++                return RouteDecision.Error("Conversational mode requires route:chat_intake as the first node.");
++            if (IsJobSpec(chosen))
++                return RouteDecision.Error("JobSpecDigest cannot be the first hop in conversational mode.");
++        }
++
++        if (IsJobSpec(chosen) && !chatIntakeCompleted)
++            return RouteDecision.Error("jobspec.v2 cannot be entered before chat intake.");
++
++        if (IsJobSpec(chosen) && !IsChatIntake(routes[0]))
++            return RouteDecision.Error("JobSpecDigest must follow chat_intake.");
++
++        var loopKey = string.IsNullOrWhiteSpace(stateHash) ? $"{g}|{userText}|{chosen}" : stateHash;
++        if (string.Equals(_lastRoute, chosen, StringComparison.OrdinalIgnoreCase) &&
++            string.Equals(_lastStateHash, loopKey, StringComparison.Ordinal))
++        {
++            _repeatCount++;
++            if (_repeatCount > 2)
++                return RouteDecision.Error($"Route '{chosen}' repeated {_repeatCount} times with unchanged state.");
++        }
++        else
++        {
++            _repeatCount = 1;
++            _lastRoute = chosen;
++            _lastStateHash = loopKey;
++        }
++
++        return new RouteDecision(
++            Ok: true,
++            SelectedRoute: chosen,
++            RouteCount: routes.Count,
+             Why: $"Selected first route in graph (phase1). userTextLen={(userText ?? "").Length}"
+         );
+     }
+ 
+-    private static List<string> ExtractRouteNames(string g)
+-    {
+-        var results = new List<string>();
+-        foreach (Match m in RouteTagRx.Matches(g))
+-        {
+-            var name = (m.Groups["name"].Value ?? "").Trim();
+-            if (name.Length == 0) continue;
+-
+-            var exists = false;
+-            foreach (var r in results)
+-            {
+-                if (string.Equals(r, name, StringComparison.OrdinalIgnoreCase))
+-                {
+-                    exists = true;
+-                    break;
+-                }
+-            }
+-
+-            if (!exists) results.Add(name);
+-        }
+-        return results;
+-    }
+-}
+-
+-public sealed record RouterValidation(bool Ok, string Message)
+-{
++    private static bool IsChatIntake(string route) =>
++        route.Equals("route:chat_intake", StringComparison.OrdinalIgnoreCase) ||
++        route.Equals("chat_intake", StringComparison.OrdinalIgnoreCase);
++
++    private static bool IsJobSpec(string route) =>
++        route.Equals("route:jobspec.v2", StringComparison.OrdinalIgnoreCase) ||
++        route.Equals("jobspec.v2", StringComparison.OrdinalIgnoreCase);
++}
++
++public sealed record RouterValidation(bool Ok, string Message)
++{
+     public static RouterValidation Valid() => new(true, "ok");
+     public static RouterValidation Invalid(string msg) => new(false, msg);
+ }
+diff --git a/Workflow/WorkflowState.cs b/Workflow/WorkflowState.cs
+index 433315b..27d0348 100644
+--- a/Workflow/WorkflowState.cs
++++ b/Workflow/WorkflowState.cs
+@@ -31,6 +31,11 @@ public sealed class WorkflowState
+     public List<string> ArtifactPackages { get; set; } = new();
+     public List<ProgramArtifactResult> ProgramArtifacts { get; set; } = new();
+     public bool PlanConfirmed { get; set; }
++    public string LastRoute { get; set; } = "";
++    public string LastRouteBeforeWait { get; set; } = "";
++    public string LastFlowSignature { get; set; } = "";
++    public bool ChatIntakeCompleted { get; set; }
++    public List<string> SelectedBlueprints { get; set; } = new();
+ 
+     public void ClearPlan()
+     {
+@@ -47,6 +52,7 @@ public sealed class WorkflowState
+         ArtifactPackages = new List<string>();
+         ProgramArtifacts = new List<ProgramArtifactResult>();
+         PlanConfirmed = false;
++        SelectedBlueprints = new List<string>();
+     }
+ 
+     public void ClearClarifications()
