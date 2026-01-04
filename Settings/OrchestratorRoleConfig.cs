@@ -1,19 +1,22 @@
+// Settings/OrchestratorRoleConfig.cs
 #nullable enable
 namespace RahBuilder.Settings;
 
 /// <summary>
-/// Per-role wiring (provider + model + blueprint template selection + role purpose).
+/// Per-role wiring (provider + model + optional inline prompt + role purpose).
 /// </summary>
 public sealed class OrchestratorRoleConfig
 {
-    public string Role { get; set; } = "";              // e.g. Orchestrator / Planner / Executor / Repair / Embed
-    public string Provider { get; set; } = "";          // e.g. OpenAI / HuggingFace / Ollama
-    public string Model { get; set; } = "";             // provider-specific model id
+    public string Role { get; set; } = "";       // chat/router/planner/executor/reviewer/embed/vision/...
+    public string Provider { get; set; } = "";   // OpenAI / HuggingFace / Ollama
+    public string Model { get; set; } = "";      // provider-specific model id
 
-    // BlueprintTemplates template id (must come from BlueprintTemplates/manifest.json)
+    // Legacy support (blueprint id) - NOT shown in UI anymore.
     public string PromptId { get; set; } = "default";
 
-    // Free-text role purpose (used to describe what this role does, for intent matching/ranking).
-    // This is NOT a tool prompt and NOT a blueprint template id.
+    // NEW: inline prompt text you can type/paste directly.
+    public string PromptText { get; set; } = "";
+
+    // Free-text role purpose for humans (and later for behavior shaping).
     public string RolePurpose { get; set; } = "";
 }
