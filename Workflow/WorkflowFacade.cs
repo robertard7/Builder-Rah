@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using RahBuilder.Settings;
 using RahBuilder.Tools.BlueprintTemplates;
 using RahOllamaOnly.Tools;
+using RahOllamaOnly.Tools.Diagnostics;
 using RahOllamaOnly.Tools.Prompt;
 using RahOllamaOnly.Tracing;
 
@@ -339,6 +340,31 @@ public sealed class WorkflowFacade
             PendingQuestionChanged?.Invoke(null);
         }
 
+        var previousRoute = _state.LastRoute;
+        var flowSignature = BuildFlowSignature(text);
+        var unchangedFlow = string.Equals(_state.LastFlowSignature, flowSignature, StringComparison.Ordinal);
+        _state.LastFlowSignature = flowSignature;
+
+        if (unchangedFlow && string.Equals(previousRoute, "route:wait_user", StringComparison.OrdinalIgnoreCase))
+        {
+            _trace.Emit("[wait_user:resume] Input unchanged; resuming without re-digest.");
+            if (_state.PendingToolPlan != null)
+            {
+                EmitToolPlanWait();
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_state.PendingQuestion))
+            {
+                EmitWaitUser(_state.PendingQuestion, _state.PendingQuestion);
+                return;
+            }
+
+            EmitWaitUser("Still waiting on new input to continue.");
+            return;
+        }
+
+        MarkRoute("route:chat_intake");
         var repoScope = RepoScope.Resolve(_cfg);
         _trace.Emit(repoScope.Message);
         if (!repoScope.Ok)
@@ -357,6 +383,7 @@ public sealed class WorkflowFacade
 
         await RunIntentExtractionAsync(text, ct).ConfigureAwait(true);
         await RunSemanticIntentAsync(text, ct).ConfigureAwait(true);
+        MarkRoute("route:digest_intent");
 
         // No silent fallbacks.
         if (!_cfg.General.GraphDriven)
@@ -454,17 +481,37 @@ public sealed class WorkflowFacade
         _forceEditBecauseInvalidJson = false;
 
         var rawJson = spec.Raw?.RootElement.GetRawText() ?? "";
-        var routeDecision = _router.Decide(mermaid, text);
+        _state.LastJobSpecJson = rawJson;
+        var routeDecision = _router.Decide(
+            mermaid,
+            text,
+            _cfg.General.ConversationMode,
+            _state.ChatIntakeCompleted,
+            _state.LastFlowSignature);
 
         _trace.Emit("[digest:ok] JobSpec complete. Handing off to Planner (not wired in this phase).");
         _trace.Emit("[route:graph_ok] Mermaid workflow graph validated. (Planner dispatch not wired yet.)");
         if (routeDecision.Ok)
+        {
             _trace.Emit($"[route:selected] {routeDecision.SelectedRoute} (routes={routeDecision.RouteCount}) {routeDecision.Why}");
-		else
-			_trace.Emit("[route:error] " + routeDecision.Why);
+            MarkRoute(NormalizeRouteName(routeDecision.SelectedRoute));
+        }
+        else
+        {
+            _trace.Emit("[route:error] " + routeDecision.Why);
+            EmitWaitUser(routeDecision.Why, routeDecision.Why);
+            return;
+        }
 
         if (!string.IsNullOrWhiteSpace(rawJson))
             _trace.Emit("[jobspec] " + Trunc(rawJson, 800));
+
+        var blueprintSelection = RunBlueprintSelection(text);
+        if (blueprintSelection.Selected.Count == 0)
+        {
+            EmitWaitUser("No blueprints matched the request. Update the workflow or adjust the request.", "No matching blueprints found.");
+            return;
+        }
 
         var activeAttachments = GetActiveAttachments();
         if (activeAttachments.Count == 0)
@@ -775,6 +822,8 @@ public sealed class WorkflowFacade
 
     private void EmitWaitUser(string reason, string? friendly = null, string? preview = null)
     {
+        _state.LastRouteBeforeWait = _state.LastRoute;
+        _state.LastRoute = "route:wait_user";
         var msg = WaitUserGate.GateMessage(reason, preview, _cfg.General.ConversationMode);
         _trace.Emit(msg);
         var chat = friendly ?? reason;
@@ -783,6 +832,7 @@ public sealed class WorkflowFacade
             RecordAssistantMessage(chat);
             UserFacingMessage?.Invoke(chat);
         }
+        UserFacingMessage?.Invoke(msg);
         if (!string.IsNullOrWhiteSpace(preview))
             _state.MemoryStore.AddClarificationQuestion(preview);
     }
@@ -811,6 +861,62 @@ public sealed class WorkflowFacade
         using var sha = System.Security.Cryptography.SHA256.Create();
         var bytes = System.Text.Encoding.UTF8.GetBytes(s ?? "");
         return Convert.ToHexString(sha.ComputeHash(bytes));
+    }
+
+    private void MarkRoute(string route)
+    {
+        var normalized = NormalizeRouteName(route);
+        if (string.IsNullOrWhiteSpace(normalized)) return;
+        _state.LastRoute = normalized;
+        if (normalized.Equals("route:chat_intake", StringComparison.OrdinalIgnoreCase))
+            _state.ChatIntakeCompleted = true;
+    }
+
+    private static string NormalizeRouteName(string route)
+    {
+        if (string.IsNullOrWhiteSpace(route)) return "";
+        return route.StartsWith("route:", StringComparison.OrdinalIgnoreCase) ? route : "route:" + route;
+    }
+
+    private string BuildFlowSignature(string userText)
+    {
+        var attachments = GetActiveAttachments();
+        var sb = new StringBuilder();
+        sb.Append(userText ?? "");
+        sb.Append("|mode=").Append(_cfg.General.ConversationMode);
+        sb.Append("|attachments=").Append(attachments.Count);
+        foreach (var a in attachments.OrderBy(a => a.StoredName, StringComparer.OrdinalIgnoreCase))
+            sb.Append("|").Append(a.StoredName).Append(":").Append(a.Kind);
+        return ComputeHash(sb.ToString());
+    }
+
+    private void PublishBlueprintDiagnostics(BlueprintSelectionResult selection)
+    {
+        try
+        {
+            var missingPrompts = new List<string>();
+            foreach (var id in _toolManifest.ToolsById.Keys)
+            {
+                if (!_toolPrompts.Has(id))
+                    missingPrompts.Add(id);
+            }
+
+            var diag = new ToolingDiagnostics(
+                ToolCount: _toolManifest.ToolsById.Count,
+                PromptCount: _toolPrompts.AllToolIds.Count,
+                ActiveToolCount: Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count),
+                MissingPrompts: missingPrompts,
+                State: _toolManifest.ToolsById.Count == 0
+                    ? "tools inactive"
+                    : (missingPrompts.Count == 0 ? "tools active" : "tools gated (missing prompts)"),
+                BlueprintTotal: selection.AvailableCount,
+                BlueprintSelectable: selection.SelectableCount,
+                SelectedBlueprints: selection.Selected.Select(s => s.Id).ToList());
+            ToolingDiagnosticsHub.Publish(diag);
+        }
+        catch
+        {
+        }
     }
 
     private static string NormalizeAttachmentKind(string kind)
@@ -986,6 +1092,31 @@ public sealed class WorkflowFacade
         return sb.ToString();
     }
 
+    private BlueprintSelectionResult RunBlueprintSelection(string userText)
+    {
+        var transcript = _state.Memory.Summarize(12);
+        var selection = BlueprintSelector.Select(
+            _cfg,
+            $"{transcript}\n{userText}",
+            _cfg.General.ConversationMode,
+            GetActiveAttachments(),
+            _cfg.General.ExecutionTarget);
+
+        _state.SelectedBlueprints = selection.Selected.Select(s => s.Id).ToList();
+        PublishBlueprintDiagnostics(selection);
+        if (selection.Selected.Count > 0)
+        {
+            _trace.Emit("[blueprint:selected] " + string.Join(", ", selection.Selected.Select(s => $"{s.Id}({s.Why})")));
+            MarkRoute("route:select_blueprints");
+        }
+        else
+        {
+            _trace.Emit("[blueprint:empty] " + string.Join(", ", selection.Rejected.Select(r => $"{r.Id}:{r.Why}")));
+        }
+
+        return selection;
+    }
+
     private AttachmentBlueprintInfo? LoadAttachmentBlueprint()
     {
         var folder = (_cfg.General.BlueprintTemplatesPath ?? "").Trim();
@@ -1042,6 +1173,56 @@ public sealed class WorkflowFacade
             return f;
 
         return Path.Combine(blueprintTemplatesFolder, f.Replace('/', Path.DirectorySeparatorChar));
+    }
+
+    private List<string> LoadBlueprintPrompts(IReadOnlyList<string> ids)
+    {
+        var results = new List<string>();
+        var folder = (_cfg.General.BlueprintTemplatesPath ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(folder) || ids == null || ids.Count == 0)
+            return results;
+
+        IReadOnlyList<BlueprintCatalogEntry> catalog;
+        try
+        {
+            catalog = BlueprintCatalog.Load(folder);
+        }
+        catch
+        {
+            return results;
+        }
+
+        foreach (var id in ids)
+        {
+            if (string.IsNullOrWhiteSpace(id)) continue;
+            var entry = catalog.FirstOrDefault(e => string.Equals(e.Id, id, StringComparison.OrdinalIgnoreCase));
+            if (entry == null) continue;
+
+            var path = ResolveTemplatePath(folder, entry.File);
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                continue;
+
+            try
+            {
+                var text = File.ReadAllText(path);
+                if (!string.IsNullOrWhiteSpace(text))
+                    results.Add(text.Trim());
+            }
+            catch { }
+        }
+
+        return results;
+    }
+
+    private string LoadRolePrompt(string roleName)
+    {
+        var role = _cfg.Orchestrator?.Roles?.FirstOrDefault(r => string.Equals(r.Role, roleName, StringComparison.OrdinalIgnoreCase));
+        var promptId = role?.PromptId ?? "";
+        if (string.IsNullOrWhiteSpace(promptId) || string.Equals(promptId, "default", StringComparison.OrdinalIgnoreCase))
+            return _cfg.General.ToolPlanPrompt ?? "";
+
+        var prompt = LoadBlueprintPrompts(new[] { promptId }).FirstOrDefault();
+        return string.IsNullOrWhiteSpace(prompt) ? (_cfg.General.ToolPlanPrompt ?? "") : prompt;
     }
 
     private bool EnsureProvidersConfigured()
@@ -1165,14 +1346,36 @@ public sealed class WorkflowFacade
 
     private async Task<bool> BuildToolPlanAsync(string userText, string jobSpecJson, CancellationToken ct)
     {
-        var prompt = (_cfg.General.ToolPlanPrompt ?? "").Trim();
-        if (prompt.Length == 0)
+        var basePrompt = (_cfg.General.ToolPlanPrompt ?? "").Trim();
+        if (basePrompt.Length == 0)
         {
             _trace.Emit("[toolplan:error] ToolPlanPrompt is empty (General.ToolPlanPrompt).");
             EmitWaitUser("ToolPlan prompt is empty. Update Settings -> General -> Tool Plan Prompt.");
             return false;
         }
 
+        var blueprintPrompts = LoadBlueprintPrompts(_state.SelectedBlueprints);
+        if (blueprintPrompts.Count == 0)
+        {
+            _trace.Emit("[toolplan:error] Blueprint selection produced no prompts.");
+            EmitWaitUser("No blueprints are available for this request. Update the workflow graph.");
+            return false;
+        }
+
+        var rolePrompt = LoadRolePrompt("Orchestrator");
+        string prompt;
+        try
+        {
+            prompt = ToolPlanRunner.AssemblePrompt(rolePrompt, blueprintPrompts, basePrompt);
+        }
+        catch (Exception ex)
+        {
+            _trace.Emit("[toolplan:error] " + ex.Message);
+            EmitWaitUser("Blueprint assembly failed. Update workflow graph or selection.");
+            return false;
+        }
+
+        MarkRoute("route:assemble_prompt");
         var blueprint = LoadAttachmentBlueprint();
         var activeAttachments = GetActiveAttachments();
         var sb = new StringBuilder();
@@ -1221,6 +1424,7 @@ public sealed class WorkflowFacade
         string toolPlanText;
         try
         {
+            MarkRoute("route:plan_tools");
             toolPlanText = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, sb.ToString(), ct).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -1404,6 +1608,7 @@ public sealed class WorkflowFacade
             return;
         }
 
+        MarkRoute("route:execute");
         _state.PlanPaused = false;
         while (true)
         {

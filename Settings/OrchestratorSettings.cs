@@ -75,7 +75,7 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 5,
+            RowCount = 6,
             Padding = new Padding(10),
         };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -149,7 +149,7 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
             Dock = DockStyle.Fill,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
-            ReadOnly = false,
+            ReadOnly = true,
             MultiSelect = false,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
@@ -160,43 +160,13 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Provider", FillWeight = 18, ReadOnly = true });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Model", FillWeight = 32, ReadOnly = true });
 
-        var promptCol = new DataGridViewComboBoxColumn
+        var promptCol = new DataGridViewTextBoxColumn
         {
             HeaderText = "Prompt (BlueprintTemplates)",
             FillWeight = 32,
-            DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton,
-            FlatStyle = FlatStyle.Flat
+            ReadOnly = true
         };
         _grid.Columns.Add(promptCol);
-
-        // --- COMMIT FIXES (this is the part that stops “set but not really set”)
-        _grid.CurrentCellDirtyStateChanged += (_, __) =>
-        {
-            if (_grid.IsCurrentCellDirty)
-                CommitGridEdits();
-        };
-
-        _grid.CellEndEdit += (_, __) => CommitGridEdits();
-
-        _grid.CellValueChanged += (_, e) =>
-        {
-            if (e.RowIndex < 0) return;
-            // Prompt column change
-            if (e.ColumnIndex == 3)
-                ApplyPromptChangeFromGrid(e.RowIndex);
-        };
-
-        _grid.DataError += (_, __) =>
-        {
-            // swallow ComboBox invalid-value popups (manifest authoritative)
-        };
-
-        _grid.CellToolTipTextNeeded += (_, e) =>
-        {
-            if (e.RowIndex < 0 || e.ColumnIndex != 3) return;
-            var id = _grid.Rows[e.RowIndex].Cells[3].Value?.ToString() ?? "";
-            e.ToolTipText = FindDescription(id);
-        };
 
         _grid.SelectionChanged += (_, __) => SyncRolePurposeEditor();
 
@@ -219,18 +189,20 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
             EditSelectedRole();
         };
 
-        var editPrompt = new Button { Text = "Prompt…", AutoSize = true, Padding = new Padding(12, 6, 12, 6) };
-        editPrompt.Click += (_, __) =>
-        {
-            CommitGridEdits();
-            EditSelectedPrompt();
-        };
-
         buttons.Controls.Add(editRole);
-        buttons.Controls.Add(editPrompt);
 
         root.Controls.Add(buttons, 0, 2);
         root.SetColumnSpan(buttons, 2);
+
+        var workflowNote = new Label
+        {
+            Text = "Blueprints are selected by workflow.",
+            AutoSize = true,
+            ForeColor = SystemColors.GrayText,
+            Margin = new Padding(0, 6, 0, 6)
+        };
+        root.Controls.Add(workflowNote, 0, 3);
+        root.SetColumnSpan(workflowNote, 2);
 
         // ===== Role Purpose editor
         _rolePurposeLabel = new Label
@@ -259,10 +231,10 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
             AutoSave.Touch($"orchestrator.rolePurpose.{role.Role}");
         };
 
-        root.Controls.Add(_rolePurposeLabel, 0, 3);
+        root.Controls.Add(_rolePurposeLabel, 0, 4);
         root.SetColumnSpan(_rolePurposeLabel, 2);
 
-        root.Controls.Add(_rolePurpose, 0, 4);
+        root.Controls.Add(_rolePurpose, 0, 5);
         root.SetColumnSpan(_rolePurpose, 2);
 
         Controls.Add(root);
@@ -355,17 +327,11 @@ public sealed class OrchestratorSettingsPage : UserControl, ISettingsPageProvide
         CommitGridEdits();
         _grid.Rows.Clear();
 
-        var promptItems = BuildPromptItemsForGrid();
-        var promptCol = (DataGridViewComboBoxColumn)_grid.Columns[3];
-        promptCol.DataSource = promptItems;
-        promptCol.DisplayMember = nameof(PromptItem.Display);
-        promptCol.ValueMember = nameof(PromptItem.Id);
-
         foreach (var r in _config.Orchestrator.Roles)
         {
             var promptId = (r.PromptId ?? "").Trim();
             if (string.Equals(promptId, "default", StringComparison.OrdinalIgnoreCase))
-                promptId = "";
+                promptId = "(workflow)";
 
             _grid.Rows.Add(r.Role, r.Provider, r.Model, promptId);
         }

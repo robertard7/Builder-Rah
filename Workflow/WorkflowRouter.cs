@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
+using RahBuilder.Settings;
 
 namespace RahBuilder.Workflow;
 
@@ -12,56 +12,64 @@ namespace RahBuilder.Workflow;
 /// </summary>
 public sealed class WorkflowRouter
 {
-    // Match route tags like:
-    //   X[route: PLAN]
-    //   X["route: PLAN"]
-    //   X[route:PLAN]
-    private static readonly Regex RouteTagRx =
-        new(@"\[[^\]]*route\s*:\s*(?<name>[A-Za-z0-9_.\-\/]+)[^\]]*\]",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private string _lastRoute = "";
+    private string _lastStateHash = "";
+    private int _repeatCount;
 
     public RouterValidation ValidateGraph(string? mermaid)
     {
-        var g = mermaid ?? "";
-
-        // Accept [router], ["router"], [entry], ["entry"] anywhere in node brackets.
-        var hasEntry = Regex.IsMatch(
-            g,
-            @"\[[^\]]*(router|entry)[^\]]*\]",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-        var hasWaitGate = g.IndexOf("wait_user", StringComparison.OrdinalIgnoreCase) >= 0;
-
-        // IMPORTANT FIX:
-        // Don't require literal "[route:" because graphs often use ["route: PLAN"].
-        var hasRoute = RouteTagRx.Matches(g).Count > 0;
-
-        if (!hasEntry)
-            return RouterValidation.Invalid("Router graph missing entry node tag [router] or [entry].");
-        if (!hasRoute)
-            return RouterValidation.Invalid("Router graph missing at least one route node tag [route: Name].");
-        if (!hasWaitGate)
-            return RouterValidation.Invalid("Router graph missing wait_user gate.");
-
-        return RouterValidation.Valid();
+        return WorkflowGraph.Validate(mermaid);
     }
 
     /// <summary>
     /// Phase 1 routing: deterministic selection.
     /// Returns the first route node in the graph (stable ordering by appearance).
     /// </summary>
-    public RouteDecision Decide(string? mermaid, string? userText)
+    public RouteDecision Decide(
+        string? mermaid,
+        string? userText,
+        ConversationMode mode,
+        bool chatIntakeCompleted,
+        string stateHash)
     {
         var g = mermaid ?? "";
         var v = ValidateGraph(g);
         if (!v.Ok)
             return RouteDecision.Error(v.Message);
 
-        var routes = ExtractRouteNames(g);
+        var routes = WorkflowGraph.ExtractRouteNames(g);
         if (routes.Count == 0)
             return RouteDecision.Error("No route nodes found after validation.");
 
         var chosen = routes[0];
+        if (mode == ConversationMode.Conversational)
+        {
+            if (!IsChatIntake(chosen))
+                return RouteDecision.Error("Conversational mode requires route:chat_intake as the first node.");
+            if (IsJobSpec(chosen))
+                return RouteDecision.Error("JobSpecDigest cannot be the first hop in conversational mode.");
+        }
+
+        if (IsJobSpec(chosen) && !chatIntakeCompleted)
+            return RouteDecision.Error("jobspec.v2 cannot be entered before chat intake.");
+
+        if (IsJobSpec(chosen) && !IsChatIntake(routes[0]))
+            return RouteDecision.Error("JobSpecDigest must follow chat_intake.");
+
+        var loopKey = string.IsNullOrWhiteSpace(stateHash) ? $"{g}|{userText}|{chosen}" : stateHash;
+        if (string.Equals(_lastRoute, chosen, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(_lastStateHash, loopKey, StringComparison.Ordinal))
+        {
+            _repeatCount++;
+            if (_repeatCount > 2)
+                return RouteDecision.Error($"Route '{chosen}' repeated {_repeatCount} times with unchanged state.");
+        }
+        else
+        {
+            _repeatCount = 1;
+            _lastRoute = chosen;
+            _lastStateHash = loopKey;
+        }
 
         return new RouteDecision(
             Ok: true,
@@ -71,28 +79,13 @@ public sealed class WorkflowRouter
         );
     }
 
-    private static List<string> ExtractRouteNames(string g)
-    {
-        var results = new List<string>();
-        foreach (Match m in RouteTagRx.Matches(g))
-        {
-            var name = (m.Groups["name"].Value ?? "").Trim();
-            if (name.Length == 0) continue;
+    private static bool IsChatIntake(string route) =>
+        route.Equals("route:chat_intake", StringComparison.OrdinalIgnoreCase) ||
+        route.Equals("chat_intake", StringComparison.OrdinalIgnoreCase);
 
-            var exists = false;
-            foreach (var r in results)
-            {
-                if (string.Equals(r, name, StringComparison.OrdinalIgnoreCase))
-                {
-                    exists = true;
-                    break;
-                }
-            }
-
-            if (!exists) results.Add(name);
-        }
-        return results;
-    }
+    private static bool IsJobSpec(string route) =>
+        route.Equals("route:jobspec.v2", StringComparison.OrdinalIgnoreCase) ||
+        route.Equals("jobspec.v2", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record RouterValidation(bool Ok, string Message)
