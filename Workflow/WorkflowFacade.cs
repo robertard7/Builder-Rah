@@ -28,6 +28,8 @@ public sealed class WorkflowFacade
     private readonly WorkflowState _state = new();
     private ToolManifest _toolManifest = new();
     private ToolPromptRegistry _toolPrompts = new();
+    private IReadOnlyList<string> _toolingValidationErrors = Array.Empty<string>();
+    private bool _toolingValid = true;
 
     private string _lastGraphHash = "";
     private bool _recentlyCompleted;
@@ -86,6 +88,7 @@ public sealed class WorkflowFacade
         SyncGraphToHub(_cfg);
         LogRepoBanner();
         StartApiHostIfEnabled();
+        _state.IntentState = new IntentState { SessionId = _state.SessionToken, Status = IntentStatus.Collecting };
     }
 
     public WorkflowFacade(AppConfig cfg, RunTrace trace)
@@ -105,6 +108,7 @@ public sealed class WorkflowFacade
         SyncGraphToHub(_cfg);
         LogRepoBanner();
         StartApiHostIfEnabled();
+        _state.IntentState = new IntentState { SessionId = _state.SessionToken, Status = IntentStatus.Collecting };
     }
 
     private void OnOutputCardProduced(OutputCard card)
@@ -212,17 +216,22 @@ public sealed class WorkflowFacade
 
     public void RefreshTooling()
     {
-        var toolsPath = (_cfg.General.ToolsPath ?? "").Trim();
-        var promptDir = (_cfg.General.ToolPromptsPath ?? "").Trim();
+        var toolsPath = ToolchainResolver.ResolveToolManifestPath(_cfg);
+        var promptDir = ToolchainResolver.ResolveToolPromptsFolder(_cfg);
 
         ToolManifest manifest;
         try
         {
+            if (string.IsNullOrWhiteSpace(toolsPath) || !File.Exists(toolsPath))
+                throw new FileNotFoundException("Tool manifest not found", toolsPath);
             manifest = ToolManifestLoader.LoadFromFile(toolsPath);
         }
         catch (Exception ex)
         {
             _trace.Emit($"[tooling:error] failed to load tools manifest at '{toolsPath}': {ex.Message}");
+            _toolManifest = new ToolManifest();
+            _toolPrompts = new ToolPromptRegistry();
+            PublishToolchainDiagnostics("tools manifest missing", toolsPath, promptDir);
             return;
         }
 
@@ -240,6 +249,16 @@ public sealed class WorkflowFacade
 
         _toolManifest = manifest;
         _toolPrompts = prompts;
+        _toolingValidationErrors = ToolManifestValidator.Validate(manifest, _cfg.General.ExecutionTarget);
+        _toolingValid = _toolingValidationErrors.Count == 0;
+        if (!_toolingValid)
+        {
+            var summary = string.Join("; ", _toolingValidationErrors);
+            _trace.Emit("[tooling:error] tools manifest validation failed: " + summary);
+        }
+
+        var diag = ToolingValidator.Validate(_toolManifest, _toolPrompts, _toolingValidationErrors);
+        ToolingDiagnosticsHub.Publish(diag);
         _trace.Emit($"[tooling] tools={manifest.ToolsById.Count} toolPrompts(files)={promptFiles}");
     }
 
@@ -266,6 +285,25 @@ public sealed class WorkflowFacade
 
         var action = UserReplyInterpreter.Interpret(_cfg, _state, text);
         NotifyStatus("Digesting intent");
+
+        var userMessage = new UserMessage(text, MapAttachments(GetActiveAttachments()), DateTimeOffset.UtcNow);
+        var intentUpdate = _intentBuilder.Apply(userMessage, _state.IntentState);
+        _state.IntentState = intentUpdate.State;
+        BroadcastEvent("intent_update", new
+        {
+            status = _state.IntentState.Status.ToString(),
+            goal = _state.IntentState.CurrentGoal,
+            slots = _state.IntentState.Slots
+        });
+
+        if (intentUpdate.RequiresUserInput && action.Action == ReplyActionType.NewRequest)
+        {
+            _state.PendingQuestion = intentUpdate.NextQuestion;
+            if (!string.IsNullOrWhiteSpace(intentUpdate.NextQuestion))
+                UserFacingMessage?.Invoke(intentUpdate.NextQuestion);
+            NotifyStatus("Waiting clarification");
+            return;
+        }
 
         // If last attempt produced invalid_json, DO NOT spin. Only accept "edit ...".
         if (_forceEditBecauseInvalidJson)
@@ -487,6 +525,10 @@ public sealed class WorkflowFacade
         }
 
         _forceEditBecauseInvalidJson = false;
+
+        if (_state.IntentState.Status != IntentStatus.Ready)
+            _state.IntentState.Status = IntentStatus.Ready;
+        _state.LastIntentResult = new IntentResult(_state.IntentState, spec);
 
         var rawJson = spec.Raw?.RootElement.GetRawText() ?? "";
         _state.LastJobSpecJson = rawJson;
@@ -858,7 +900,6 @@ public sealed class WorkflowFacade
             RecordAssistantMessage(chat);
             UserFacingMessage?.Invoke(chat);
         }
-        UserFacingMessage?.Invoke(msg);
         if (!string.IsNullOrWhiteSpace(preview))
             _state.MemoryStore.AddClarificationQuestion(preview);
     }
@@ -927,14 +968,24 @@ public sealed class WorkflowFacade
                     missingPrompts.Add(id);
             }
 
+            var validationErrors = _toolingValidationErrors ?? Array.Empty<string>();
+            var state = _toolManifest.ToolsById.Count == 0
+                ? "tools inactive"
+                : (missingPrompts.Count == 0 ? "tools active" : "tools gated (missing prompts)");
+            var activeCount = Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count);
+            if (validationErrors.Count > 0)
+            {
+                state = $"tools invalid ({validationErrors.Count} manifest errors)";
+                activeCount = 0;
+            }
+
             var diag = new ToolingDiagnostics(
                 ToolCount: _toolManifest.ToolsById.Count,
                 PromptCount: _toolPrompts.AllToolIds.Count,
-                ActiveToolCount: Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count),
+                ActiveToolCount: activeCount,
                 MissingPrompts: missingPrompts,
-                State: _toolManifest.ToolsById.Count == 0
-                    ? "tools inactive"
-                    : (missingPrompts.Count == 0 ? "tools active" : "tools gated (missing prompts)"),
+                ValidationErrors: validationErrors,
+                State: state,
                 BlueprintTotal: selection.AvailableCount,
                 BlueprintSelectable: selection.SelectableCount,
                 SelectedBlueprints: selection.Selected.Select(s => s.Id).ToList(),
@@ -944,6 +995,40 @@ public sealed class WorkflowFacade
                 ? "(none)"
                 : string.Join(", ", selection.SelectionBreakdown.Select(kv => $"{kv.Key}:{kv.Value}"));
             _trace.Emit($"[blueprint:coverage] Blueprints available: {selection.AvailableCount}; selected: {selection.Selected.Count}; Selection breakdown: {breakdown}");
+        }
+        catch
+        {
+        }
+    }
+
+    private void PublishToolchainDiagnostics(string state, string toolsPath, string promptDir)
+    {
+        try
+        {
+            var missingPrompts = new List<string>();
+            foreach (var id in _toolManifest.ToolsById.Keys)
+            {
+                if (!_toolPrompts.Has(id))
+                    missingPrompts.Add(id);
+            }
+
+            var info = string.IsNullOrWhiteSpace(state) ? "" : state;
+            if (!string.IsNullOrWhiteSpace(toolsPath))
+                info = string.IsNullOrWhiteSpace(info) ? $"manifest={toolsPath}" : $"{info} (manifest={toolsPath})";
+            if (!string.IsNullOrWhiteSpace(promptDir))
+                info = string.IsNullOrWhiteSpace(info) ? $"prompts={promptDir}" : $"{info} (prompts={promptDir})";
+
+            var diag = new ToolingDiagnostics(
+                ToolCount: _toolManifest.ToolsById.Count,
+                PromptCount: _toolPrompts.AllToolIds.Count,
+                ActiveToolCount: Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count),
+                MissingPrompts: missingPrompts,
+                State: string.IsNullOrWhiteSpace(info) ? "tools status unknown" : info,
+                BlueprintTotal: 0,
+                BlueprintSelectable: 0,
+                SelectedBlueprints: Array.Empty<string>(),
+                BlueprintTagBreakdown: new Dictionary<string, int>());
+            ToolingDiagnosticsHub.Publish(diag);
         }
         catch
         {
@@ -995,6 +1080,40 @@ public sealed class WorkflowFacade
             .Where(a => a?.Active != false)
             .Select(a => a!)
             .ToList();
+    }
+
+    private static IReadOnlyList<Attachment> MapAttachments(IReadOnlyList<AttachmentInbox.AttachmentEntry> entries)
+    {
+        return (entries ?? Array.Empty<AttachmentInbox.AttachmentEntry>())
+            .Where(e => e != null)
+            .Select(e => new Attachment(
+                e.HostPath ?? "",
+                e.OriginalName ?? e.StoredName ?? "",
+                GuessMimeType(e),
+                e.SizeBytes,
+                null))
+            .ToList();
+    }
+
+    private static string GuessMimeType(AttachmentInbox.AttachmentEntry entry)
+    {
+        var name = entry.OriginalName ?? entry.StoredName ?? "";
+        var ext = Path.GetExtension(name)?.ToLowerInvariant() ?? "";
+        return ext switch
+        {
+            ".png" => "image/png",
+            ".jpg" => "image/jpeg",
+            ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".bmp" => "image/bmp",
+            ".webp" => "image/webp",
+            ".tiff" => "image/tiff",
+            ".txt" => "text/plain",
+            ".md" => "text/markdown",
+            ".json" => "application/json",
+            ".pdf" => "application/pdf",
+            _ => string.IsNullOrWhiteSpace(entry.Kind) ? "application/octet-stream" : $"application/{entry.Kind}"
+        };
     }
 
     private void NotifyStatus(string? phaseOverride = null)
@@ -1284,6 +1403,17 @@ public sealed class WorkflowFacade
 
     private bool EnsureToolPromptsReady()
     {
+        if (_toolingValidationErrors.Count > 0 || !_toolingValid)
+        {
+            var summary = string.Join("; ", _toolingValidationErrors);
+            var msg = string.IsNullOrWhiteSpace(summary)
+                ? "Tools manifest validation failed."
+                : "Tools manifest validation failed: " + summary;
+            _trace.Emit("[tooling:error] " + msg);
+            EmitWaitUser(msg, "Fix tools manifest validation errors and retry.");
+            return false;
+        }
+
         if (_toolManifest == null || _toolManifest.ToolsById.Count == 0)
         {
             _trace.Emit("[tooling:error] Tools manifest is empty or failed to load.");
@@ -1668,6 +1798,16 @@ public sealed class WorkflowFacade
         if (_state.PendingToolPlan == null)
         {
             EmitWaitUser("No tool plan to execute.");
+            NotifyStatus();
+            return;
+        }
+        if (_toolingValidationErrors.Count > 0 || !_toolingValid)
+        {
+            var summary = string.Join("; ", _toolingValidationErrors);
+            var msg = string.IsNullOrWhiteSpace(summary)
+                ? "Tools manifest validation failed."
+                : "Tools manifest validation failed: " + summary;
+            EmitWaitUser(msg, "Fix tools manifest validation errors and retry.");
             NotifyStatus();
             return;
         }

@@ -12,7 +12,8 @@ namespace RahBuilder.Ui;
 public sealed class ChatComposerControl : UserControl
 {
     private readonly RichTextBox _input;
-    private readonly Button _attach;
+    private readonly Button _attachmentsButton;
+    private readonly Button _photosButton;
     private readonly Button _send;
     private readonly FlowLayoutPanel _chips;
     private readonly Label _status;
@@ -20,8 +21,8 @@ public sealed class ChatComposerControl : UserControl
     private AttachmentInbox _inbox;
     private readonly List<AttachmentInbox.AttachmentEntry> _attachments = new();
 
+    private const int MaxVisibleLines = 20;
     private readonly int _minHeight = 34;
-    private readonly int _maxHeight = 180;
 
     public event Action<string>? SendRequested;
     public event Action<IReadOnlyList<AttachmentInbox.AttachmentEntry>>? AttachmentsChanged;
@@ -41,11 +42,43 @@ public sealed class ChatComposerControl : UserControl
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 3
+            RowCount = 4
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        var actionRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = true,
+            Margin = new Padding(0, 0, 0, 4)
+        };
+
+        _attachmentsButton = new Button
+        {
+            Text = "Attachments",
+            AutoSize = true,
+            Padding = new Padding(10, 6, 10, 6),
+            Margin = new Padding(0, 0, 6, 0)
+        };
+
+        _photosButton = new Button
+        {
+            Text = "Photos",
+            AutoSize = true,
+            Padding = new Padding(10, 6, 10, 6),
+            Margin = new Padding(0, 0, 6, 0)
+        };
+
+        _attachmentsButton.Click += (_, _) => ChooseAttachments();
+        _photosButton.Click += (_, _) => ChoosePhotos();
+
+        actionRow.Controls.Add(_attachmentsButton);
+        actionRow.Controls.Add(_photosButton);
 
         _chips = new FlowLayoutPanel
         {
@@ -70,11 +103,10 @@ public sealed class ChatComposerControl : UserControl
         var composerRow = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 3,
+            ColumnCount = 2,
             RowCount = 1
         };
         composerRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        composerRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         composerRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
         _input = new RichTextBox
@@ -89,14 +121,6 @@ public sealed class ChatComposerControl : UserControl
             Height = _minHeight
         };
 
-        _attach = new Button
-        {
-            Text = "Attach…",
-            AutoSize = true,
-            Padding = new Padding(12, 8, 12, 8),
-            Margin = new Padding(6, 0, 0, 0)
-        };
-
         _send = new Button
         {
             Text = "Send",
@@ -105,7 +129,6 @@ public sealed class ChatComposerControl : UserControl
             Margin = new Padding(6, 0, 0, 0)
         };
 
-        _attach.Click += (_, _) => ChooseFiles();
         _send.Click += (_, _) => FireSend();
 
         _input.TextChanged += (_, _) => ReflowHeight();
@@ -124,12 +147,12 @@ public sealed class ChatComposerControl : UserControl
         };
 
         composerRow.Controls.Add(_input, 0, 0);
-        composerRow.Controls.Add(_attach, 1, 0);
-        composerRow.Controls.Add(_send, 2, 0);
+        composerRow.Controls.Add(_send, 1, 0);
 
-        root.Controls.Add(_chips, 0, 0);
-        root.Controls.Add(statusPanel, 0, 1);
-        root.Controls.Add(composerRow, 0, 2);
+        root.Controls.Add(actionRow, 0, 0);
+        root.Controls.Add(_chips, 0, 1);
+        root.Controls.Add(statusPanel, 0, 2);
+        root.Controls.Add(composerRow, 0, 3);
 
         Controls.Add(root);
 
@@ -142,7 +165,8 @@ public sealed class ChatComposerControl : UserControl
     public void SetEnabled(bool enabled)
     {
         _input.Enabled = enabled;
-        _attach.Enabled = enabled;
+        _attachmentsButton.Enabled = enabled;
+        _photosButton.Enabled = enabled;
         _send.Enabled = enabled;
     }
 
@@ -169,13 +193,25 @@ public sealed class ChatComposerControl : UserControl
         SendRequested?.Invoke(text);
     }
 
-    private void ChooseFiles()
+    private void ChooseAttachments()
+    {
+        ChooseFiles("Attach files", "All files (*.*)|*.*");
+    }
+
+    private void ChoosePhotos()
+    {
+        ChooseFiles(
+            "Attach photos",
+            "Image files (*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp;*.tiff)|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp;*.tiff|All files (*.*)|*.*");
+    }
+
+    private void ChooseFiles(string title, string filter)
     {
         using var dlg = new OpenFileDialog
         {
             Multiselect = true,
-            Title = "Attach files",
-            Filter = "All files (*.*)|*.*"
+            Title = title,
+            Filter = filter
         };
 
         if (dlg.ShowDialog() == DialogResult.OK)
@@ -315,11 +351,11 @@ public sealed class ChatComposerControl : UserControl
 
     private void ReflowHeight()
     {
-        var lines = Math.Max(1, _input.Lines.Length);
+        var lines = Math.Max(1, _input.GetLineFromCharIndex(_input.TextLength) + 1);
         var lineH = TextRenderer.MeasureText("X", _input.Font).Height;
-
-        var desired = (lines * lineH) + 14;
-        var clamped = Math.Max(_minHeight, Math.Min(_maxHeight, desired));
+        var targetLines = Math.Min(MaxVisibleLines, lines);
+        var desired = (targetLines * lineH) + 14;
+        var clamped = Math.Max(_minHeight, desired);
 
         if (_input.Height != clamped)
             _input.Height = clamped;

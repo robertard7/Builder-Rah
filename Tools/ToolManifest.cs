@@ -9,10 +9,14 @@ public sealed class ToolDefinition
 {
     public string Id { get; init; } = "";
     public string Description { get; init; } = "";
+    public string Command { get; init; } = "";
+    public IReadOnlyList<string> Targets { get; init; } = Array.Empty<string>();
 }
 
 public sealed class ToolManifest
 {
+    public int Version { get; set; }
+
     public Dictionary<string, ToolDefinition> ToolsById { get; } =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -40,7 +44,13 @@ public sealed class ToolManifest
             if (string.IsNullOrWhiteSpace(kv.Value.Id))
             {
                 // tolerate cases where dictionary key is the id
-                ToolsById[kv.Key] = new ToolDefinition { Id = kv.Key, Description = kv.Value.Description ?? "" };
+                ToolsById[kv.Key] = new ToolDefinition
+                {
+                    Id = kv.Key,
+                    Description = kv.Value.Description ?? "",
+                    Command = kv.Value.Command ?? "",
+                    Targets = kv.Value.Targets ?? Array.Empty<string>()
+                };
             }
             else
             {

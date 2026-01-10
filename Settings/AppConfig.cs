@@ -29,8 +29,6 @@ public sealed class GeneralSettings
     public string SandboxContainerPath { get; set; } = "";
     public string InboxHostPath { get; set; } = DefaultInboxPath();
 
-    public string ToolsPath { get; set; } = "";                 // tools.json
-    public string ToolPromptsPath { get; set; } = "";           // folder: Tools/Prompt (files named by toolId)
     public string BlueprintTemplatesPath { get; set; } = "";    // folder: BlueprintTemplates (prompt library)
     public string ToolPlanPrompt { get; set; } = DefaultToolPlanPrompt();
     public string IntentExtractorPrompt { get; set; } = DefaultIntentExtractorPrompt();
