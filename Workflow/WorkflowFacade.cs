@@ -745,7 +745,7 @@ public sealed class WorkflowFacade
 
         try
         {
-            var result = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", prompt, userText, ct, _state.SelectedBlueprints, "jobspec_digest").ConfigureAwait(false);
+            var result = await LlmInvoker.InvokeChatAsync(_cfg, "planner", prompt, userText, ct).ConfigureAwait(false);
 
             if (string.IsNullOrWhiteSpace(result))
             {

@@ -1,3 +1,4 @@
+// Workflow/WorkflowGraph.cs
 #nullable enable
 using System;
 using System.Collections.Generic;
@@ -12,46 +13,27 @@ public static class WorkflowGraph
         new(@"\[[^\]]*route\s*:\s*(?<name>[A-Za-z0-9_.\-\/]+)[^\]]*\]",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly string[] RequiredRoutes = new[]
-    {
-        "route:chat_intake",
-        "route:digest_intent",
-        "route:select_blueprints",
-        "route:assemble_prompt",
-        "route:plan_tools",
-        "route:execute",
-        "route:wait_user",
-        "route:loop_detect"
-    };
-
     public static RouterValidation Validate(string? mermaid)
     {
         var g = mermaid ?? "";
+        if (g.Trim().Length == 0)
+            return RouterValidation.Invalid("Workflow graph is empty.");
 
-        var hasEntry = Regex.IsMatch(
-            g,
-            @"\[[^\]]*(router|entry)[^\]]*\]",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        // Accept either explicit [entry] tag or a route named UserInput as the “entry concept”.
+        var hasEntryTag = Regex.IsMatch(g, @"\[[^\]]*(entry|router)[^\]]*\]", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-        var hasWaitGate = g.IndexOf("wait_user", StringComparison.OrdinalIgnoreCase) >= 0;
         var routes = ExtractRouteNames(g);
-
-        if (!hasEntry)
-            return RouterValidation.Invalid("Router graph missing entry node tag [router] or [entry].");
         if (routes.Count == 0)
             return RouterValidation.Invalid("Router graph missing at least one route node tag [route: Name].");
-        if (!hasWaitGate)
-            return RouterValidation.Invalid("Router graph missing wait_user gate.");
 
-        foreach (var required in RequiredRoutes)
-        {
-            var plain = required.Replace("route:", "", StringComparison.OrdinalIgnoreCase);
-            var match = routes.Any(r =>
-                string.Equals(r, required, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(r, plain, StringComparison.OrdinalIgnoreCase));
-            if (!match)
-                return RouterValidation.Invalid($"Workflow graph missing required route node: {required}");
-        }
+        var hasUserInput = routes.Any(r => string.Equals(r, "UserInput", StringComparison.OrdinalIgnoreCase));
+        if (!hasEntryTag && !hasUserInput)
+            return RouterValidation.Invalid("Graph needs either an [entry] node tag or a [route: UserInput] node.");
+
+        // The WAIT_USER gate is core to your UI flow.
+        var hasWaitUser = routes.Any(r => string.Equals(r, "WaitUser", StringComparison.OrdinalIgnoreCase));
+        if (!hasWaitUser)
+            return RouterValidation.Invalid("Graph missing required [route: WaitUser] node (WAIT_USER gate).");
 
         return RouterValidation.Valid();
     }
@@ -64,17 +46,8 @@ public static class WorkflowGraph
             var name = (m.Groups["name"].Value ?? "").Trim();
             if (name.Length == 0) continue;
 
-            var exists = false;
-            foreach (var r in results)
-            {
-                if (string.Equals(r, name, StringComparison.OrdinalIgnoreCase))
-                {
-                    exists = true;
-                    break;
-                }
-            }
-
-            if (!exists) results.Add(name);
+            if (!results.Any(r => string.Equals(r, name, StringComparison.OrdinalIgnoreCase)))
+                results.Add(name);
         }
         return results;
     }

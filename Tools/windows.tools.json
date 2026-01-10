@@ -1,0 +1,327 @@
+{
+  "version": 3,
+  "notes": [
+    "OVER-SPEC TOOLBOX (WINDOWS): command tool manifest. Each tool is a known id + a command template.",
+    "This file is designed for Windows host execution using PowerShell (pwsh/powershell), winget, git, dotnet, etc.",
+    "Args are passed as a raw string and substituted into {args}.",
+    "Hard rule: NEVER invent tool ids at runtime. Only call ids listed here.",
+    "Policy: Commands should fail clearly if a dependency isn't installed (no silent 'success')."
+  ],
+  "tools": [
+    {
+      "id": "windows.sys.info",
+      "desc": "System info: OS, CPU, RAM, disks, mounts/volumes.",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; Get-ComputerInfo | Select-Object OsName,OsVersion,OsBuildNumber,WindowsVersion,OsArchitecture,CsName | Format-List; Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed | Format-Table -Auto; Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory | Format-List; Get-Volume | Select-Object DriveLetter,FileSystemLabel,FileSystem,SizeRemaining,Size | Format-Table -Auto\""
+    },
+    {
+      "id": "windows.sys.env",
+      "desc": "Show environment (trimmed).",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; Get-ChildItem Env: | Sort-Object Name | Select-Object -First 350 | Format-Table -Auto\""
+    },
+    {
+      "id": "windows.sys.ps",
+      "desc": "Top processes (CPU/mem).",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; Get-Process | Sort-Object CPU -Descending | Select-Object -First 40 Name,Id,CPU,WorkingSet,Path | Format-Table -Auto; Write-Host '-----'; Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 40 Name,Id,CPU,WorkingSet,Path | Format-Table -Auto\""
+    },
+    {
+      "id": "windows.sys.uptime",
+      "desc": "Uptime.",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $os=Get-CimInstance Win32_OperatingSystem; $boot=$os.LastBootUpTime; $uptime=(Get-Date)-$boot; Write-Host ('LastBoot: ' + $boot); Write-Host ('Uptime: ' + $uptime)\""
+    },
+    {
+      "id": "windows.sys.dmesg",
+      "desc": "System event tail (safe). args: <n optional>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $n='{args}'; if([string]::IsNullOrWhiteSpace($n)){$n=220}; if($n -notmatch '^[0-9]+$'){$n=220}; Get-WinEvent -LogName System -MaxEvents ([int]$n) | Select-Object TimeCreated,Id,LevelDisplayName,ProviderName,Message | Format-List\""
+    },
+    {
+      "id": "windows.sys.mount.check",
+      "desc": "Verify working dirs exist and are writable (Windows equivalents).",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $paths=@('.','./logs','./tools'); foreach($p in $paths){ if(!(Test-Path $p)){ New-Item -ItemType Directory -Force -Path $p | Out-Null }; Write-Host ('[check] ' + (Resolve-Path $p)); $f=Join-Path $p '__mount_test.txt'; 'test_'+[DateTimeOffset]::Now.ToUnixTimeSeconds() | Set-Content -Path $f -Encoding utf8; Get-Content $f; Remove-Item -Force $f }\""
+    },
+    {
+      "id": "windows.sys.which",
+      "desc": "Locate executables. args: <name1> <name2> ...",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Continue'; $argsList=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); foreach($x in $argsList){ Write-Host ('== ' + $x + ' =='); $c=Get-Command $x -ErrorAction SilentlyContinue; if($c){ $c | Select-Object Name,Source,Path | Format-Table -Auto } else { Write-Host 'not found' } }\""
+    },
+    {
+      "id": "windows.sys.os",
+      "desc": "Identify OS + version.",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; (Get-ComputerInfo | Select-Object OsName,OsVersion,OsBuildNumber,WindowsVersion,OsArchitecture) | Format-List\""
+    },
+    {
+      "id": "windows.net.ping",
+      "desc": "Ping a host. args: <host>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $h='{args}'; if([string]::IsNullOrWhiteSpace($h)){ throw 'missing host' }; Test-Connection -ComputerName $h -Count 4 | Format-Table -Auto\""
+    },
+    {
+      "id": "windows.net.dns",
+      "desc": "DNS lookup. args: <name>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $n='{args}'; if([string]::IsNullOrWhiteSpace($n)){ throw 'missing name' }; Resolve-DnsName $n -ErrorAction Stop | Format-Table -Auto\""
+    },
+    {
+      "id": "windows.net.http.head",
+      "desc": "HTTP HEAD request. args: <url>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $u='{args}'; if([string]::IsNullOrWhiteSpace($u)){ throw 'missing url' }; $r=Invoke-WebRequest -Method Head -Uri $u -MaximumRedirection 5; $r.Headers.GetEnumerator() | Sort-Object Name | Format-Table -Auto\""
+    },
+    {
+      "id": "windows.net.http.get",
+      "desc": "HTTP GET first N lines. args: <url> [n]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $u=$parts[0]; $n=$parts[1]; if([string]::IsNullOrWhiteSpace($u)){ throw 'missing url' }; if([string]::IsNullOrWhiteSpace($n)){$n=120}; if($n -notmatch '^[0-9]+$'){$n=120}; $txt=(Invoke-WebRequest -Uri $u -MaximumRedirection 5).Content; $lines=$txt -split \"`r?`n\"; $lines | Select-Object -First ([int]$n)\""
+    },
+    {
+      "id": "windows.repo.ls",
+      "desc": "List current directory.",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; Get-Location; Get-ChildItem -Force | Format-Table -Auto\""
+    },
+    {
+      "id": "windows.repo.tree",
+      "desc": "Tree view (if tree exists) or fallback. args: <path optional>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){$p='.'}; if(Get-Command tree -ErrorAction SilentlyContinue){ cmd /c \"tree \\\"$p\\\" /F /A\" } else { Get-ChildItem -Recurse -Directory -Depth 3 -Force -Path $p | Select-Object -First 400 FullName }\""
+    },
+    {
+      "id": "windows.repo.finddir",
+      "desc": "List directories under path. args: <maxdepth optional> (uses current dir).",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $d='{args}'; if([string]::IsNullOrWhiteSpace($d)){$d=4}; if($d -notmatch '^[0-9]+$'){$d=4}; Get-ChildItem -Recurse -Directory -Depth ([int]$d) -Force | Select-Object -First 600 FullName\""
+    },
+    {
+      "id": "windows.repo.clean",
+      "desc": "Danger: remove build artifacts under current dir (safe patterns).",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $root=Get-Location; $targets=@('bin','obj','dist','build','.next','target'); foreach($t in $targets){ Get-ChildItem -Path $root -Recurse -Force -Directory -Filter $t -ErrorAction SilentlyContinue | ForEach-Object { Remove-Item -Recurse -Force -LiteralPath $_.FullName -ErrorAction SilentlyContinue } }; Write-Host '[repo.clean] done'\""
+    },
+    {
+      "id": "windows.file.cat",
+      "desc": "Print a file (safe). args: <path>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){ throw 'missing path' }; if(!(Test-Path -LiteralPath $p)){ throw ('not found: ' + $p) }; Get-Content -LiteralPath $p -TotalCount 340\""
+    },
+    {
+      "id": "windows.file.head",
+      "desc": "Show first N lines. args: <path> [n]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $p=$parts[0]; $n=$parts[1]; if([string]::IsNullOrWhiteSpace($p)){ throw 'missing path' }; if([string]::IsNullOrWhiteSpace($n)){$n=180}; if($n -notmatch '^[0-9]+$'){$n=180}; Get-Content -LiteralPath $p -TotalCount ([int]$n)\""
+    },
+    {
+      "id": "windows.file.tail",
+      "desc": "Show last N lines. args: <path> [n]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $p=$parts[0]; $n=$parts[1]; if([string]::IsNullOrWhiteSpace($p)){ throw 'missing path' }; if([string]::IsNullOrWhiteSpace($n)){$n=180}; if($n -notmatch '^[0-9]+$'){$n=180}; Get-Content -LiteralPath $p -Tail ([int]$n)\""
+    },
+    {
+      "id": "windows.file.stat",
+      "desc": "File info + sha256 (if file). args: <path>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){ throw 'missing path' }; if(!(Test-Path -LiteralPath $p)){ throw 'not found' }; Get-Item -LiteralPath $p | Format-List FullName,Length,LastWriteTime,Attributes; if(Test-Path -LiteralPath $p -PathType Leaf){ Get-FileHash -Algorithm SHA256 -LiteralPath $p | Format-List }\""
+    },
+    {
+      "id": "windows.file.find",
+      "desc": "Find files by name pattern under current dir. args: <pattern>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $pat='{args}'; if([string]::IsNullOrWhiteSpace($pat)){ throw 'missing pattern' }; Get-ChildItem -Recurse -Force -File -Filter $pat -ErrorAction SilentlyContinue | Select-Object -First 800 FullName\""
+    },
+    {
+      "id": "windows.file.searchpath",
+      "desc": "Find occurrences of a literal string in one file (safe). args: <path> <pattern>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $raw='{args}'; $i=$raw.IndexOf(' '); if($i -lt 1){ throw 'usage: <path> <pattern>' }; $p=$raw.Substring(0,$i).Trim(); $pat=$raw.Substring($i+1); if(!(Test-Path -LiteralPath $p)){ throw 'not a file' }; Select-String -LiteralPath $p -SimpleMatch -Pattern $pat | Select-Object LineNumber,Line | Format-Table -Auto\""
+    },
+    {
+      "id": "windows.grep.text",
+      "desc": "Search text under current dir. args: <pattern>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $pat='{args}'; if([string]::IsNullOrWhiteSpace($pat)){ throw 'missing pattern' }; Get-ChildItem -Recurse -Force -File | Select-String -Pattern $pat -SimpleMatch -ErrorAction SilentlyContinue | Select-Object -First 500 Path,LineNumber,Line | Format-Table -Auto\""
+    },
+    {
+      "id": "windows.grep.files",
+      "desc": "List files under current dir matching pattern. args: <pattern>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $pat='{args}'; if([string]::IsNullOrWhiteSpace($pat)){ throw 'missing pattern' }; Get-ChildItem -Recurse -Force -File | Select-String -Pattern $pat -SimpleMatch -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path -Unique | Select-Object -First 900\""
+    },
+    {
+      "id": "windows.git.status",
+      "desc": "Git status. args: <path optional>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){$p='.'}; Push-Location $p; git status -sb; Pop-Location\""
+    },
+    {
+      "id": "windows.git.diff",
+      "desc": "Git diff (trimmed). args: <path optional>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){$p='.'}; Push-Location $p; git diff --stat; Write-Host '-----'; git diff | Select-Object -First 1200; Pop-Location\""
+    },
+    {
+      "id": "windows.git.log",
+      "desc": "Recent commits. args: <path optional>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){$p='.'}; Push-Location $p; git --no-pager log --oneline -n 80; Pop-Location\""
+    },
+    {
+      "id": "windows.git.clone",
+      "desc": "Clone a repo into current dir. args: <url> <dest>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $url=$parts[0]; $dest=$parts[1]; if([string]::IsNullOrWhiteSpace($url) -or [string]::IsNullOrWhiteSpace($dest)){ throw 'usage: <url> <dest>' }; git clone $url $dest\""
+    },
+    {
+      "id": "windows.apt.update",
+      "desc": "Update packages (Windows: winget source update).",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; if(Get-Command winget -ErrorAction SilentlyContinue){ winget source update } else { throw 'winget not installed' }\""
+    },
+    {
+      "id": "windows.apt.install",
+      "desc": "Install packages (Windows: winget install). args: <pkgIds...>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $pkgs=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); if($pkgs.Count -eq 0){ throw 'missing packages' }; if(!(Get-Command winget -ErrorAction SilentlyContinue)){ throw 'winget not installed' }; foreach($p in $pkgs){ winget install --id $p -e --accept-package-agreements --accept-source-agreements }\""
+    },
+    {
+      "id": "windows.apt.install.core",
+      "desc": "Install core build tools (Windows via winget).",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; if(!(Get-Command winget -ErrorAction SilentlyContinue)){ throw 'winget not installed' }; $ids=@('Git.Git','Kitware.CMake','Ninja-build.Ninja','Microsoft.PowerShell','Microsoft.WindowsTerminal'); foreach($id in $ids){ winget install --id $id -e --accept-package-agreements --accept-source-agreements }\""
+    },
+    {
+      "id": "windows.apt.install.dotnet",
+      "desc": "Install dotnet SDK (Windows via winget).",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; if(!(Get-Command winget -ErrorAction SilentlyContinue)){ throw 'winget not installed' }; winget install --id Microsoft.DotNet.SDK.8 -e --accept-package-agreements --accept-source-agreements\""
+    },
+    {
+      "id": "windows.apt.install.languages",
+      "desc": "Install a wide language toolchain (Windows via winget).",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; if(!(Get-Command winget -ErrorAction SilentlyContinue)){ throw 'winget not installed' }; $ids=@('Git.Git','Kitware.CMake','Ninja-build.Ninja','Microsoft.DotNet.SDK.8','OpenJS.NodeJS','GoLang.Go','Python.Python.3.12','Rustlang.Rustup','EclipseAdoptium.Temurin.17.JDK'); foreach($id in $ids){ winget install --id $id -e --accept-package-agreements --accept-source-agreements }\""
+    },
+    {
+      "id": "windows.dotnet.info",
+      "desc": "Dotnet SDK/runtime info.",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; dotnet --info\""
+    },
+    {
+      "id": "windows.dotnet.new",
+      "desc": "Create a dotnet project template. args: <template> <outputDir> [extraArgs].",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $raw='{args}'; $parts=$raw -split '\\s+'; $tpl=$parts[0]; $out=$parts[1]; if([string]::IsNullOrWhiteSpace($tpl) -or [string]::IsNullOrWhiteSpace($out)){ throw 'usage: <template> <outputDir> [extraArgs]' }; $extra=$parts[2..($parts.Length-1)]; dotnet new $tpl -o $out @extra\""
+    },
+    {
+      "id": "windows.build.dotnet",
+      "desc": "Dotnet build using dotnet CLI. args: <path optional> [extraArgs]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $a='{args}'; if([string]::IsNullOrWhiteSpace($a)){ dotnet build -v minimal } else { dotnet build $a }\""
+    },
+    {
+      "id": "windows.test.dotnet",
+      "desc": "Dotnet test using dotnet CLI. args: <path optional> [extraArgs]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $a='{args}'; if([string]::IsNullOrWhiteSpace($a)){ dotnet test } else { dotnet test $a }\""
+    },
+    {
+      "id": "windows.fs.mkdir",
+      "desc": "Create a directory. args: <path>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){ throw 'missing path' }; New-Item -ItemType Directory -Force -Path $p | Out-Null; Write-Host ('created ' + (Resolve-Path $p))\""
+    },
+    {
+      "id": "windows.run.cmd",
+      "desc": "Run a PowerShell command safely (logged). args: <command>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $cmd='{args}'; if([string]::IsNullOrWhiteSpace($cmd)){ throw 'missing command' }; Write-Host ('[run.cmd] ' + $cmd); Invoke-Expression $cmd\""
+    },
+    {
+      "id": "windows.docker.logs",
+      "desc": "Container logs tail. args: <container> [n]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $c=$parts[0]; $n=$parts[1]; if([string]::IsNullOrWhiteSpace($c)){ throw 'usage: <container> [n]' }; if([string]::IsNullOrWhiteSpace($n)){$n=300}; if($n -notmatch '^[0-9]+$'){$n=300}; if(Get-Command docker -ErrorAction SilentlyContinue){ docker logs --tail $n $c } else { throw 'docker not installed' }\""
+    },
+    {
+      "id": "windows.lang.detect",
+      "desc": "Rough language detection by file extension under current dir. args: <path optional>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){$p='.'}; $exts=@('cs','cpp','c','h','hpp','rs','go','py','js','ts','java','kt','php','rb','swift','lua','sh','ps1'); $files=Get-ChildItem -Recurse -Force -File -Path $p -ErrorAction SilentlyContinue; $counts=@{}; foreach($f in $files){ $e=$f.Extension.TrimStart('.').ToLower(); if($exts -contains $e){ if(!$counts.ContainsKey($e)){$counts[$e]=0}; $counts[$e]++ } }; $counts.GetEnumerator() | Sort-Object Value -Descending | Select-Object -First 40 | Format-Table -Auto Name,Value\""
+    },
+    {
+      "id": "windows.c.build",
+      "desc": "Build a C file with gcc/clang if installed. args: <src.c> <out> [cflags...]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $src=$parts[0]; $out=$parts[1]; if([string]::IsNullOrWhiteSpace($src) -or [string]::IsNullOrWhiteSpace($out)){ throw 'usage: <src.c> <out> [cflags...]' }; $rest=$parts[2..($parts.Length-1)]; $cc=(Get-Command gcc -ErrorAction SilentlyContinue); if(!$cc){ $cc=(Get-Command clang -ErrorAction SilentlyContinue) }; if(!$cc){ throw 'gcc/clang not found' }; & $cc.Path $src '-o' $out @rest\""
+    },
+    {
+      "id": "windows.cpp.build",
+      "desc": "Build a C++ file with g++/clang++ if installed. args: <src.cpp> <out> [cxxflags...]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $src=$parts[0]; $out=$parts[1]; if([string]::IsNullOrWhiteSpace($src) -or [string]::IsNullOrWhiteSpace($out)){ throw 'usage: <src.cpp> <out> [cxxflags...]' }; $rest=$parts[2..($parts.Length-1)]; $cc=(Get-Command g++ -ErrorAction SilentlyContinue); if(!$cc){ $cc=(Get-Command clang++ -ErrorAction SilentlyContinue) }; if(!$cc){ throw 'g++/clang++ not found' }; & $cc.Path $src '-o' $out @rest\""
+    },
+    {
+      "id": "windows.cmake.configure",
+      "desc": "CMake configure. args: <srcDir> <buildDir> [extraArgs...]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $src=$parts[0]; $b=$parts[1]; if([string]::IsNullOrWhiteSpace($src) -or [string]::IsNullOrWhiteSpace($b)){ throw 'usage: <srcDir> <buildDir> [extraArgs...]' }; $rest=$parts[2..($parts.Length-1)]; if(!(Get-Command cmake -ErrorAction SilentlyContinue)){ throw 'cmake not found' }; cmake -S $src -B $b -G Ninja @rest\""
+    },
+    {
+      "id": "windows.cmake.build",
+      "desc": "CMake build. args: <buildDir> [target]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $b=$parts[0]; $t=$parts[1]; if([string]::IsNullOrWhiteSpace($b)){ throw 'usage: <buildDir> [target]' }; if(!(Get-Command cmake -ErrorAction SilentlyContinue)){ throw 'cmake not found' }; if([string]::IsNullOrWhiteSpace($t)){ cmake --build $b } else { cmake --build $b --target $t }\""
+    },
+    {
+      "id": "windows.rust.build",
+      "desc": "Cargo build. args: <projectDir> [--release]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $p=$parts[0]; $mode=$parts[1]; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir> [--release]' }; Push-Location $p; if([string]::IsNullOrWhiteSpace($mode)){ cargo build } else { cargo build $mode }; Pop-Location\""
+    },
+    {
+      "id": "windows.rust.test",
+      "desc": "Cargo test. args: <projectDir>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir>' }; Push-Location $p; cargo test; Pop-Location\""
+    },
+    {
+      "id": "windows.go.build",
+      "desc": "Go build. args: <projectDir> [outName]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $p=$parts[0]; $out=$parts[1]; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir> [outName]' }; Push-Location $p; if([string]::IsNullOrWhiteSpace($out)){ go build ./... } else { go build -o $out ./... }; Pop-Location\""
+    },
+    {
+      "id": "windows.go.test",
+      "desc": "Go test. args: <projectDir>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir>' }; Push-Location $p; go test ./...; Pop-Location\""
+    },
+    {
+      "id": "windows.node.install",
+      "desc": "Node install deps. args: <projectDir>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir>' }; Push-Location $p; if(Test-Path package-lock.json){ npm ci } else { npm install }; Pop-Location\""
+    },
+    {
+      "id": "windows.node.build",
+      "desc": "Node build script. args: <projectDir> [scriptName]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $p=$parts[0]; $s=$parts[1]; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir> [scriptName]' }; if([string]::IsNullOrWhiteSpace($s)){$s='build'}; Push-Location $p; npm run $s; Pop-Location\""
+    },
+    {
+      "id": "windows.node.test",
+      "desc": "Node test script. args: <projectDir> [scriptName]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $p=$parts[0]; $s=$parts[1]; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir> [scriptName]' }; if([string]::IsNullOrWhiteSpace($s)){$s='test'}; Push-Location $p; npm run $s; Pop-Location\""
+    },
+    {
+      "id": "windows.python.venv",
+      "desc": "Create venv. args: <projectDir> [venvName]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $p=$parts[0]; $v=$parts[1]; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir> [venvName]' }; if([string]::IsNullOrWhiteSpace($v)){$v='.venv'}; python -m venv (Join-Path $p $v); Write-Host ('created ' + (Join-Path $p $v))\""
+    },
+    {
+      "id": "windows.python.pip.install",
+      "desc": "Pip install requirements. args: <projectDir> [requirementsFile]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $p=$parts[0]; $r=$parts[1]; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir> [requirementsFile]' }; if([string]::IsNullOrWhiteSpace($r)){$r='requirements.txt'}; Push-Location $p; python -m pip install -r $r; Pop-Location\""
+    },
+    {
+      "id": "windows.python.run",
+      "desc": "Run python module/script. args: <projectDir> <scriptOrModule> [args...]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $raw='{args}'; $parts=$raw -split '\\s+'; $p=$parts[0]; $s=$parts[1]; if([string]::IsNullOrWhiteSpace($p) -or [string]::IsNullOrWhiteSpace($s)){ throw 'usage: <projectDir> <scriptOrModule> [args...]' }; $rest=$parts[2..($parts.Length-1)]; Push-Location $p; python $s @rest; Pop-Location\""
+    },
+    {
+      "id": "windows.java.maven.build",
+      "desc": "Maven build. args: <projectDir> [goals...] (default: package)",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $raw='{args}'; $parts=$raw -split '\\s+'; $p=$parts[0]; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir> [goals...]' }; $goals=$parts[1..($parts.Length-1)]; Push-Location $p; if($goals.Count -eq 0){ mvn -q -DskipTests package } else { mvn @goals }; Pop-Location\""
+    },
+    {
+      "id": "windows.java.gradle.build",
+      "desc": "Gradle build. args: <projectDir> [task] (default: build)",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $parts=('{args}' -split '\\s+' | Where-Object {$_ -ne ''}); $p=$parts[0]; $t=$parts[1]; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir> [task]' }; if([string]::IsNullOrWhiteSpace($t)){$t='build'}; Push-Location $p; if(Test-Path .\\gradlew){ .\\gradlew $t } else { gradle $t }; Pop-Location\""
+    },
+    {
+      "id": "windows.php.composer.install",
+      "desc": "Composer install. args: <projectDir>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir>' }; Push-Location $p; composer install; Pop-Location\""
+    },
+    {
+      "id": "windows.ruby.bundle.install",
+      "desc": "Bundler install. args: <projectDir>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <projectDir>' }; Push-Location $p; bundle install; Pop-Location\""
+    },
+    {
+      "id": "windows.fmt.format",
+      "desc": "Formatting pass (clang-format if present). args: <path>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <path>' }; $cf=Get-Command clang-format -ErrorAction SilentlyContinue; if(!$cf){ throw 'clang-format not installed' }; Get-ChildItem -Recurse -Force -File -Path $p -Include *.c,*.h,*.cpp,*.hpp | ForEach-Object { & $cf.Path -i $_.FullName }; Write-Host '[fmt.format] clang-format done'\""
+    },
+    {
+      "id": "windows.lint.cpp",
+      "desc": "Static analysis (cppcheck) if installed. args: <path>",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $p='{args}'; if([string]::IsNullOrWhiteSpace($p)){ throw 'usage: <path>' }; $cc=Get-Command cppcheck -ErrorAction SilentlyContinue; if(!$cc){ throw 'cppcheck not installed' }; & $cc.Path --enable=warning,style,performance --inline-suppr $p; exit 0\""
+    },
+    {
+      "id": "windows.dbg.gdb",
+      "desc": "Run gdb on a binary (if installed). args: <binary> [args...]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $raw='{args}'; $parts=$raw -split '\\s+'; $bin=$parts[0]; if([string]::IsNullOrWhiteSpace($bin)){ throw 'usage: <binary> [args...]' }; $rest=$parts[1..($parts.Length-1)]; $g=Get-Command gdb -ErrorAction SilentlyContinue; if(!$g){ throw 'gdb not installed' }; & $g.Path --args $bin @rest\""
+    },
+    {
+      "id": "windows.dbg.valgrind",
+      "desc": "Run valgrind on a binary (usually WSL). args: <binary> [args...]",
+      "cmd": "powershell -NoProfile -Command \"$ErrorActionPreference='Stop'; $raw='{args}'; $parts=$raw -split '\\s+'; $bin=$parts[0]; if([string]::IsNullOrWhiteSpace($bin)){ throw 'usage: <binary> [args...]' }; $rest=$parts[1..($parts.Length-1)]; $v=Get-Command valgrind -ErrorAction SilentlyContinue; if(!$v){ throw 'valgrind not installed (Windows host typically needs WSL)' }; & $v.Path --leak-check=full $bin @rest\""
+    }
+  ]
+}

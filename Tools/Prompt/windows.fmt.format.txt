@@ -1,0 +1,170 @@
+C:\dev\rah\RahOllamaOnly\Tools\Prompt\windows.fmt.format.txt
+TOOL ID:
+windows.fmt.format
+CATEGORY:
+build
+PURPOSE:
+Run a formatting pass using clang-format (must be installed). Recursively finds files under a path and formats matching extensions in place.
+WHEN TO USE:
+- You need to apply clang-format across a code tree (.c, .h, .cpp, .hpp).
+- You want an automated formatting sweep before committing or reviewing diffs.
+- You know clang-format is installed and available on PATH.
+WHEN NOT TO USE:
+- clang-format is not installed (tool throws).
+- You need a different formatter (this tool is clang-format only).
+- You need to preview changes without modifying files (this tool edits files in place with -i).
+INPUT PARAMETERS:
+- args: <path>
+  - Entire raw args assigned:
+    $p = '{args}'
+  - If args is null/empty/whitespace: throws 'usage: <path>'
+  - args is used as a path string; it is passed to Get-ChildItem -Path $p.
+EXECUTION ENVIRONMENT:
+- Windows host.
+- Runs:
+  powershell -NoProfile -Command "<script>"
+- ErrorActionPreference 'Stop'.
+- Checks:
+  $cf = Get-Command clang-format -ErrorAction SilentlyContinue
+  if(!$cf){ throw 'clang-format not installed' }
+- File enumeration and formatting:
+  Get-ChildItem -Recurse -Force -File -Path $p -Include *.c,*.h,*.cpp,*.hpp |
+    ForEach-Object { & $cf.Path -i $_.FullName }
+- Prints:
+  Write-Host '[fmt.format] clang-format done'
+OUTPUT:
+- Typically no output per-file unless clang-format emits messages, plus the final "[fmt.format] clang-format done".
+SIDE EFFECTS:
+- Modifies source files in place (clang-format -i).
+- May change whitespace, formatting, and line breaks across the matched file set.
+SAFETY RULES:
+- This tool is destructive in the sense that it edits files; use with version control or backups.
+- Do not claim it respects a specific .clang-format config unless one exists in the repo and clang-format uses it (tool itself does not specify a style).
+- Do not claim it formats other file types; only *.c, *.h, *.cpp, *.hpp.
+COMMON FAILURE MODES:
+- clang-format missing -> throws.
+- Path invalid -> Get-ChildItem errors.
+- Access denied on files -> formatting may fail and stop execution due to ErrorActionPreference Stop.
+- Large trees -> long runtime.
+EXAMPLES:
+- Format current directory tree:
+  [[TOOL:RUN]]
+  id=windows.fmt.format
+  args=.
+  [[/TOOL]]
+
+- Format a specific folder:
+  [[TOOL:RUN]]
+  id=windows.fmt.format
+  args=.\src
+  [[/TOOL]]
+
+- Format a repo path:
+  [[TOOL:RUN]]
+  id=windows.fmt.format
+  args=C:\dev\rah\RahOllamaOnly
+  [[/TOOL]]
+
+ANTI-HALLUCINATION NOTES:
+- Tool always requires clang-format; it does not install it.
+- Tool always uses -i (in-place). No dry-run mode.
+- File matching uses -Include with the listed extensions only.
+- If you didn’t run the tool, do not claim files are formatted; verify via git diff (windows.git.diff).
+
+DETAILED WINDOWS EXECUTION NOTES:
+- This prompt is bound to the windows.tools.json manifest entry and must not be regenerated.
+- Always prefer the existing file over creating a new one; only write a new prompt if the manifest is missing it.
+- Keep the tool id exact and prefixed with 'windows.' to avoid collisions with linux prompts.
+- Run commands from a Windows host with PowerShell available; the manifest templates already include -NoProfile.
+- Expect commands to run without interactivity; do not add prompts or confirmations beyond what the tool already emits.
+- Respect the working directory assumptions in the manifest command and avoid altering paths unless the user requested it.
+- Avoid adding new parameters; pass the raw args string exactly into the manifest template.
+- Preserve UTF-8 text handling and keep outputs readable for log capture and trace review.
+
+WHEN TO USE (DETAILED):
+- Call this tool when the manifest describes the exact action needed; do not substitute other tools with similar names.
+- Prefer the Windows variant over any linux.* or unprefixed variant when the manifest id starts with windows.
+- Use this file as the authoritative behavior description before attempting to modify any commands.
+- Reuse the existing prompt structure to keep behavior stable across runs and deployments.
+
+WHEN NOT TO USE (DETAILED):
+- Do not invoke if the requested outcome mismatches the manifest command semantics.
+- Avoid using this tool to guess system state; rely on the command output only.
+- Do not call if credentials, secrets, or sensitive tokens would be echoed back in clear text.
+- Skip this tool if the user asked for a Linux/WSL-only action; choose the linux prompt instead when appropriate.
+
+INPUT HANDLING DETAILS:
+- Provide arguments exactly as they should be placed into {args} with minimal quoting changes.
+- Trim trailing spaces and avoid smart quotes or unusual whitespace that PowerShell may misinterpret.
+- Validate optional numeric parameters before using them; default values in the manifest should remain intact.
+- If the tool ignores args, state that clearly and do not invent new switches.
+- Ensure paths use Windows separators or are PowerShell-friendly (e.g., ./relative/path).
+- Do not insert environment variables or aliases that are not already part of the manifest template.
+
+OUTPUT EXPECTATIONS:
+- Expect plain text output suitable for logs and downstream parsing.
+- Capture both stdout and stderr when summarizing results; note if stderr is expected to be empty.
+- Preserve table formatting and line ordering; do not truncate unless the manifest already limits rows.
+- If the command emits warnings by design, mention them but do not treat them as failures unless exit code is non-zero.
+- Avoid reformatting the output in the prompt; let the command speak for itself.
+
+SIDE EFFECTS AND STATE:
+- Most tools are read-only; confirm before suggesting that files or directories will change.
+- If the tool touches the filesystem (creates temp files or directories), state that it cleans up after itself.
+- Do not claim that the tool installs packages or modifies config unless the manifest command actually does.
+- Note whether network access is required and whether proxies/firewalls could affect results.
+
+SAFETY AND COMPLIANCE CHECKLIST:
+1) Confirm the tool id exactly matches the manifest (no silent renames).
+2) Verify the filename is <toolId>.txt and lives under Tools/Prompt/.
+3) Ensure the TOOL ID line inside the file matches the filename and manifest id.
+4) Do not drop the windows. prefix; it is required for Windows tool separation.
+5) Scan existing prompt files before generating new content to avoid duplicates.
+6) Keep instructions platform-accurate (Windows commands stay Windows).
+7) Avoid adding sudo/bash guidance here; stay within PowerShell semantics.
+8) Mention prerequisites such as winget, git, dotnet, or compilers if the manifest depends on them.
+9) Encourage dry runs or read-only checks before destructive actions if applicable.
+10) Remind the operator to review path arguments to avoid deleting unintended directories.
+
+FAILURE MODES AND TRIAGE NOTES:
+- Non-zero exit codes should be surfaced plainly; do not claim success on partial output.
+- Missing command dependencies (git/winget/dotnet/cmake) should be reported as blocking issues.
+- Network-dependent commands may fail with timeouts or TLS errors; report them without rewriting history.
+- Permission denied errors may require elevation; do not assume elevation is available.
+- If the tool relies on a temp file, mention where it is created and that it is deleted afterward.
+- If the command uses relative paths, ensure the caller understands they are relative to the working directory.
+
+EXAMPLE CALLS (ADAPT AS NEEDED):
+- Example 1: Invoke windows.fmt.format with minimal args to exercise the manifest template end-to-end.
+- Example 2: Capture verbose output by adding logging flags only if the manifest allows optional args.
+- Example 3: Pair windows.fmt.format with a follow-up inspection tool (e.g., windows.git.status) instead of modifying the template.
+- Example 4: Demonstrate failure handling by noting what happens when required args are missing or malformed.
+
+ANTI-HALLUCINATION GUARDRAILS:
+- Do not fabricate new commands, flags, or behavior; stick strictly to the manifest cmd string.
+- Do not invent files, directories, or outputs that are not produced by the tool.
+- Do not promise success for actions that depend on external services or privileges.
+- Be explicit when the tool ignores args or when args are optional.
+- Call out any ambiguity and request clarification rather than guessing the desired command.
+- Keep the description focused on how to run windows.fmt.format safely rather than solving unrelated tasks.
+
+AUDIT TRAIL REMINDERS:
+- Note that each prompt should remain between 100 and 300 lines after expansion for consistency.
+- Retain clear section headers so future maintainers can verify coverage quickly.
+- Keep examples and safety notes updated if the manifest command changes in the future.
+- Document whether the tool is read-only or mutates state so reviewers can gauge blast radius.
+- Encourage attaching actual command output in logs when validating fixes.
+
+POST-RUN FOLLOW-UPS:
+- Summarize key results briefly while linking back to the command output lines.
+- Suggest next-step tools (e.g., windows.git.diff after windows.git.status) without altering this tool's command.
+- If the run failed, propose concrete remediation steps such as installing prerequisites or re-running with adjusted args.
+- Remind that reruns should continue using the same manifest-defined id and filename.
+
+PERSISTENCE OF RULES:
+- The no-regeneration rule is permanent: reuse these files unless a manifest tool is truly missing.
+- Never drop or shorten the windows.* prefix; it distinguishes Windows tools from Linux ones.
+- Keep TOOL ID, CATEGORY, and PURPOSE sections unchanged except for correctness fixes.
+- Any expansions must preserve the underlying command template semantics exactly.
+- Do not let LLM auto-completion invent different ids or filenames while editing these prompts.
+- When in doubt, read the manifest first, then the existing prompt, and only then make edits.

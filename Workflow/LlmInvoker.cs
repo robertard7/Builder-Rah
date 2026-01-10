@@ -1,3 +1,4 @@
+// Workflow/LlmInvoker.cs
 #nullable enable
 using System;
 using System.Collections.Generic;
@@ -30,6 +31,7 @@ public static class LlmInvoker
         role = (role ?? "").Trim();
         if (role.Length == 0) throw new InvalidOperationException("Role is required.");
 
+        // Try exact role first, then case-insensitive match.
         var rc = cfg.Orchestrator?.Roles?
             .FirstOrDefault(r => string.Equals(r.Role ?? "", role, StringComparison.OrdinalIgnoreCase));
 
@@ -57,6 +59,7 @@ public static class LlmInvoker
         }
         catch
         {
+            // audit is best-effort
         }
 
         if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
@@ -72,74 +75,71 @@ public static class LlmInvoker
         throw new InvalidOperationException($"[digest:error] Unsupported provider '{provider}' for role '{role}'.");
     }
 
-	private static async Task<string> InvokeOllamaAsync(
-		AppConfig cfg,
-		string model,
-		string systemPrompt,
-		string userText,
-		CancellationToken ct)
-	{
-		if (cfg.Providers?.Ollama?.Enabled != true)
-			throw new InvalidOperationException("[digest:error] Ollama provider is disabled.");
+    private static async Task<string> InvokeOllamaAsync(
+        AppConfig cfg,
+        string model,
+        string systemPrompt,
+        string userText,
+        CancellationToken ct)
+    {
+        if (cfg.Providers?.Ollama?.Enabled != true)
+            throw new InvalidOperationException("[digest:error] Ollama provider is disabled.");
 
-		var baseUrl = (cfg.Providers.Ollama.BaseUrl ?? "").Trim().TrimEnd('/');
-		if (baseUrl.Length == 0)
-			throw new InvalidOperationException("[digest:error] Ollama BaseUrl is empty (Providers.Ollama.BaseUrl).");
+        var baseUrl = (cfg.Providers.Ollama.BaseUrl ?? "").Trim().TrimEnd('/');
+        if (baseUrl.Length == 0)
+            throw new InvalidOperationException("[digest:error] Ollama BaseUrl is empty (Providers.Ollama.BaseUrl).");
 
-		// Use /api/generate for deterministic single-shot structured output.
-		var url = baseUrl + "/api/generate";
+        var url = baseUrl + "/api/generate";
 
-		var combinedPrompt =
-			(systemPrompt ?? "").Trim() +
-			"\n\nUSER REQUEST:\n" +
-			(userText ?? "").Trim() +
-			"\n\nReturn EXACTLY one JSON object and nothing else.";
+        var combinedPrompt =
+            (systemPrompt ?? "").Trim() +
+            "\n\nUSER REQUEST:\n" +
+            (userText ?? "").Trim() +
+            "\n\nReturn EXACTLY one JSON object and nothing else.";
 
-		var payload = new
-		{
-			model,
-			prompt = combinedPrompt,
-			stream = false,
-			format = "json",
-			options = new
-			{
-				temperature = 0.0
-			}
-		};
+        var payload = new
+        {
+            model,
+            prompt = combinedPrompt,
+            stream = false,
+            format = "json",
+            options = new
+            {
+                temperature = 0.0
+            }
+        };
 
-		var reqJson = JsonSerializer.Serialize(payload);
+        using var req = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+        };
 
-		using var req = new HttpRequestMessage(HttpMethod.Post, url)
-		{
-			Content = new StringContent(reqJson, Encoding.UTF8, "application/json")
-		};
+        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+        var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
-		using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
-		var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode)
+            throw new InvalidOperationException($"[digest:error] Ollama /api/generate HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
 
-		if (!resp.IsSuccessStatusCode)
-			throw new InvalidOperationException($"[digest:error] Ollama /api/generate HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("response", out var r) && r.ValueKind == JsonValueKind.String)
+                return r.GetString() ?? "";
+        }
+        catch
+        {
+            // fall through
+        }
 
-		// Ollama generate response: { response: "....", done: true, ... }
-		try
-		{
-			using var doc = JsonDocument.Parse(body);
-			if (doc.RootElement.TryGetProperty("response", out var r) &&
-				r.ValueKind == JsonValueKind.String)
-			{
-				return r.GetString() ?? "";
-			}
-		}
-		catch
-		{
-			// fallthrough
-		}
+        return body;
+    }
 
-		// If shape changes, return raw body so trace shows it.
-		return body;
-	}
-
-    private static async Task<string> InvokeOpenAiAsync(AppConfig cfg, string model, string systemPrompt, string userText, CancellationToken ct)
+    private static async Task<string> InvokeOpenAiAsync(
+        AppConfig cfg,
+        string model,
+        string systemPrompt,
+        string userText,
+        CancellationToken ct)
     {
         if (cfg.Providers?.OpenAI?.Enabled != true)
             throw new InvalidOperationException("[digest:error] OpenAI provider is disabled.");
@@ -165,11 +165,9 @@ public static class LlmInvoker
             }
         };
 
-        var reqJson = JsonSerializer.Serialize(payload);
-
         using var req = new HttpRequestMessage(HttpMethod.Post, url)
         {
-            Content = new StringContent(reqJson, Encoding.UTF8, "application/json")
+            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
         };
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
@@ -191,8 +189,7 @@ public static class LlmInvoker
             if (choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
             {
                 var msg = choices[0].GetProperty("message");
-                var content = msg.GetProperty("content").GetString();
-                return content ?? "";
+                return msg.GetProperty("content").GetString() ?? "";
             }
         }
         catch { }
@@ -200,7 +197,12 @@ public static class LlmInvoker
         return body;
     }
 
-    private static async Task<string> InvokeHuggingFaceAsync(AppConfig cfg, string model, string systemPrompt, string userText, CancellationToken ct)
+    private static async Task<string> InvokeHuggingFaceAsync(
+        AppConfig cfg,
+        string model,
+        string systemPrompt,
+        string userText,
+        CancellationToken ct)
     {
         if (cfg.Providers?.HuggingFace?.Enabled != true)
             throw new InvalidOperationException("[digest:error] HuggingFace provider is disabled.");
@@ -223,11 +225,9 @@ public static class LlmInvoker
             parameters = new { return_full_text = false }
         };
 
-        var reqJson = JsonSerializer.Serialize(payload);
-
         using var req = new HttpRequestMessage(HttpMethod.Post, url)
         {
-            Content = new StringContent(reqJson, Encoding.UTF8, "application/json")
+            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
         };
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
