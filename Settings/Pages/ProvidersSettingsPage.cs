@@ -2,33 +2,78 @@
 using System;
 using System.Windows.Forms;
 using RahBuilder.Settings;
+using RahOllamaOnly.Tracing;
 
 namespace RahBuilder.Settings.Pages;
 
 public sealed class ProvidersSettingsPage : UserControl
 {
     private readonly AppConfig _config;
+    private readonly RunTrace? _trace;
+    private readonly CheckBox _providerEnabled;
 
-    public ProvidersSettingsPage(AppConfig config)
+    public ProvidersSettingsPage(AppConfig config, RunTrace? trace = null)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        _trace = trace;
 
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 3,
+            RowCount = 4,
             AutoScroll = true
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        root.Controls.Add(BuildOpenAI(), 0, 0);
-        root.Controls.Add(BuildHuggingFace(), 0, 1);
-        root.Controls.Add(BuildOllama(), 0, 2);
+        _providerEnabled = new CheckBox
+        {
+            Text = "Provider Enabled",
+            Checked = _config.General.ProviderEnabled,
+            AutoSize = true
+        };
+        _providerEnabled.CheckedChanged += (_, _) =>
+        {
+            _config.General.ProviderEnabled = _providerEnabled.Checked;
+            AutoSave.Touch();
+            var status = _providerEnabled.Checked ? "enabled" : "disabled";
+            var stamp = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            _trace?.Emit($"[provider] Provider {status} at {stamp}");
+        };
+
+        var providerBox = new GroupBox { Text = "Provider", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(10) };
+        var providerPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false
+        };
+        var desc = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(760, 0),
+            Text = "When off, all language model calls are suppressed; workflow will request you re-enable this before running."
+        };
+        providerPanel.Controls.Add(_providerEnabled);
+        providerPanel.Controls.Add(desc);
+        providerBox.Controls.Add(providerPanel);
+
+        root.Controls.Add(providerBox, 0, 0);
+        root.Controls.Add(BuildOpenAI(), 0, 1);
+        root.Controls.Add(BuildHuggingFace(), 0, 2);
+        root.Controls.Add(BuildOllama(), 0, 3);
 
         Controls.Add(root);
+    }
+
+    public void FocusProviderToggle()
+    {
+        if (_providerEnabled.CanFocus)
+            _providerEnabled.Focus();
     }
 
     private Control BuildOpenAI()

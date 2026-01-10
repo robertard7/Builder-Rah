@@ -17,6 +17,8 @@ public sealed class ChatComposerControl : UserControl
     private readonly Button _send;
     private readonly FlowLayoutPanel _chips;
     private readonly Label _status;
+    private readonly Label _providerHint;
+    private readonly Button _retryProvider;
 
     private AttachmentInbox _inbox;
     private readonly List<AttachmentInbox.AttachmentEntry> _attachments = new();
@@ -26,6 +28,7 @@ public sealed class ChatComposerControl : UserControl
 
     public event Action<string>? SendRequested;
     public event Action<IReadOnlyList<AttachmentInbox.AttachmentEntry>>? AttachmentsChanged;
+    public event Action? RetryProviderRequested;
 
     public ChatComposerControl(AttachmentInbox inbox)
     {
@@ -98,7 +101,25 @@ public sealed class ChatComposerControl : UserControl
         };
 
         _status = new Label { AutoSize = true, ForeColor = Color.DimGray };
+        _providerHint = new Label
+        {
+            AutoSize = true,
+            ForeColor = Color.DarkGoldenrod,
+            Text = "Currently offline or provider unreachable. Try again later.",
+            Visible = false
+        };
+        _retryProvider = new Button
+        {
+            Text = "Retry Provider",
+            AutoSize = true,
+            Padding = new Padding(8, 2, 8, 2),
+            Visible = false
+        };
+        _retryProvider.Click += (_, _) => RetryProviderRequested?.Invoke();
+
         statusPanel.Controls.Add(_status);
+        statusPanel.Controls.Add(_providerHint);
+        statusPanel.Controls.Add(_retryProvider);
 
         var composerRow = new TableLayoutPanel
         {
@@ -182,6 +203,12 @@ public sealed class ChatComposerControl : UserControl
     {
         _input.Text = "";
         ReflowHeight();
+    }
+
+    public void SetProviderOffline(bool isOffline)
+    {
+        _providerHint.Visible = isOffline;
+        _retryProvider.Visible = isOffline;
     }
 
     private void FireSend()

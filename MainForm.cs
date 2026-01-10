@@ -34,6 +34,11 @@ public sealed class MainForm : Form
     private readonly ToolStripStatusLabel _repoStatus;
     private readonly ToolStripStatusLabel _attachmentsStatus;
     private readonly ToolStripStatusLabel _workflowStatus;
+    private readonly LinkLabel _providerBadge;
+    private readonly ToolTip _providerToolTip;
+    private readonly TabPage _settingsTab;
+    private readonly SettingsHostControl _settingsControl;
+    private bool _lastProviderEnabled;
     private readonly List<OutputCard> _cards = new();
     private readonly Button _downloadButton;
     private readonly ListBox _cardList;
@@ -62,6 +67,7 @@ public sealed class MainForm : Form
         _workflow.OutputCardProduced += OnOutputCardProduced;
         _workflow.TraceAttentionRequested += ShowTracePane;
         _workflow.PlanReady += OnPlanReady;
+        _workflow.ProviderReachabilityChanged += OnProviderReachabilityChanged;
 
         _mainTabs = new TabControl { Dock = DockStyle.Fill };
 
@@ -81,11 +87,39 @@ public sealed class MainForm : Form
         _composer = new ChatComposerControl(_inbox);
         _composer.SendRequested += text => _ = SendNowAsync(text);
         _composer.AttachmentsChanged += att => _workflow.SetAttachments(att);
+        _composer.RetryProviderRequested += () =>
+        {
+            _workflow.RetryProvider();
+            UpdateProviderBadge();
+        };
         _workflow.SetAttachments(_inbox.List());
+        _providerToolTip = new ToolTip();
+        _providerBadge = new LinkLabel
+        {
+            AutoSize = true,
+            LinkBehavior = LinkBehavior.NeverUnderline,
+            Text = "Provider: -",
+            Margin = new Padding(0, 0, 0, 6)
+        };
+        _providerBadge.LinkClicked += (_, _) => OpenProvidersSettings();
+        _providerToolTip.SetToolTip(_providerBadge, "Provider enabled/disabled; click to open settings");
+
+        var providerHeader = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Padding = new Padding(6, 6, 6, 0)
+        };
+        providerHeader.Controls.Add(_providerBadge);
+
         var chatPanel = new Panel { Dock = DockStyle.Fill };
         chatPanel.Controls.Add(_chatView);
         chatPanel.Controls.Add(_composer);
+        chatPanel.Controls.Add(providerHeader);
         _composer.BringToFront();
+        providerHeader.BringToFront();
         _chatView.SendToBack();
 
         // Diagnostics: trace + output cards
@@ -188,13 +222,9 @@ public sealed class MainForm : Form
         _mainTabs.TabPages.Add(_diagnosticsTab);
 
         // Settings tab
-        _mainTabs.TabPages.Add(new TabPage("Settings")
-        {
-            Controls =
-            {
-                new SettingsHostControl(_config, AfterSettingsSaved, _trace) { Dock = DockStyle.Fill }
-            }
-        });
+        _settingsControl = new SettingsHostControl(_config, AfterSettingsSaved, _trace) { Dock = DockStyle.Fill };
+        _settingsTab = new TabPage("Settings") { Controls = { _settingsControl } };
+        _mainTabs.TabPages.Add(_settingsTab);
 
         Controls.Add(_mainTabs);
 
@@ -207,6 +237,8 @@ public sealed class MainForm : Form
         Controls.Add(_statusStrip);
 
         PublishConfigToRuntime();
+        _lastProviderEnabled = _config.General.ProviderEnabled;
+        UpdateProviderBadge();
 
         if (_config.General.EnableGlobalClipboardShortcuts)
             ClipboardPolicy.Apply(this);
@@ -219,6 +251,7 @@ public sealed class MainForm : Form
             _workflow.OutputCardProduced -= OnOutputCardProduced;
             _workflow.TraceAttentionRequested -= ShowTracePane;
             _workflow.PlanReady -= OnPlanReady;
+            _workflow.ProviderReachabilityChanged -= OnProviderReachabilityChanged;
         };
 
         UpdateStatus(null);
@@ -248,6 +281,14 @@ public sealed class MainForm : Form
         _composer.SetInbox(_inbox);
         _composer.ReloadAttachments(_inbox.List());
         _workflow.SetAttachments(_inbox.List());
+
+        if (_lastProviderEnabled != _config.General.ProviderEnabled && _config.General.ProviderEnabled)
+        {
+            _workflow.ResetProviderState();
+            _workflow.MarkProviderReachable(true, $"[provider] Provider enabled at {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss}");
+        }
+        _lastProviderEnabled = _config.General.ProviderEnabled;
+        UpdateProviderBadge();
 
         if (_config.General.EnableGlobalClipboardShortcuts)
             ClipboardPolicy.Apply(this);
@@ -296,6 +337,43 @@ public sealed class MainForm : Form
         _repoStatus.Text = $"Repo: {snapshot.Repo}";
         _attachmentsStatus.Text = $"Attachments: {snapshot.AttachmentsActive}/{snapshot.AttachmentsTotal}";
         _workflowStatus.Text = $"Workflow: {snapshot.Workflow}";
+    }
+
+    private void OpenProvidersSettings()
+    {
+        _mainTabs.SelectedTab = _settingsTab;
+        _settingsControl.FocusProvidersTab();
+    }
+
+    private void UpdateProviderBadge()
+    {
+        var enabled = _config.General.ProviderEnabled;
+        var reachable = _workflow.ProviderReachable;
+        if (!enabled)
+        {
+            _providerBadge.Text = "⚠️ Provider: OFF";
+            _providerBadge.LinkColor = Color.Firebrick;
+            _composer.SetProviderOffline(false);
+            return;
+        }
+
+        if (!reachable)
+        {
+            _providerBadge.Text = "⚠️ Provider: OFFLINE";
+            _providerBadge.LinkColor = Color.DarkGoldenrod;
+            _composer.SetProviderOffline(true);
+            return;
+        }
+
+        _providerBadge.Text = "🧠 Provider: ON";
+        _providerBadge.LinkColor = Color.SeaGreen;
+        _composer.SetProviderOffline(false);
+    }
+
+    private void OnProviderReachabilityChanged(bool reachable)
+    {
+        if (!IsHandleCreated) return;
+        BeginInvoke(new Action(UpdateProviderBadge));
     }
 
     private void OnOutputCardProduced(OutputCard card)

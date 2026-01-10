@@ -107,6 +107,10 @@ public sealed class ProgramArtifactGenerator
             }
             catch (Exception ex)
             {
+                if (ex is ProviderUnavailableException)
+                    return ProgramArtifactResult.Failure("provider_unreachable");
+                if (ex is ProviderDisabledException)
+                    return ProgramArtifactResult.Failure("provider_disabled");
                 return ProgramArtifactResult.Failure("program_invoke_failed: " + ex.Message);
             }
 

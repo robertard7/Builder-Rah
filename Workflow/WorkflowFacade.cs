@@ -31,6 +31,7 @@ public sealed class WorkflowFacade
     private IReadOnlyList<string> _toolingValidationErrors = Array.Empty<string>();
     private IReadOnlyList<string> _toolingWarnings = Array.Empty<string>();
     private bool _toolingValid = true;
+    private bool _providerReachable = true;
 
     private string _lastGraphHash = "";
     private bool _recentlyCompleted;
@@ -71,6 +72,9 @@ public sealed class WorkflowFacade
     public event Action? TraceAttentionRequested;
     public event Action<OutputCard>? OutputCardProduced;
     public event Action<PlanDefinition>? PlanReady;
+    public event Action<bool>? ProviderReachabilityChanged;
+
+    public bool ProviderReachable => _providerReachable;
 
     public WorkflowFacade(RunTrace trace)
     {
@@ -269,6 +273,37 @@ public sealed class WorkflowFacade
         _trace.Emit($"[tooling] tools={manifest.ToolsById.Count} toolPrompts(files)={promptFiles}");
     }
 
+    public void ResetProviderState()
+    {
+        _state.ClearPlan();
+        _state.ClearClarifications();
+        _state.PendingQuestion = null;
+        _state.PendingUserRequest = "";
+        _state.LastJobSpecJson = null;
+        _state.LastIntent = null;
+        _state.LastIntentResult = null;
+        _state.IntentState = new IntentState();
+        _state.ChatIntakeCompleted = false;
+        _state.LastRoute = "";
+        _state.LastRouteBeforeWait = "";
+        _state.WaitLoopKey = "";
+        _state.WaitLoopCount = 0;
+    }
+
+    public void MarkProviderReachable(bool reachable, string reason)
+    {
+        if (_providerReachable == reachable) return;
+        _providerReachable = reachable;
+        _trace.Emit(reason);
+        ProviderReachabilityChanged?.Invoke(reachable);
+    }
+
+    public void RetryProvider()
+    {
+        var stamp = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        MarkProviderReachable(true, $"[provider] Provider retry requested at {stamp}");
+    }
+
     public Task RouteUserInput(string text, CancellationToken ct) => RouteUserInput(_cfg, text, ct);
 
     public async Task RouteUserInput(AppConfig cfg, string text, CancellationToken ct)
@@ -279,6 +314,12 @@ public sealed class WorkflowFacade
         if (string.IsNullOrWhiteSpace(text))
         {
             EmitWaitUser("You must start with user chat input.");
+            return;
+        }
+
+        if (!_cfg.General.ProviderEnabled)
+        {
+            EmitProviderDisabled();
             return;
         }
 
@@ -824,6 +865,17 @@ public sealed class WorkflowFacade
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+            {
+                HandleProviderUnavailable(ex);
+                return JobSpec.Invalid("provider_unreachable");
+            }
+            if (ex is ProviderDisabledException)
+            {
+                EmitProviderDisabled();
+                return JobSpec.Invalid("provider_disabled");
+            }
+
             _trace.Emit("[digest:error] Digest invocation failed: " + ex.Message);
             return JobSpec.Invalid("digest_invoke_failed");
         }
@@ -836,6 +888,16 @@ public sealed class WorkflowFacade
             var result = await IntentExtractor.ExtractAsync(_cfg, userText, GetActiveAttachments(), _state.Memory, _state.MemoryStore, ct).ConfigureAwait(false);
             if (!result.Ok || result.Extraction == null)
             {
+                if (result.Error.Contains("provider_unreachable", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleProviderUnavailable(new Exception(result.Error));
+                    return null;
+                }
+                if (result.Error.Contains("provider_disabled", StringComparison.OrdinalIgnoreCase))
+                {
+                    EmitProviderDisabled();
+                    return null;
+                }
                 _trace.Emit("[intent:error] " + result.Error);
                 return null;
             }
@@ -847,6 +909,16 @@ public sealed class WorkflowFacade
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+            {
+                HandleProviderUnavailable(ex);
+                return null;
+            }
+            if (ex is ProviderDisabledException)
+            {
+                EmitProviderDisabled();
+                return null;
+            }
             _trace.Emit("[intent:error] " + ex.Message);
             return null;
         }
@@ -865,6 +937,16 @@ public sealed class WorkflowFacade
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+            {
+                HandleProviderUnavailable(ex);
+                return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", "provider_unreachable", false);
+            }
+            if (ex is ProviderDisabledException)
+            {
+                EmitProviderDisabled();
+                return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", "provider_disabled", false);
+            }
             _trace.Emit("[intent:error] " + ex.Message);
             return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", ex.Message, false);
         }
@@ -909,6 +991,19 @@ public sealed class WorkflowFacade
         }
         if (!string.IsNullOrWhiteSpace(preview))
             _state.MemoryStore.AddClarificationQuestion(preview);
+    }
+
+    private void EmitProviderDisabled()
+    {
+        _trace.Emit("[provider:disabled] Provider disabled; skipping workflow.");
+        UserFacingMessage?.Invoke("Provider disabled — enable in Settings to continue.");
+    }
+
+    private void HandleProviderUnavailable(Exception ex)
+    {
+        var detail = ex?.Message ?? "provider unavailable";
+        MarkProviderReachable(false, "[provider:offline] " + detail);
+        UserFacingMessage?.Invoke("Currently offline or provider unreachable. Try again later.");
     }
 
     private void SyncGraphToHub(AppConfig cfg)
@@ -1613,6 +1708,16 @@ public sealed class WorkflowFacade
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+            {
+                HandleProviderUnavailable(ex);
+                return false;
+            }
+            if (ex is ProviderDisabledException)
+            {
+                EmitProviderDisabled();
+                return false;
+            }
             _trace.Emit("[toolplan:error] invoke failed: " + ex.Message);
             EmitWaitUser("ToolPlan invocation failed. Reply with: edit <rewrite your request>");
             return false;
@@ -1633,6 +1738,16 @@ public sealed class WorkflowFacade
             }
             catch (Exception ex)
             {
+                if (ex is ProviderUnavailableException)
+                {
+                    HandleProviderUnavailable(ex);
+                    return false;
+                }
+                if (ex is ProviderDisabledException)
+                {
+                    EmitProviderDisabled();
+                    return false;
+                }
                 _trace.Emit("[toolplan:error] retry failed: " + ex.Message);
             }
         }
@@ -1657,6 +1772,16 @@ public sealed class WorkflowFacade
             }
             catch (Exception ex)
             {
+                if (ex is ProviderUnavailableException)
+                {
+                    HandleProviderUnavailable(ex);
+                    return false;
+                }
+                if (ex is ProviderDisabledException)
+                {
+                    EmitProviderDisabled();
+                    return false;
+                }
                 _trace.Emit("[toolplan:error] unknown toolId retry failed: " + ex.Message);
             }
         }
@@ -1852,6 +1977,16 @@ public sealed class WorkflowFacade
             var result = await _executor.RunNextAsync(_cfg, _attachments, _toolManifest, _toolPrompts, ct).ConfigureAwait(false);
             if (!result.Ok)
             {
+                if (result.Message.Contains("provider unreachable", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleProviderUnavailable(new Exception(result.Message));
+                    return;
+                }
+                if (result.Message.Contains("provider disabled", StringComparison.OrdinalIgnoreCase))
+                {
+                    EmitProviderDisabled();
+                    return;
+                }
                 var errorCard = new OutputCard
                 {
                     Kind = OutputCardKind.Error,
@@ -1926,6 +2061,16 @@ public sealed class WorkflowFacade
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+            {
+                HandleProviderUnavailable(ex);
+                return;
+            }
+            if (ex is ProviderDisabledException)
+            {
+                EmitProviderDisabled();
+                return;
+            }
             _trace.Emit("[final:error] " + ex.Message);
             EmitWaitUser("Final response failed. Reply with: edit <rewrite your request>");
             return;
@@ -2002,6 +2147,16 @@ public sealed class WorkflowFacade
         var result = await _artifactGenerator.BuildProjectArtifacts(spec, _state.ToolOutputs, _cfg, GetActiveAttachments(), repo.RepoRoot, _state.SessionToken, ct).ConfigureAwait(false);
         if (!result.Ok)
         {
+            if (string.Equals(result.Message, "provider_unreachable", StringComparison.OrdinalIgnoreCase))
+            {
+                HandleProviderUnavailable(new Exception(result.Message));
+                return;
+            }
+            if (string.Equals(result.Message, "provider_disabled", StringComparison.OrdinalIgnoreCase))
+            {
+                EmitProviderDisabled();
+                return;
+            }
             _trace.Emit("[program:error] " + result.Message);
             return;
         }
