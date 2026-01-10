@@ -215,17 +215,22 @@ public sealed class WorkflowFacade
 
     public void RefreshTooling()
     {
-        var toolsPath = (_cfg.General.ToolsPath ?? "").Trim();
-        var promptDir = (_cfg.General.ToolPromptsPath ?? "").Trim();
+        var toolsPath = ToolchainResolver.ResolveToolManifestPath(_cfg);
+        var promptDir = ToolchainResolver.ResolveToolPromptsFolder(_cfg);
 
         ToolManifest manifest;
         try
         {
+            if (string.IsNullOrWhiteSpace(toolsPath) || !File.Exists(toolsPath))
+                throw new FileNotFoundException("Tool manifest not found", toolsPath);
             manifest = ToolManifestLoader.LoadFromFile(toolsPath);
         }
         catch (Exception ex)
         {
             _trace.Emit($"[tooling:error] failed to load tools manifest at '{toolsPath}': {ex.Message}");
+            _toolManifest = new ToolManifest();
+            _toolPrompts = new ToolPromptRegistry();
+            PublishToolchainDiagnostics("tools manifest missing", toolsPath, promptDir);
             return;
         }
 
@@ -244,6 +249,7 @@ public sealed class WorkflowFacade
         _toolManifest = manifest;
         _toolPrompts = prompts;
         _trace.Emit($"[tooling] tools={manifest.ToolsById.Count} toolPrompts(files)={promptFiles}");
+        PublishToolchainDiagnostics("tools loaded", toolsPath, promptDir);
     }
 
     public Task RouteUserInput(string text, CancellationToken ct) => RouteUserInput(_cfg, text, ct);
@@ -975,6 +981,40 @@ public sealed class WorkflowFacade
         }
     }
 
+    private void PublishToolchainDiagnostics(string state, string toolsPath, string promptDir)
+    {
+        try
+        {
+            var missingPrompts = new List<string>();
+            foreach (var id in _toolManifest.ToolsById.Keys)
+            {
+                if (!_toolPrompts.Has(id))
+                    missingPrompts.Add(id);
+            }
+
+            var info = string.IsNullOrWhiteSpace(state) ? "" : state;
+            if (!string.IsNullOrWhiteSpace(toolsPath))
+                info = string.IsNullOrWhiteSpace(info) ? $"manifest={toolsPath}" : $"{info} (manifest={toolsPath})";
+            if (!string.IsNullOrWhiteSpace(promptDir))
+                info = string.IsNullOrWhiteSpace(info) ? $"prompts={promptDir}" : $"{info} (prompts={promptDir})";
+
+            var diag = new ToolingDiagnostics(
+                ToolCount: _toolManifest.ToolsById.Count,
+                PromptCount: _toolPrompts.AllToolIds.Count,
+                ActiveToolCount: Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count),
+                MissingPrompts: missingPrompts,
+                State: string.IsNullOrWhiteSpace(info) ? "tools status unknown" : info,
+                BlueprintTotal: 0,
+                BlueprintSelectable: 0,
+                SelectedBlueprints: Array.Empty<string>(),
+                BlueprintTagBreakdown: new Dictionary<string, int>());
+            ToolingDiagnosticsHub.Publish(diag);
+        }
+        catch
+        {
+        }
+    }
+
     private static string NormalizeAttachmentKind(string kind)
     {
         var k = (kind ?? "").ToLowerInvariant();
@@ -1346,7 +1386,7 @@ public sealed class WorkflowFacade
         if (_toolManifest == null || _toolManifest.ToolsById.Count == 0)
         {
             _trace.Emit("[tooling:error] Tools manifest is empty or failed to load.");
-            EmitWaitUser("Tools manifest not loaded. Set ToolsPath in Settings.", "");
+            EmitWaitUser("Tools manifest not loaded for the selected execution target.", "");
             return false;
         }
 
