@@ -26,6 +26,7 @@ public sealed class WorkflowFacade
     private AppConfig _cfg;
     private IReadOnlyList<AttachmentInbox.AttachmentEntry> _attachments = Array.Empty<AttachmentInbox.AttachmentEntry>();
     private readonly WorkflowState _state = new();
+    private readonly IntentBuilder _intentBuilder = new();
     private ToolManifest _toolManifest = new();
     private ToolPromptRegistry _toolPrompts = new();
 
@@ -86,6 +87,7 @@ public sealed class WorkflowFacade
         SyncGraphToHub(_cfg);
         LogRepoBanner();
         StartApiHostIfEnabled();
+        _state.IntentState = new IntentState { SessionId = _state.SessionToken, Status = IntentStatus.Collecting };
     }
 
     public WorkflowFacade(AppConfig cfg, RunTrace trace)
@@ -105,6 +107,7 @@ public sealed class WorkflowFacade
         SyncGraphToHub(_cfg);
         LogRepoBanner();
         StartApiHostIfEnabled();
+        _state.IntentState = new IntentState { SessionId = _state.SessionToken, Status = IntentStatus.Collecting };
     }
 
     private void OnOutputCardProduced(OutputCard card)
@@ -266,6 +269,25 @@ public sealed class WorkflowFacade
 
         var action = UserReplyInterpreter.Interpret(_cfg, _state, text);
         NotifyStatus("Digesting intent");
+
+        var userMessage = new UserMessage(text, MapAttachments(GetActiveAttachments()), DateTimeOffset.UtcNow);
+        var intentUpdate = _intentBuilder.Apply(userMessage, _state.IntentState);
+        _state.IntentState = intentUpdate.State;
+        BroadcastEvent("intent_update", new
+        {
+            status = _state.IntentState.Status.ToString(),
+            goal = _state.IntentState.CurrentGoal,
+            slots = _state.IntentState.Slots
+        });
+
+        if (intentUpdate.RequiresUserInput && action.Action == ReplyActionType.NewRequest)
+        {
+            _state.PendingQuestion = intentUpdate.NextQuestion;
+            if (!string.IsNullOrWhiteSpace(intentUpdate.NextQuestion))
+                UserFacingMessage?.Invoke(intentUpdate.NextQuestion);
+            NotifyStatus("Waiting clarification");
+            return;
+        }
 
         // If last attempt produced invalid_json, DO NOT spin. Only accept "edit ...".
         if (_forceEditBecauseInvalidJson)
@@ -487,6 +509,10 @@ public sealed class WorkflowFacade
         }
 
         _forceEditBecauseInvalidJson = false;
+
+        if (_state.IntentState.Status != IntentStatus.Ready)
+            _state.IntentState.Status = IntentStatus.Ready;
+        _state.LastIntentResult = new IntentResult(_state.IntentState, spec);
 
         var rawJson = spec.Raw?.RootElement.GetRawText() ?? "";
         _state.LastJobSpecJson = rawJson;
@@ -994,6 +1020,40 @@ public sealed class WorkflowFacade
             .Where(a => a?.Active != false)
             .Select(a => a!)
             .ToList();
+    }
+
+    private static IReadOnlyList<Attachment> MapAttachments(IReadOnlyList<AttachmentInbox.AttachmentEntry> entries)
+    {
+        return (entries ?? Array.Empty<AttachmentInbox.AttachmentEntry>())
+            .Where(e => e != null)
+            .Select(e => new Attachment(
+                e.HostPath ?? "",
+                e.OriginalName ?? e.StoredName ?? "",
+                GuessMimeType(e),
+                e.SizeBytes,
+                null))
+            .ToList();
+    }
+
+    private static string GuessMimeType(AttachmentInbox.AttachmentEntry entry)
+    {
+        var name = entry.OriginalName ?? entry.StoredName ?? "";
+        var ext = Path.GetExtension(name)?.ToLowerInvariant() ?? "";
+        return ext switch
+        {
+            ".png" => "image/png",
+            ".jpg" => "image/jpeg",
+            ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".bmp" => "image/bmp",
+            ".webp" => "image/webp",
+            ".tiff" => "image/tiff",
+            ".txt" => "text/plain",
+            ".md" => "text/markdown",
+            ".json" => "application/json",
+            ".pdf" => "application/pdf",
+            _ => string.IsNullOrWhiteSpace(entry.Kind) ? "application/octet-stream" : $"application/{entry.Kind}"
+        };
     }
 
     private void NotifyStatus(string? phaseOverride = null)
