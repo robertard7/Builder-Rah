@@ -2,31 +2,32 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 
 namespace RahBuilder.Settings;
 
 public static class ConfigStore
 {
-    private const string FileName = "appsettings.local.json";
+    private const string BaseFileName = "appsettings.json";
+    private const string LocalFileName = "appsettings.local.json";
 
     public static AppConfig Load()
     {
-        var path = GetConfigPath();
+        var builder = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile(BaseFileName, optional: true, reloadOnChange: false)
+            .AddJsonFile(LocalFileName, optional: true, reloadOnChange: false)
+            .AddEnvironmentVariables();
+
+        TryAddUserSecrets(builder);
 
         AppConfig cfg;
-        if (File.Exists(path))
+        try
         {
-            try
-            {
-                var json = File.ReadAllText(path);
-                cfg = JsonSerializer.Deserialize<AppConfig>(json, JsonOptions()) ?? new AppConfig();
-            }
-            catch
-            {
-                cfg = new AppConfig();
-            }
+            var configuration = builder.Build();
+            cfg = configuration.Get<AppConfig>() ?? new AppConfig();
         }
-        else
+        catch
         {
             cfg = new AppConfig();
         }
@@ -41,7 +42,7 @@ public static class ConfigStore
 
         Normalize(cfg);
 
-        var path = GetConfigPath();
+        var path = GetLocalConfigPath();
         var json = JsonSerializer.Serialize(cfg, JsonOptions());
         File.WriteAllText(path, json);
     }
@@ -63,10 +64,23 @@ public static class ConfigStore
         // DO NOT reintroduce legacy scalar RolePrompt_* properties.
     }
 
-    private static string GetConfigPath()
+    private static void TryAddUserSecrets(ConfigurationBuilder builder)
+    {
+#if DEBUG
+        try
+        {
+            builder.AddUserSecrets<ConfigStore>(optional: true);
+        }
+        catch
+        {
+        }
+#endif
+    }
+
+    private static string GetLocalConfigPath()
     {
         // Keep it simple: config lives beside the executable.
-        return Path.Combine(AppContext.BaseDirectory, FileName);
+        return Path.Combine(AppContext.BaseDirectory, LocalFileName);
     }
 
     private static JsonSerializerOptions JsonOptions() => new()

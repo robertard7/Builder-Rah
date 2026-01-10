@@ -9,6 +9,7 @@ public sealed record ToolingDiagnostics(
     int PromptCount,
     int ActiveToolCount,
     IReadOnlyList<string> MissingPrompts,
+    IReadOnlyList<string> Warnings,
     IReadOnlyList<string> ValidationErrors,
     string State,
     int BlueprintTotal,
@@ -17,5 +18,5 @@ public sealed record ToolingDiagnostics(
     IReadOnlyDictionary<string, int> BlueprintTagBreakdown)
 {
     public static ToolingDiagnostics Empty { get; } =
-        new ToolingDiagnostics(0, 0, 0, Array.Empty<string>(), Array.Empty<string>(), "tools inactive", 0, 0, Array.Empty<string>(), new Dictionary<string, int>());
+        new ToolingDiagnostics(0, 0, 0, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "tools inactive", 0, 0, Array.Empty<string>(), new Dictionary<string, int>());
 }

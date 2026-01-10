@@ -56,6 +56,23 @@ public static class RepoScope
         return new GitInfo(true, okMsg);
     }
 
+    public static string? GetTrackedLocalSettingsWarning(Result scope)
+    {
+#if DEBUG
+        if (!scope.Ok)
+            return null;
+
+        var gitDir = Path.Combine(scope.RepoRoot, ".git");
+        if (!Directory.Exists(gitDir))
+            return null;
+
+        var output = RunGitCommand("ls-files appsettings.local.json", scope.RepoRoot);
+        if (!string.IsNullOrWhiteSpace(output))
+            return "[config:warn] appsettings.local.json is tracked by git. Remove it and use appsettings.example.json.";
+#endif
+        return null;
+    }
+
     private static string PickRoot(AppConfig cfg)
     {
         var root = (cfg.General?.RepoRoot ?? "").Trim();
@@ -96,6 +113,32 @@ public static class RepoScope
             var output = p.StandardOutput.ReadToEnd().Trim();
             p.WaitForExit(2000);
             if (p.ExitCode != 0) return "";
+            return output;
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private static string RunGitCommand(string args, string workingDirectory)
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo("git", args)
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            if (!string.IsNullOrWhiteSpace(workingDirectory) && Directory.Exists(workingDirectory))
+                startInfo.WorkingDirectory = workingDirectory;
+
+            using var p = Process.Start(startInfo);
+            if (p == null) return "";
+            var output = p.StandardOutput.ReadToEnd().Trim();
+            p.WaitForExit(2000);
             return output;
         }
         catch

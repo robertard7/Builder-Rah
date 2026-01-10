@@ -11,7 +11,8 @@ public static class ToolingValidator
     public static ToolingDiagnostics Validate(
         ToolManifest? manifest,
         ToolPromptRegistry? prompts,
-        IReadOnlyList<string>? validationErrors = null)
+        IReadOnlyList<string>? validationErrors = null,
+        IReadOnlyList<string>? warnings = null)
     {
         manifest ??= new ToolManifest(new Dictionary<string, ToolDefinition>(StringComparer.OrdinalIgnoreCase));
         prompts ??= new ToolPromptRegistry();
@@ -19,6 +20,8 @@ public static class ToolingValidator
         var toolIds = manifest.ToolsById.Keys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
         var missing = new List<string>();
         var errors = validationErrors?.Where(e => !string.IsNullOrWhiteSpace(e)).ToList() ?? new List<string>();
+        var warningList = warnings?.Where(w => !string.IsNullOrWhiteSpace(w)).ToList() ?? new List<string>();
+        var blockingErrors = errors.Where(e => !IsWarning(e)).ToList();
 
         foreach (var id in toolIds)
         {
@@ -31,10 +34,10 @@ public static class ToolingValidator
             ? (missing.Count == 0 ? "tools active" : "tools gated (missing prompts)")
             : "tools inactive";
 
-        if (errors.Count > 0)
+        if (blockingErrors.Count > 0)
         {
             active = 0;
-            state = $"tools invalid ({errors.Count} manifest errors)";
+            state = $"tools invalid ({blockingErrors.Count} manifest errors)";
         }
 
         return new ToolingDiagnostics(
@@ -42,6 +45,7 @@ public static class ToolingValidator
             PromptCount: prompts.AllToolIds.Count,
             ActiveToolCount: active < 0 ? 0 : active,
             MissingPrompts: missing,
+            Warnings: warningList,
             ValidationErrors: errors,
             State: state,
             BlueprintTotal: 0,
@@ -49,5 +53,10 @@ public static class ToolingValidator
             SelectedBlueprints: Array.Empty<string>(),
             BlueprintTagBreakdown: new Dictionary<string, int>()
         );
+    }
+
+    private static bool IsWarning(string message)
+    {
+        return message.StartsWith("[config:warn]", StringComparison.OrdinalIgnoreCase);
     }
 }

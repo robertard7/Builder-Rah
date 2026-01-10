@@ -29,6 +29,7 @@ public sealed class WorkflowFacade
     private ToolManifest _toolManifest = new();
     private ToolPromptRegistry _toolPrompts = new();
     private IReadOnlyList<string> _toolingValidationErrors = Array.Empty<string>();
+    private IReadOnlyList<string> _toolingWarnings = Array.Empty<string>();
     private bool _toolingValid = true;
 
     private string _lastGraphHash = "";
@@ -257,7 +258,13 @@ public sealed class WorkflowFacade
             _trace.Emit("[tooling:error] tools manifest validation failed: " + summary);
         }
 
-        var diag = ToolingValidator.Validate(_toolManifest, _toolPrompts, _toolingValidationErrors);
+        var repoScope = RepoScope.Resolve(_cfg);
+        var settingsWarning = RepoScope.GetTrackedLocalSettingsWarning(repoScope);
+        _toolingWarnings = string.IsNullOrWhiteSpace(settingsWarning)
+            ? Array.Empty<string>()
+            : new[] { settingsWarning };
+
+        var diag = ToolingValidator.Validate(_toolManifest, _toolPrompts, _toolingValidationErrors, _toolingWarnings);
         ToolingDiagnosticsHub.Publish(diag);
         _trace.Emit($"[tooling] tools={manifest.ToolsById.Count} toolPrompts(files)={promptFiles}");
     }
@@ -969,13 +976,15 @@ public sealed class WorkflowFacade
             }
 
             var validationErrors = _toolingValidationErrors ?? Array.Empty<string>();
+            var warnings = _toolingWarnings ?? Array.Empty<string>();
+            var blockingErrors = validationErrors.Where(e => !IsWarning(e)).ToList();
             var state = _toolManifest.ToolsById.Count == 0
                 ? "tools inactive"
                 : (missingPrompts.Count == 0 ? "tools active" : "tools gated (missing prompts)");
             var activeCount = Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count);
-            if (validationErrors.Count > 0)
+            if (blockingErrors.Count > 0)
             {
-                state = $"tools invalid ({validationErrors.Count} manifest errors)";
+                state = $"tools invalid ({blockingErrors.Count} manifest errors)";
                 activeCount = 0;
             }
 
@@ -984,6 +993,7 @@ public sealed class WorkflowFacade
                 PromptCount: _toolPrompts.AllToolIds.Count,
                 ActiveToolCount: activeCount,
                 MissingPrompts: missingPrompts,
+                Warnings: warnings,
                 ValidationErrors: validationErrors,
                 State: state,
                 BlueprintTotal: selection.AvailableCount,
@@ -1023,6 +1033,8 @@ public sealed class WorkflowFacade
                 PromptCount: _toolPrompts.AllToolIds.Count,
                 ActiveToolCount: Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count),
                 MissingPrompts: missingPrompts,
+                Warnings: _toolingWarnings ?? Array.Empty<string>(),
+                ValidationErrors: Array.Empty<string>(),
                 State: string.IsNullOrWhiteSpace(info) ? "tools status unknown" : info,
                 BlueprintTotal: 0,
                 BlueprintSelectable: 0,
@@ -1045,6 +1057,11 @@ public sealed class WorkflowFacade
             "code" => "code",
             _ => "other"
         };
+    }
+
+    private static bool IsWarning(string message)
+    {
+        return message.StartsWith("[config:warn]", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsTextualAttachment(string kind)

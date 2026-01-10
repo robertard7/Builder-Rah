@@ -40,13 +40,17 @@ public sealed class ToolingDiagnosticsPage : UserControl, ISettingsPageProvider
         var breakdown = diag.BlueprintTagBreakdown != null && diag.BlueprintTagBreakdown.Any()
             ? string.Join(", ", diag.BlueprintTagBreakdown.Select(kv => $"{kv.Key}:{kv.Value}"))
             : "(none)";
+        var warnings = diag.Warnings != null && diag.Warnings.Any()
+            ? string.Join(Environment.NewLine, diag.Warnings.Select(w => "- " + w))
+            : "(none)";
         var validationErrors = diag.ValidationErrors != null && diag.ValidationErrors.Any()
             ? string.Join(Environment.NewLine, diag.ValidationErrors.Select(e => "- " + e))
             : "(none)";
         _status.Text =
             $"Tools: {diag.ActiveToolCount}/{diag.ToolCount} active (prompts={diag.PromptCount}, missing={diag.MissingPrompts.Count}){Environment.NewLine}" +
             $"State: {diag.State}{Environment.NewLine}" +
-            $"Manifest validation errors:{Environment.NewLine}{validationErrors}{Environment.NewLine}" +
+            $"Warnings:{Environment.NewLine}{warnings}{Environment.NewLine}" +
+            $"Validation errors:{Environment.NewLine}{validationErrors}{Environment.NewLine}" +
             $"Blueprints: {diag.BlueprintSelectable}/{diag.BlueprintTotal} selectable{Environment.NewLine}" +
             $"Selected Blueprints: {selected}{Environment.NewLine}" +
             $"Selection breakdown: {breakdown}";
