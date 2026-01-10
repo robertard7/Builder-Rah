@@ -1417,6 +1417,7 @@ public sealed class WorkflowFacade
         var sb = new StringBuilder();
         sb.AppendLine("SCHEMA: tool_plan.v1 (mode,tweakFirst,steps[id,toolId,inputs{storedName},why])");
         sb.AppendLine("ALLOWED_TOOLS: file.read.text, vision.describe.image");
+        sb.AppendLine("MANIFEST_TOOL_IDS: " + JsonSerializer.Serialize(_toolManifest.ToolsById.Keys.OrderBy(id => id)));
         sb.AppendLine("STRICT: JSON only, no markdown, no prose, no invented tools.");
         sb.AppendLine("CHANGE_STRATEGY: " + ComputeChangeStrategy(_state.PendingUserRequest));
         sb.AppendLine();
@@ -1492,6 +1493,38 @@ public sealed class WorkflowFacade
         if (plan == null)
         {
             EmitWaitUser("I couldn't build a tool plan. Could you restate what you want?");
+            return false;
+        }
+
+        var unknownToolIds = ToolPlanValidator.GetUnknownToolIds(plan, _toolManifest);
+        if (unknownToolIds.Count > 0)
+        {
+            _trace.Emit("[toolplan:retry] unknown toolId(s): " + string.Join(", ", unknownToolIds));
+            try
+            {
+                var toolIdsJson = JsonSerializer.Serialize(_toolManifest.ToolsById.Keys.OrderBy(id => id));
+                var repairPrompt = prompt + $"\n\nERROR: unknown toolId(s): {string.Join(", ", unknownToolIds)}. Use only tool IDs from the manifest: {toolIdsJson}. Output ONLY valid tool_plan.v1 JSON.";
+                toolPlanText = await LlmInvoker.InvokeChatAsync(_cfg, "Orchestrator", repairPrompt, sb.ToString(), ct, _state.SelectedBlueprints, "tool_plan_retry_unknown_tool").ConfigureAwait(false);
+                _trace.Emit("[toolplan:raw] " + Trunc(toolPlanText, 1200));
+                plan = ToolPlanParser.TryParse(toolPlanText);
+            }
+            catch (Exception ex)
+            {
+                _trace.Emit("[toolplan:error] unknown toolId retry failed: " + ex.Message);
+            }
+        }
+
+        if (plan == null)
+        {
+            EmitWaitUser("I couldn't build a tool plan. Could you restate what you want?");
+            return false;
+        }
+
+        unknownToolIds = ToolPlanValidator.GetUnknownToolIds(plan, _toolManifest);
+        if (unknownToolIds.Count > 0)
+        {
+            _trace.Emit("[toolplan:error] unknown toolId(s): " + string.Join(", ", unknownToolIds));
+            EmitWaitUser("Tool plan referenced unknown toolId(s). Reply with: edit <rewrite your request>");
             return false;
         }
 

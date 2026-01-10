@@ -57,6 +57,13 @@ public sealed class ExecutionOrchestrator
             return new ToolRunResult(false, "[tool:error] invalid step index");
 
         var step = _state.PendingToolPlan.Steps[_state.PendingStepIndex];
+        if (!manifest.Has(step.ToolId))
+        {
+            var known = string.Join(", ", manifest.ToolsById.Keys.OrderBy(id => id));
+            _trace.Emit($"[tool:error] unknown toolId '{step.ToolId}' at step {_state.PendingStepIndex + 1}. Known tools: {known}");
+            return new ToolRunResult(false, "Unknown toolId in tool plan. Please regenerate the plan.");
+        }
+
         var result = await ToolStepRunner.RunAsync(step, cfg, _trace, attachments, manifest, prompts, ct).ConfigureAwait(false);
         if (!result.Ok)
             return result;
