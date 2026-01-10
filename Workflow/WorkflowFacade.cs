@@ -26,9 +26,10 @@ public sealed class WorkflowFacade
     private AppConfig _cfg;
     private IReadOnlyList<AttachmentInbox.AttachmentEntry> _attachments = Array.Empty<AttachmentInbox.AttachmentEntry>();
     private readonly WorkflowState _state = new();
-    private readonly IntentBuilder _intentBuilder = new();
     private ToolManifest _toolManifest = new();
     private ToolPromptRegistry _toolPrompts = new();
+    private IReadOnlyList<string> _toolingValidationErrors = Array.Empty<string>();
+    private bool _toolingValid = true;
 
     private string _lastGraphHash = "";
     private bool _recentlyCompleted;
@@ -248,8 +249,17 @@ public sealed class WorkflowFacade
 
         _toolManifest = manifest;
         _toolPrompts = prompts;
+        _toolingValidationErrors = ToolManifestValidator.Validate(manifest, _cfg.General.ExecutionTarget);
+        _toolingValid = _toolingValidationErrors.Count == 0;
+        if (!_toolingValid)
+        {
+            var summary = string.Join("; ", _toolingValidationErrors);
+            _trace.Emit("[tooling:error] tools manifest validation failed: " + summary);
+        }
+
+        var diag = ToolingValidator.Validate(_toolManifest, _toolPrompts, _toolingValidationErrors);
+        ToolingDiagnosticsHub.Publish(diag);
         _trace.Emit($"[tooling] tools={manifest.ToolsById.Count} toolPrompts(files)={promptFiles}");
-        PublishToolchainDiagnostics("tools loaded", toolsPath, promptDir);
     }
 
     public Task RouteUserInput(string text, CancellationToken ct) => RouteUserInput(_cfg, text, ct);
@@ -958,14 +968,24 @@ public sealed class WorkflowFacade
                     missingPrompts.Add(id);
             }
 
+            var validationErrors = _toolingValidationErrors ?? Array.Empty<string>();
+            var state = _toolManifest.ToolsById.Count == 0
+                ? "tools inactive"
+                : (missingPrompts.Count == 0 ? "tools active" : "tools gated (missing prompts)");
+            var activeCount = Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count);
+            if (validationErrors.Count > 0)
+            {
+                state = $"tools invalid ({validationErrors.Count} manifest errors)";
+                activeCount = 0;
+            }
+
             var diag = new ToolingDiagnostics(
                 ToolCount: _toolManifest.ToolsById.Count,
                 PromptCount: _toolPrompts.AllToolIds.Count,
-                ActiveToolCount: Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count),
+                ActiveToolCount: activeCount,
                 MissingPrompts: missingPrompts,
-                State: _toolManifest.ToolsById.Count == 0
-                    ? "tools inactive"
-                    : (missingPrompts.Count == 0 ? "tools active" : "tools gated (missing prompts)"),
+                ValidationErrors: validationErrors,
+                State: state,
                 BlueprintTotal: selection.AvailableCount,
                 BlueprintSelectable: selection.SelectableCount,
                 SelectedBlueprints: selection.Selected.Select(s => s.Id).ToList(),
@@ -1383,10 +1403,21 @@ public sealed class WorkflowFacade
 
     private bool EnsureToolPromptsReady()
     {
+        if (_toolingValidationErrors.Count > 0 || !_toolingValid)
+        {
+            var summary = string.Join("; ", _toolingValidationErrors);
+            var msg = string.IsNullOrWhiteSpace(summary)
+                ? "Tools manifest validation failed."
+                : "Tools manifest validation failed: " + summary;
+            _trace.Emit("[tooling:error] " + msg);
+            EmitWaitUser(msg, "Fix tools manifest validation errors and retry.");
+            return false;
+        }
+
         if (_toolManifest == null || _toolManifest.ToolsById.Count == 0)
         {
             _trace.Emit("[tooling:error] Tools manifest is empty or failed to load.");
-            EmitWaitUser("Tools manifest not loaded for the selected execution target.", "");
+            EmitWaitUser("Tools manifest not loaded. Set ToolsPath in Settings.");
             return false;
         }
 
@@ -1734,6 +1765,16 @@ public sealed class WorkflowFacade
         if (_state.PendingToolPlan == null)
         {
             EmitWaitUser("No tool plan to execute.");
+            NotifyStatus();
+            return;
+        }
+        if (_toolingValidationErrors.Count > 0 || !_toolingValid)
+        {
+            var summary = string.Join("; ", _toolingValidationErrors);
+            var msg = string.IsNullOrWhiteSpace(summary)
+                ? "Tools manifest validation failed."
+                : "Tools manifest validation failed: " + summary;
+            EmitWaitUser(msg, "Fix tools manifest validation errors and retry.");
             NotifyStatus();
             return;
         }
