@@ -21,6 +21,8 @@ public sealed class WorkflowState
     public bool AutoApproveAll { get; set; }
     public bool PlanPaused { get; set; }
     public IntentExtraction? LastIntent { get; set; }
+    public IntentState IntentState { get; set; } = new();
+    public IntentResult? LastIntentResult { get; set; }
     public ChatMemory Memory { get; } = new();
     public ConversationMemory MemoryStore { get; } = new();
     public HashSet<string> ConfirmedFields { get; set; } = new(StringComparer.OrdinalIgnoreCase);
