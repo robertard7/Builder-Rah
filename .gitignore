@@ -5,3 +5,7 @@ obj/
 *.cache
 *.log
 .vs/
+
+appsettings.local.json
+*.local.json
+
