@@ -858,7 +858,6 @@ public sealed class WorkflowFacade
             RecordAssistantMessage(chat);
             UserFacingMessage?.Invoke(chat);
         }
-        UserFacingMessage?.Invoke(msg);
         if (!string.IsNullOrWhiteSpace(preview))
             _state.MemoryStore.AddClarificationQuestion(preview);
     }
@@ -1287,7 +1286,7 @@ public sealed class WorkflowFacade
         if (_toolManifest == null || _toolManifest.ToolsById.Count == 0)
         {
             _trace.Emit("[tooling:error] Tools manifest is empty or failed to load.");
-            EmitWaitUser("Tools manifest not loaded. Set ToolsPath in Settings.");
+            EmitWaitUser("Tools manifest not loaded. Set ToolsPath in Settings.", "");
             return false;
         }
 
