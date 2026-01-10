@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 using RahBuilder.Settings;
+using RahBuilder.Workflow;
 using RahOllamaOnly.Tools;
 using RahOllamaOnly.Tools.Prompt;
 
@@ -46,7 +47,7 @@ public sealed class ToolchainSettingsPage : UserControl
             Dock = DockStyle.Fill,
             AutoSize = true,
             Padding = new Padding(6),
-            Text = "Tools load from General.ToolsPath (tools.json). Tool prompts load from General.ToolPromptsPath (files named by toolId; .txt/.md ok)."
+            Text = "Tools load from repo-relative manifests based on Execution Target. Prompts load from Tools/Prompt (or target-specific prompt folder if present)."
         };
 
         root.Controls.Add(top, 0, 0);
@@ -62,10 +63,24 @@ public sealed class ToolchainSettingsPage : UserControl
     {
         _list.Items.Clear();
 
-        var toolsPath = (_config.General.ToolsPath ?? "").Trim();
-        var promptsDir = (_config.General.ToolPromptsPath ?? "").Trim();
+        var toolsPath = ToolchainResolver.ResolveToolManifestPath(_config);
+        var promptsDir = ToolchainResolver.ResolveToolPromptsFolder(_config);
+        if (string.IsNullOrWhiteSpace(toolsPath) || !File.Exists(toolsPath))
+        {
+            _status.Text = $"Missing tools manifest: {toolsPath}";
+            return;
+        }
 
-        var manifest = ToolManifestLoader.LoadFromFile(toolsPath);
+        ToolManifest manifest;
+        try
+        {
+            manifest = ToolManifestLoader.LoadFromFile(toolsPath);
+        }
+        catch (Exception ex)
+        {
+            _status.Text = $"Failed to load manifest: {ex.Message}";
+            return;
+        }
 
         // Collect toolIds from prompt folder, stripping extensions.
         var promptIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

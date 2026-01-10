@@ -152,8 +152,6 @@ public sealed class GeneralSettingsPage : UserControl
         grid.Controls.Add(convoLabel, 0, row);
         grid.Controls.Add(convoCombo, 1, row);
         row++;
-        AddRow("Tools Manifest Path (tools.json)", () => _config.General.ToolsPath, v => _config.General.ToolsPath = v);
-        AddRow("Tool Prompts Folder (Tools/Prompt)", () => _config.General.ToolPromptsPath, v => _config.General.ToolPromptsPath = v);
         AddRow("BlueprintTemplates Folder", () => _config.General.BlueprintTemplatesPath, v => _config.General.BlueprintTemplatesPath = v);
 
         grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -218,6 +216,28 @@ public sealed class GeneralSettingsPage : UserControl
         };
         grid.Controls.Add(execLabel, 0, row);
         grid.Controls.Add(execCombo, 1, row);
+        row++;
+
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var toolchainLabel = new Label { Text = "Resolved Toolchain Paths", AutoSize = true, Anchor = AnchorStyles.Left, Padding = new Padding(0, 6, 10, 0) };
+        var toolchainText = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            Multiline = true,
+            Height = 54
+        };
+        void UpdateToolchainPreview()
+        {
+            var manifestPath = ToolchainResolver.ResolveToolManifestPath(_config);
+            var promptsPath = ToolchainResolver.ResolveToolPromptsFolder(_config);
+            toolchainText.Text = $"Manifest: {manifestPath}{Environment.NewLine}Prompts: {promptsPath}";
+        }
+        UpdateToolchainPreview();
+        execCombo.SelectedIndexChanged += (_, _) => UpdateToolchainPreview();
+        repoBox.TextChanged += (_, _) => UpdateToolchainPreview();
+        grid.Controls.Add(toolchainLabel, 0, row);
+        grid.Controls.Add(toolchainText, 1, row);
         row++;
 
         AddMultiline(

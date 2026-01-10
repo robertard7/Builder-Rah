@@ -42,6 +42,7 @@ public sealed class ToolingDiagnosticsPage : UserControl, ISettingsPageProvider
             : "(none)";
         _status.Text =
             $"Tools: {diag.ActiveToolCount}/{diag.ToolCount} active (prompts={diag.PromptCount}, missing={diag.MissingPrompts.Count}){Environment.NewLine}" +
+            $"Toolchain: {diag.State}{Environment.NewLine}" +
             $"Blueprints: {diag.BlueprintSelectable}/{diag.BlueprintTotal} selectable{Environment.NewLine}" +
             $"Selected Blueprints: {selected}{Environment.NewLine}" +
             $"Selection breakdown: {breakdown}";
