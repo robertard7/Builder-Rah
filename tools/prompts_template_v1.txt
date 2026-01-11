@@ -1,5 +1,7 @@
 # Tool Prompt Template v1
 version: 1
+description: <short description of the prompt>
+tags: [<tag-one>, <tag-two>]
 
 tool_name: <tool-name>
 use_case: <what this tool is used for>

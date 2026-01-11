@@ -1,5 +1,7 @@
 # Prompt Template
 version: 1
+description: Template for CLI tools that execute commands and return structured output.
+tags: [cli, commands, execution]
 category: CLI
 
 tool_name: <cli-tool-name>
