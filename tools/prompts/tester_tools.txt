@@ -1,7 +1,7 @@
 # Prompt Template
 version: 1
 description: Template for running tests and summarizing results.
-tags: [testing, validation, results]
+tags: [testing, validation, results, usageExamples, inputSpec, outputSpec]
 category: tester
 
 tool_name: <tester-name>

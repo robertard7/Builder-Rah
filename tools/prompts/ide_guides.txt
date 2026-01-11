@@ -1,7 +1,7 @@
 # Prompt Template
 version: 1
 description: Template for IDE guidance and configuration workflows.
-tags: [ide, guidance, configuration]
+tags: [ide, guidance, configuration, usageExamples, inputSpec, outputSpec]
 category: IDE
 
 tool_name: <ide-tool-name>

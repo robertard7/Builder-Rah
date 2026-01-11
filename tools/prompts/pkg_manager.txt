@@ -1,7 +1,7 @@
 # Prompt Template
 version: 1
 description: Template for package manager operations and install guidance.
-tags: [package, install, update]
+tags: [package, install, update, installHints, usageExamples, inputSpec, outputSpec]
 category: pkg manager
 
 tool_name: <pkg-manager-name>

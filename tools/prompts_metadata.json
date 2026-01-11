@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "description": "Prompt template metadata for tool handlers",
+  "categories": [
+    "CLI",
+    "IDE",
+    "pkg manager",
+    "tester",
+    "ai assistant"
+  ],
+  "requiredFields": [
+    "version",
+    "description",
+    "tags",
+    "category"
+  ],
+  "tagHints": [
+    "installHints",
+    "usageExamples",
+    "inputSpec",
+    "outputSpec"
+  ]
+}

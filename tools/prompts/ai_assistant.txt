@@ -1,7 +1,7 @@
 # Prompt Template
 version: 1
 description: Template for AI assistant interactions and responses.
-tags: [ai, assistant, guidance]
+tags: [ai, assistant, guidance, usageExamples, inputSpec, outputSpec]
 category: ai assistant
 
 tool_name: <assistant-name>
