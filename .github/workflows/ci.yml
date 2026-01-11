@@ -17,3 +17,5 @@ jobs:
         run: dotnet build -c Debug --no-restore
       - name: Test
         run: dotnet test -c Debug --no-build
+      - name: Security scan
+        run: dotnet list package --vulnerable

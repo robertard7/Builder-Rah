@@ -5,12 +5,14 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using RahBuilder.Common.Json;
 using RahBuilder.Common.Text;
 using RahBuilder.Headless.Api;
 using RahBuilder.Headless.Models;
+using RahBuilder.Metrics;
 using RahBuilder.Settings;
 using RahBuilder.Workflow.Provider;
 using RahOllamaOnly.Tracing;
@@ -69,10 +71,13 @@ public sealed class HeadlessApiServer
 
     private async Task HandleAsync(HttpListenerContext ctx, CancellationToken ct)
     {
+        var sw = Stopwatch.StartNew();
+        var isError = false;
         try
         {
             if (!Authorize(ctx))
             {
+                isError = true;
                 await WriteErrorAsync(ctx, 401, ApiError.Unauthorized(), ct).ConfigureAwait(false);
                 return;
             }
@@ -85,6 +90,19 @@ public sealed class HeadlessApiServer
             {
                 var metrics = ProviderDiagnosticsHub.LatestMetrics;
                 await WriteJsonAsync(ctx, 200, metrics, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "GET" && path == "/healthz")
+            {
+                await WriteJsonAsync(ctx, 200, new { ok = true, telemetry = TelemetryRegistry.Snapshot() }, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "GET" && path == "/readyz")
+            {
+                var provider = ProviderDiagnosticsHub.LatestMetrics;
+                await WriteJsonAsync(ctx, 200, new { ok = provider.Enabled && provider.Reachable, provider }, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -131,6 +149,7 @@ public sealed class HeadlessApiServer
                     var state = _store.Load(sessionId);
                     if (state == null)
                     {
+                        isError = true;
                         await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
                         return;
                     }
@@ -143,6 +162,7 @@ public sealed class HeadlessApiServer
                     var state = _store.Load(sessionId);
                     if (state == null)
                     {
+                        isError = true;
                         await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
                         return;
                     }
@@ -155,6 +175,7 @@ public sealed class HeadlessApiServer
                     var state = _store.Load(sessionId);
                     if (state == null)
                     {
+                        isError = true;
                         await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
                         return;
                     }
@@ -171,6 +192,7 @@ public sealed class HeadlessApiServer
                     var state = _store.Load(sessionId);
                     if (state == null)
                     {
+                        isError = true;
                         await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
                         return;
                     }
@@ -187,6 +209,7 @@ public sealed class HeadlessApiServer
                     var text = payload.TryGetProperty("text", out var t) ? t.GetString() ?? "" : "";
                     if (string.IsNullOrWhiteSpace(text))
                     {
+                        isError = true;
                         await WriteErrorAsync(ctx, 400, ApiError.BadRequest("text_required"), ct).ConfigureAwait(false);
                         return;
                     }
@@ -201,6 +224,7 @@ public sealed class HeadlessApiServer
                     var pathValue = payload.TryGetProperty("path", out var p) ? p.GetString() ?? "" : "";
                     if (string.IsNullOrWhiteSpace(pathValue) || !File.Exists(pathValue))
                     {
+                        isError = true;
                         await WriteErrorAsync(ctx, 400, ApiError.BadRequest("path_required"), ct).ConfigureAwait(false);
                         return;
                     }
@@ -228,6 +252,7 @@ public sealed class HeadlessApiServer
                     var state = _store.Load(sessionId);
                     if (state == null)
                     {
+                        isError = true;
                         await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
                         return;
                     }
@@ -256,11 +281,18 @@ public sealed class HeadlessApiServer
                 }
             }
 
+            isError = true;
             await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
+            isError = true;
             await WriteErrorAsync(ctx, 500, ApiError.ServerError(ex.Message), ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            sw.Stop();
+            TelemetryRegistry.RecordRequest(sw.ElapsedMilliseconds, isError);
         }
     }
 

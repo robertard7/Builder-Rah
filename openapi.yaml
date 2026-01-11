@@ -264,6 +264,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProviderMetrics"
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Health
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        "200":
+          description: Readiness
   /provider/events:
     get:
       summary: Provider events
