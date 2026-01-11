@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using RahBuilder.Settings;
 using RahBuilder.Workflow;
+using RahBuilder.Workflow.Provider;
 using RahBuilder.Ui;
 using RahOllamaOnly.Tools.Diagnostics;
 using RahOllamaOnly.Tracing;
