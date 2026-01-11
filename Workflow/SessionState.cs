@@ -24,5 +24,6 @@ public sealed class SessionState
     public string PendingToolPlanJson { get; set; } = "";
     public int PendingStepIndex { get; set; }
     public bool PlanConfirmed { get; set; }
+    public bool Canceled { get; set; }
     public DateTimeOffset LastTouched { get; set; } = DateTimeOffset.UtcNow;
 }

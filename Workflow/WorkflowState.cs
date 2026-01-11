@@ -40,6 +40,7 @@ public sealed class WorkflowState
     public List<string> SelectedBlueprints { get; set; } = new();
     public string WaitLoopKey { get; set; } = "";
     public int WaitLoopCount { get; set; }
+    public bool Canceled { get; set; }
 
     public void ClearPlan()
     {

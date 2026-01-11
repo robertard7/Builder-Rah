@@ -87,7 +87,10 @@ rah session send --id <id> --message "text"
 rah session status --id <id>
 rah session plan --id <id>
 rah session cancel --id <id>
+rah session delete --id <id>
 rah run --id <id>
+rah provider metrics
+rah provider events
 ```
 
 ## Caching

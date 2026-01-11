@@ -8,7 +8,9 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using RahBuilder.Common.Json;
+using RahBuilder.Common.Text;
 using RahBuilder.Headless.Api;
+using RahBuilder.Headless.Models;
 using RahBuilder.Settings;
 using RahBuilder.Workflow.Provider;
 using RahOllamaOnly.Tracing;
@@ -88,8 +90,19 @@ public sealed class HeadlessApiServer
 
             if (req.HttpMethod == "GET" && path == "/provider/events")
             {
-                var eventsList = ProviderDiagnosticsHub.Events;
-                await WriteJsonAsync(ctx, 200, eventsList, ct).ConfigureAwait(false);
+                var limit = ParseQueryInt(req, "limit", 100);
+                var offset = ParseQueryInt(req, "offset", 0);
+                if (limit <= 0) limit = 100;
+                if (offset < 0) offset = 0;
+
+                var eventsList = ProviderDiagnosticsHub.Events
+                    .OrderByDescending(e => e.Timestamp)
+                    .Skip(offset)
+                    .Take(limit)
+                    .Select(e => new ProviderEventDto(e.EventType.ToString(), e.Timestamp, e.Message, e.Metadata))
+                    .ToList();
+                var total = ProviderDiagnosticsHub.Events.Count;
+                await WriteJsonAsync(ctx, 200, new { total, limit, offset, items = eventsList }, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -147,7 +160,8 @@ public sealed class HeadlessApiServer
                     }
                     var workflow = new WorkflowFacade(_cfg, _trace);
                     workflow.ApplySessionState(state);
-                    var status = workflow.GetPublicSnapshot();
+                    var statusCode = workflow.GetSessionStatusSnapshot();
+                    var status = new SessionStatusDto(statusCode.ToString(), StatusMapper.ToDisplay(statusCode));
                     await WriteJsonAsync(ctx, 200, new { sessionId, status }, ct).ConfigureAwait(false);
                     return;
                 }
@@ -219,7 +233,7 @@ public sealed class HeadlessApiServer
                     }
                     var workflow = new WorkflowFacade(_cfg, _trace);
                     workflow.ApplySessionState(state);
-                    workflow.StopPlan();
+                    workflow.CancelPlan();
                     var updated = workflow.BuildSessionState();
                     _store.Save(updated);
                     await WriteJsonAsync(ctx, 200, new { sessionId, status = workflow.GetPublicSnapshot() }, ct).ConfigureAwait(false);
@@ -228,6 +242,14 @@ public sealed class HeadlessApiServer
 
                 if (parts.Length == 2 && req.HttpMethod == "DELETE")
                 {
+                    var state = _store.Load(sessionId);
+                    if (state != null)
+                    {
+                        var inbox = new AttachmentInbox(_cfg.General, _trace);
+                        foreach (var attachment in state.Attachments)
+                            inbox.Remove(attachment.StoredName);
+                    }
+                    DeleteArtifactsForSession(sessionId);
                     _store.Delete(sessionId);
                     await WriteJsonAsync(ctx, 200, new { ok = true, sessionId }, ct).ConfigureAwait(false);
                     return;
@@ -258,7 +280,7 @@ public sealed class HeadlessApiServer
         workflow.UserFacingMessage += msg =>
         {
             if (!string.IsNullOrWhiteSpace(msg))
-                responses.Add(msg);
+                responses.Add(UserSafeText.Sanitize(msg));
         };
 
         await workflow.RouteUserInput(_cfg, text, ct).ConfigureAwait(false);
@@ -276,7 +298,7 @@ public sealed class HeadlessApiServer
         workflow.UserFacingMessage += msg =>
         {
             if (!string.IsNullOrWhiteSpace(msg))
-                responses.Add(msg);
+                responses.Add(UserSafeText.Sanitize(msg));
         };
         await workflow.ApproveAllStepsAsync(ct).ConfigureAwait(false);
         var updated = workflow.BuildSessionState();
@@ -291,6 +313,39 @@ public sealed class HeadlessApiServer
         if (string.IsNullOrWhiteSpace(body))
             return JsonDocument.Parse("{}").RootElement;
         return JsonDocument.Parse(body).RootElement;
+    }
+
+    private static int ParseQueryInt(HttpListenerRequest req, string key, int fallback)
+    {
+        var value = req.QueryString[key];
+        if (int.TryParse(value, out var parsed))
+            return parsed;
+        return fallback;
+    }
+
+    private void DeleteArtifactsForSession(string sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId)) return;
+        var repoRoot = _cfg.General.RepoRoot ?? "";
+        if (string.IsNullOrWhiteSpace(repoRoot)) return;
+        var artifactsRoot = Path.Combine(repoRoot, "Workflow", "ProgramArtifacts");
+        if (!Directory.Exists(artifactsRoot)) return;
+
+        var token = "-" + sessionId + "-";
+        foreach (var dir in Directory.GetDirectories(artifactsRoot))
+        {
+            if (dir.Contains(token, StringComparison.OrdinalIgnoreCase))
+            {
+                try { Directory.Delete(dir, true); } catch { }
+            }
+        }
+        foreach (var file in Directory.GetFiles(artifactsRoot, "*.zip"))
+        {
+            if (file.Contains(token, StringComparison.OrdinalIgnoreCase))
+            {
+                try { File.Delete(file); } catch { }
+            }
+        }
     }
 
     private static async Task WriteJsonAsync(HttpListenerContext ctx, int statusCode, object payload, CancellationToken ct)

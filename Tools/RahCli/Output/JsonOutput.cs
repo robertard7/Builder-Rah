@@ -9,11 +9,11 @@ public static class JsonOutput
 {
     public static void Write(object payload)
     {
-        Console.WriteLine(JsonDefaults.Serialize(payload));
+        Console.WriteLine(JsonDefaults.Serialize(new { ok = true, data = payload }));
     }
 
     public static void WriteError(ApiError error)
     {
-        Console.Error.WriteLine(JsonDefaults.Serialize(error));
+        Console.Error.WriteLine(JsonDefaults.Serialize(new { ok = false, error }));
     }
 }

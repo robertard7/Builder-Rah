@@ -1,31 +1,15 @@
 #nullable enable
 using System.Collections.Generic;
-using System.Linq;
+using RahBuilder.Common.Text;
 
 namespace RahBuilder.Workflow;
 
 public static class OutputSanitizer
 {
-    private static readonly string[] ForbiddenTokens =
-    {
-        "WAIT_USER",
-        "tooling warnings",
-        "tooling warning",
-        "tools invalid",
-        "tools inactive"
-    };
-
     public static string Sanitize(string input)
     {
-        if (string.IsNullOrWhiteSpace(input)) return input;
-        var sanitized = input;
-        foreach (var token in ForbiddenTokens)
-        {
-            if (sanitized.Contains(token))
-                sanitized = sanitized.Replace(token, "", System.StringComparison.OrdinalIgnoreCase);
-        }
-        return string.Join(" ", sanitized.Split(' ').Where(s => !string.IsNullOrWhiteSpace(s)));
+        return UserSafeText.Sanitize(input);
     }
 
-    public static IReadOnlyList<string> Forbidden => ForbiddenTokens;
+    public static IReadOnlyList<string> Forbidden => UserSafeText.Forbidden;
 }

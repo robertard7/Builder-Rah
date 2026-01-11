@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RahBuilder", "RahBuilder.cs
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RahCli", "Tools\\RahCli\\RahCli.csproj", "{B2C5E7A7-9C3D-4B0A-9F0C-34A1B807D3A5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RahBuilder.Tests", "Tests\\RahBuilder.Tests.csproj", "{C5C32D6A-0E59-4E0C-9D1E-65F2B8E6B3A8}"
+EndProject
 
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -22,5 +24,9 @@ Global
 		{B2C5E7A7-9C3D-4B0A-9F0C-34A1B807D3A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B2C5E7A7-9C3D-4B0A-9F0C-34A1B807D3A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B2C5E7A7-9C3D-4B0A-9F0C-34A1B807D3A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5C32D6A-0E59-4E0C-9D1E-65F2B8E6B3A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5C32D6A-0E59-4E0C-9D1E-65F2B8E6B3A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5C32D6A-0E59-4E0C-9D1E-65F2B8E6B3A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5C32D6A-0E59-4E0C-9D1E-65F2B8E6B3A8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

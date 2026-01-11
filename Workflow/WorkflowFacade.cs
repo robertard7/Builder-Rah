@@ -185,6 +185,7 @@ public sealed class WorkflowFacade
         _state.ClearPlan();
         _state.PendingUserRequest = "";
         _state.ClearClarifications();
+        _state.Canceled = false;
         PendingStepChanged?.Invoke("", false);
         NotifyStatus();
         _planNeedsArtifacts = false;
@@ -196,8 +197,21 @@ public sealed class WorkflowFacade
         _state.ClearPlan();
         _state.PendingUserRequest = "";
         _state.ClearClarifications();
+        _state.Canceled = false;
         PendingStepChanged?.Invoke("", false);
         EmitWaitUser("Plan cleared. Tell me what you’d like instead.");
+        NotifyStatus();
+    }
+
+    public void CancelPlan()
+    {
+        _recentlyCompleted = false;
+        _state.Canceled = true;
+        _state.ClearPlan();
+        _state.ClearClarifications();
+        _state.PendingUserRequest = "";
+        _state.PendingQuestion = null;
+        PendingStepChanged?.Invoke("", false);
         NotifyStatus();
     }
 
@@ -343,6 +357,7 @@ public sealed class WorkflowFacade
     {
         if (cfg != null) _cfg = cfg;
         text ??= "";
+        _state.Canceled = false;
 
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -840,9 +855,11 @@ public sealed class WorkflowFacade
 
     public object GetPublicSnapshot()
     {
+        var status = GetSessionStatus();
         return new
         {
-            status = ComputeWorkflowPhase(),
+            status = status.ToString(),
+            statusDisplay = StatusMapper.ToDisplay(status),
             stepIndex = _state.PendingStepIndex,
             steps = _state.PendingToolPlan?.Steps?.Count ?? 0,
             pendingQuestion = _state.PendingQuestion,
@@ -1100,6 +1117,7 @@ public sealed class WorkflowFacade
             PendingToolPlanJson = _state.PendingToolPlanJson ?? "",
             PendingStepIndex = _state.PendingStepIndex,
             PlanConfirmed = _state.PlanConfirmed,
+            Canceled = _state.Canceled,
             LastTouched = DateTimeOffset.UtcNow
         };
 
@@ -1131,6 +1149,7 @@ public sealed class WorkflowFacade
         _state.PendingToolPlanJson = state.PendingToolPlanJson ?? "";
         _state.PendingStepIndex = state.PendingStepIndex;
         _state.PlanConfirmed = state.PlanConfirmed;
+        _state.Canceled = state.Canceled;
         if (!string.IsNullOrWhiteSpace(_state.PendingToolPlanJson))
         {
             var plan = ToolPlanParser.TryParse(_state.PendingToolPlanJson);
@@ -1331,6 +1350,8 @@ public sealed class WorkflowFacade
         };
     }
 
+    public SessionStatus GetSessionStatusSnapshot() => GetSessionStatus();
+
     private static bool IsWarning(string message)
     {
         return message.StartsWith("[config:warn]", StringComparison.OrdinalIgnoreCase);
@@ -1424,27 +1445,12 @@ public sealed class WorkflowFacade
 
     private string ComputeWorkflowPhase()
     {
-        if (_recentlyCompleted)
-            return "Done";
+        return StatusMapper.ToDisplay(GetSessionStatus());
+    }
 
-        if (_state.PendingToolPlan != null)
-        {
-            var idx = Math.Max(0, _state.PendingStepIndex);
-            var count = _state.PendingToolPlan.Steps.Count;
-            if (idx >= count)
-                return "Done";
-            if (_state.ToolOutputs.Count > 0 || idx > 0 || _state.AutoApproveAll)
-                return "Tool execution";
-            return "Planning";
-        }
-
-        if (!string.IsNullOrWhiteSpace(_state.PendingQuestion))
-            return "Waiting clarification";
-
-        if (!string.IsNullOrWhiteSpace(_state.PendingUserRequest))
-            return "Digesting intent";
-
-        return "Idle";
+    private SessionStatus GetSessionStatus()
+    {
+        return StatusMapper.GetStatus(_state, _recentlyCompleted);
     }
 
     private static string ShortRepo(string repoRoot)
