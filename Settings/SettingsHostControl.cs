@@ -58,15 +58,33 @@ public sealed class SettingsHostControl : UserControl
     public void FocusProvidersTab()
     {
         if (_tabs == null) return;
+        SelectTab("Providers");
+
+        _providersPage?.FocusProviderToggle();
+    }
+
+    public void FocusToolchainTab()
+    {
+        if (_tabs == null) return;
+        SelectTab("Toolchain");
+    }
+
+    public void FocusGeneralTab()
+    {
+        if (_tabs == null) return;
+        SelectTab("General");
+    }
+
+    private void SelectTab(string name)
+    {
+        if (_tabs == null) return;
         for (var i = 0; i < _tabs.TabPages.Count; i++)
         {
-            if (string.Equals(_tabs.TabPages[i].Text, "Providers", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(_tabs.TabPages[i].Text, name, StringComparison.OrdinalIgnoreCase))
             {
                 _tabs.SelectedIndex = i;
                 break;
             }
         }
-
-        _providersPage?.FocusProviderToggle();
     }
 }

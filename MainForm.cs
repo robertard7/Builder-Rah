@@ -10,6 +10,7 @@ using System.Windows.Forms;
 using RahBuilder.Settings;
 using RahBuilder.Workflow;
 using RahBuilder.Ui;
+using RahOllamaOnly.Tools.Diagnostics;
 using RahOllamaOnly.Tracing;
 using RahOllamaOnly.Ui;
 
@@ -40,6 +41,7 @@ public sealed class MainForm : Form
     private readonly TabPage _settingsTab;
     private readonly SettingsHostControl _settingsControl;
     private bool _lastProviderEnabled;
+    private ToolingDiagnostics _toolingDiagnostics = ToolingDiagnostics.Empty;
     private readonly List<OutputCard> _cards = new();
     private readonly Button _downloadButton;
     private readonly ListBox _cardList;
@@ -91,8 +93,11 @@ public sealed class MainForm : Form
         _composer.RetryProviderRequested += () =>
         {
             _workflow.RetryProvider();
-            UpdateProviderBadge();
+            NotifyProviderRetry();
         };
+        _composer.ProviderStatusClicked += OpenProvidersSettings;
+        _composer.ToolchainStatusClicked += OpenToolchainSettings;
+        _composer.ExecutionStatusClicked += OpenGeneralSettings;
         _workflow.SetAttachments(_inbox.List());
         _providerToolTip = new ToolTip();
         _providerBadge = new LinkLabel
@@ -212,7 +217,21 @@ public sealed class MainForm : Form
         outputSplit.Panel2.Controls.Add(detailTabs);
 
         var auxTabs = new TabControl { Dock = DockStyle.Fill };
-        auxTabs.TabPages.Add(new TabPage("Trace") { Controls = { _traceBox } });
+        var tracePanel = new Panel { Dock = DockStyle.Fill };
+        var reinitProvider = new Button
+        {
+            Text = "Reinitialize Provider",
+            Dock = DockStyle.Top,
+            Height = 28
+        };
+        reinitProvider.Click += (_, _) =>
+        {
+            _workflow.RetryProvider();
+            NotifyProviderRetry();
+        };
+        tracePanel.Controls.Add(_traceBox);
+        tracePanel.Controls.Add(reinitProvider);
+        auxTabs.TabPages.Add(new TabPage("Trace") { Controls = { tracePanel } });
         auxTabs.TabPages.Add(new TabPage("Outputs") { Controls = { outputSplit } });
 
         _traceWriter.Updated += () =>
@@ -249,6 +268,7 @@ public sealed class MainForm : Form
         PublishConfigToRuntime();
         _lastProviderEnabled = _config.General.ProviderEnabled;
         UpdateProviderBadge();
+        UpdateStatusLine();
 
         if (_config.General.EnableGlobalClipboardShortcuts)
             ClipboardPolicy.Apply(this);
@@ -262,8 +282,10 @@ public sealed class MainForm : Form
             _workflow.TraceAttentionRequested -= ShowTracePane;
             _workflow.PlanReady -= OnPlanReady;
             _workflow.ProviderStateChanged -= OnProviderStateChanged;
+            ToolingDiagnosticsHub.Updated -= OnToolingDiagnosticsUpdated;
         };
 
+        ToolingDiagnosticsHub.Updated += OnToolingDiagnosticsUpdated;
         UpdateStatus(null);
     }
 
@@ -303,6 +325,7 @@ public sealed class MainForm : Form
         }
         _lastProviderEnabled = _config.General.ProviderEnabled;
         UpdateProviderBadge();
+        UpdateStatusLine();
 
         if (_config.General.EnableGlobalClipboardShortcuts)
             ClipboardPolicy.Apply(this);
@@ -368,6 +391,7 @@ public sealed class MainForm : Form
             _providerBadge.Text = "⚠️ Provider: OFF";
             _providerBadge.LinkColor = Color.Goldenrod;
             _composer.SetProviderOffline(false);
+            UpdateStatusLine();
             return;
         }
 
@@ -376,18 +400,73 @@ public sealed class MainForm : Form
             _providerBadge.Text = "⚠️ Provider: OFFLINE";
             _providerBadge.LinkColor = Color.Firebrick;
             _composer.SetProviderOffline(true);
+            UpdateStatusLine();
             return;
         }
 
         _providerBadge.Text = "🧠 Provider: ON";
         _providerBadge.LinkColor = Color.SeaGreen;
         _composer.SetProviderOffline(false);
+        UpdateStatusLine();
     }
 
     private void OnProviderStateChanged(ProviderState state)
     {
         if (!IsHandleCreated) return;
         BeginInvoke(new Action(UpdateProviderBadge));
+    }
+
+    private void OnToolingDiagnosticsUpdated(ToolingDiagnostics diag)
+    {
+        _toolingDiagnostics = diag ?? ToolingDiagnostics.Empty;
+        if (!IsHandleCreated) return;
+        BeginInvoke(new Action(UpdateStatusLine));
+    }
+
+    private void UpdateStatusLine()
+    {
+        var enabled = _workflow.ProviderState.Enabled;
+        var reachable = _workflow.ProviderState.Reachable;
+        var providerText = enabled ? (reachable ? "Provider: ON" : "Provider: OFFLINE") : "Provider: OFF";
+        var providerColor = enabled ? (reachable ? Color.SeaGreen : Color.Firebrick) : Color.Goldenrod;
+
+        var toolchainStatus = ComputeToolchainStatus(_toolingDiagnostics);
+        var toolchainText = $"Toolchain: {toolchainStatus.Text}";
+
+        var executionText = $"Execution: {_config.General.ExecutionTarget}";
+        var executionColor = Color.DimGray;
+
+        _composer.UpdateStatusLine(providerText, providerColor, toolchainText, toolchainStatus.Color, executionText, executionColor);
+    }
+
+    private static (string Text, Color Color) ComputeToolchainStatus(ToolingDiagnostics diag)
+    {
+        if (diag == null) return ("WARN", Color.Goldenrod);
+        if (diag.ValidationErrors != null && diag.ValidationErrors.Count > 0)
+            return ("FAIL", Color.Firebrick);
+        if (diag.MissingPrompts != null && diag.MissingPrompts.Count > 0)
+            return ("WARN", Color.Goldenrod);
+        if (diag.ToolCount == 0)
+            return ("WARN", Color.Goldenrod);
+        return ("OK", Color.SeaGreen);
+    }
+
+    private void OpenToolchainSettings()
+    {
+        _mainTabs.SelectedTab = _settingsTab;
+        _settingsControl.FocusToolchainTab();
+    }
+
+    private void OpenGeneralSettings()
+    {
+        _mainTabs.SelectedTab = _settingsTab;
+        _settingsControl.FocusGeneralTab();
+    }
+
+    private void NotifyProviderRetry()
+    {
+        AppendChat("Provider retry initiated.\n");
+        UpdateProviderBadge();
     }
 
     private void OnOutputCardProduced(OutputCard card)

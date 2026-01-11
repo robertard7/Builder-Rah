@@ -19,6 +19,12 @@ public sealed class ChatComposerControl : UserControl
     private readonly Label _status;
     private readonly Label _providerHint;
     private readonly Button _retryProvider;
+    private readonly FlowLayoutPanel _statusLine;
+    private readonly LinkLabel _providerStatus;
+    private readonly LinkLabel _toolchainStatus;
+    private readonly LinkLabel _executionStatus;
+    private readonly Timer _retryTimer;
+    private int _retryCountdown;
 
     private AttachmentInbox _inbox;
     private readonly List<AttachmentInbox.AttachmentEntry> _attachments = new();
@@ -29,6 +35,9 @@ public sealed class ChatComposerControl : UserControl
     public event Action<string>? SendRequested;
     public event Action<IReadOnlyList<AttachmentInbox.AttachmentEntry>>? AttachmentsChanged;
     public event Action? RetryProviderRequested;
+    public event Action? ProviderStatusClicked;
+    public event Action? ToolchainStatusClicked;
+    public event Action? ExecutionStatusClicked;
 
     public ChatComposerControl(AttachmentInbox inbox)
     {
@@ -45,8 +54,9 @@ public sealed class ChatComposerControl : UserControl
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4
+            RowCount = 5
         };
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -115,7 +125,26 @@ public sealed class ChatComposerControl : UserControl
             Padding = new Padding(8, 2, 8, 2),
             Visible = false
         };
-        _retryProvider.Click += (_, _) => RetryProviderRequested?.Invoke();
+        _retryProvider.Click += (_, _) =>
+        {
+            BeginProviderRetryCooldown(10);
+            RetryProviderRequested?.Invoke();
+        };
+
+        _statusLine = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = true,
+            Margin = new Padding(0, 0, 0, 4)
+        };
+        _providerStatus = BuildStatusLink("Provider: -", () => ProviderStatusClicked?.Invoke());
+        _toolchainStatus = BuildStatusLink("Toolchain: -", () => ToolchainStatusClicked?.Invoke());
+        _executionStatus = BuildStatusLink("Execution: -", () => ExecutionStatusClicked?.Invoke());
+        _statusLine.Controls.Add(_providerStatus);
+        _statusLine.Controls.Add(_toolchainStatus);
+        _statusLine.Controls.Add(_executionStatus);
 
         statusPanel.Controls.Add(_status);
         statusPanel.Controls.Add(_providerHint);
@@ -174,11 +203,15 @@ public sealed class ChatComposerControl : UserControl
         root.Controls.Add(_chips, 0, 1);
         root.Controls.Add(statusPanel, 0, 2);
         root.Controls.Add(composerRow, 0, 3);
+        root.Controls.Add(_statusLine, 0, 4);
 
         Controls.Add(root);
 
-        Height = _minHeight + Padding.Vertical + _chips.Height + statusPanel.Height;
+        Height = _minHeight + Padding.Vertical + _chips.Height + statusPanel.Height + _statusLine.Height;
         RefreshAttachments(_inbox.List());
+
+        _retryTimer = new Timer { Interval = 1000 };
+        _retryTimer.Tick += (_, _) => TickRetryCooldown();
     }
 
     public void FocusInput() => _input.Focus();
@@ -209,6 +242,16 @@ public sealed class ChatComposerControl : UserControl
     {
         _providerHint.Visible = isOffline;
         _retryProvider.Visible = isOffline;
+    }
+
+    public void UpdateStatusLine(string provider, Color providerColor, string toolchain, Color toolchainColor, string execution, Color executionColor)
+    {
+        _providerStatus.Text = provider;
+        _providerStatus.LinkColor = providerColor;
+        _toolchainStatus.Text = toolchain;
+        _toolchainStatus.LinkColor = toolchainColor;
+        _executionStatus.Text = execution;
+        _executionStatus.LinkColor = executionColor;
     }
 
     private void FireSend()
@@ -386,5 +429,45 @@ public sealed class ChatComposerControl : UserControl
 
         if (_input.Height != clamped)
             _input.Height = clamped;
+    }
+
+    private static LinkLabel BuildStatusLink(string text, Action onClick)
+    {
+        var link = new LinkLabel
+        {
+            AutoSize = true,
+            Text = text,
+            LinkBehavior = LinkBehavior.NeverUnderline,
+            Margin = new Padding(0, 0, 12, 0),
+            LinkColor = Color.DimGray
+        };
+        link.LinkClicked += (_, _) => onClick();
+        return link;
+    }
+
+    private void BeginProviderRetryCooldown(int seconds)
+    {
+        _retryCountdown = Math.Max(1, seconds);
+        _retryProvider.Enabled = false;
+        _retryTimer.Start();
+        UpdateRetryButtonText();
+    }
+
+    private void TickRetryCooldown()
+    {
+        _retryCountdown = Math.Max(0, _retryCountdown - 1);
+        UpdateRetryButtonText();
+        if (_retryCountdown <= 0)
+        {
+            _retryTimer.Stop();
+            _retryProvider.Enabled = true;
+            _retryProvider.Text = "Retry Provider";
+        }
+    }
+
+    private void UpdateRetryButtonText()
+    {
+        if (_retryProvider.Enabled) return;
+        _retryProvider.Text = $"Retry Provider ({_retryCountdown}s)";
     }
 }
