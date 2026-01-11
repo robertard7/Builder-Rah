@@ -2,10 +2,10 @@
   "categories": [
     "editors",
     "IDE",
-    "CLI util",
-    "package manager",
+    "CLI",
+    "pkg manager",
     "tester",
-    "AI assistant",
+    "ai assistant",
     "monitoring",
     "networking",
     "security"
