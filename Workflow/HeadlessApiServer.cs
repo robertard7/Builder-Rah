@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using RahBuilder.Settings;
+using RahBuilder.Workflow.Provider;
 using RahOllamaOnly.Tracing;
 
 namespace RahBuilder.Workflow;
@@ -75,6 +76,13 @@ public sealed class HeadlessApiServer
             var req = ctx.Request;
             var path = req.Url?.AbsolutePath?.TrimEnd('/') ?? "";
             if (path.Length == 0) path = "/";
+
+            if (req.HttpMethod == "GET" && path == "/provider/metrics")
+            {
+                var metrics = ProviderDiagnosticsHub.LatestMetrics;
+                await WriteJsonAsync(ctx, 200, metrics, ct).ConfigureAwait(false);
+                return;
+            }
 
             if (req.HttpMethod == "GET" && path == "/sessions")
             {

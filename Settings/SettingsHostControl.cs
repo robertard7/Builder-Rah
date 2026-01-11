@@ -43,6 +43,7 @@ public sealed class SettingsHostControl : UserControl
         AddTab(tabs, "Workflow Graph", new WorkflowGraphSettingsPage(_config));
         AddTab(tabs, "Toolchain", new ToolchainSettingsPage(_config));
         AddTab(tabs, "Tooling Diagnostics", new ToolingDiagnosticsPage(_config));
+        AddTab(tabs, "Provider Health", new ProviderDiagnosticsPage());
 
         Controls.Clear();
         Controls.Add(tabs);

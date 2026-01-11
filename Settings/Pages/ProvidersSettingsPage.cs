@@ -9,6 +9,7 @@ public sealed class ProvidersSettingsPage : UserControl
 {
     private readonly AppConfig _config;
     private readonly CheckBox _providerEnabled;
+    private readonly CheckBox _cloudAssistEnabled;
     private readonly ToolTip _providerTip;
 
     public ProvidersSettingsPage(AppConfig config)
@@ -40,6 +41,18 @@ public sealed class ProvidersSettingsPage : UserControl
             AutoSave.Touch();
         };
 
+        _cloudAssistEnabled = new CheckBox
+        {
+            Text = "Cloud Assist Enabled (OpenAI/HuggingFace)",
+            Checked = _config.General.CloudAssistEnabled,
+            AutoSize = true
+        };
+        _cloudAssistEnabled.CheckedChanged += (_, _) =>
+        {
+            _config.General.CloudAssistEnabled = _cloudAssistEnabled.Checked;
+            AutoSave.Touch();
+        };
+
         var providerBox = new GroupBox { Text = "Provider", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(10) };
         var providerPanel = new FlowLayoutPanel
         {
@@ -54,9 +67,17 @@ public sealed class ProvidersSettingsPage : UserControl
             MaximumSize = new Size(760, 0),
             Text = "When off, all language model calls are suppressed; workflow will request you re-enable this before running."
         };
+        var cloudAssistDesc = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(760, 0),
+            Text = "Cloud Assist enables OpenAI/HuggingFace helpers; keep off for local-only workflows."
+        };
         _providerTip.SetToolTip(_providerEnabled, desc.Text);
         providerPanel.Controls.Add(_providerEnabled);
         providerPanel.Controls.Add(desc);
+        providerPanel.Controls.Add(_cloudAssistEnabled);
+        providerPanel.Controls.Add(cloudAssistDesc);
         providerBox.Controls.Add(providerPanel);
 
         root.Controls.Add(providerBox, 0, 0);

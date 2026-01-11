@@ -18,6 +18,8 @@ public static class LlmInvoker
     private static readonly HttpClient _http = new HttpClient();
     public static Action<string>? AuditLogger { get; set; }
     public static Func<bool>? IsProviderReachable { get; set; }
+    public static Action<string>? ProviderCallSucceeded { get; set; }
+    public static Action<string, Exception>? ProviderCallFailed { get; set; }
 
     public static async Task<string> InvokeChatAsync(
         AppConfig cfg,
@@ -67,17 +69,45 @@ public static class LlmInvoker
             // audit is best-effort
         }
 
-        if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
-            return await InvokeOllamaAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
-
-        if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
-            return await InvokeOpenAiAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
-
-        if (provider.Equals("HuggingFace", StringComparison.OrdinalIgnoreCase) ||
+        if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase) ||
+            provider.Equals("HuggingFace", StringComparison.OrdinalIgnoreCase) ||
             provider.Equals("Hugging Face", StringComparison.OrdinalIgnoreCase))
-            return await InvokeHuggingFaceAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
+        {
+            if (cfg.General?.CloudAssistEnabled != true)
+                throw new CloudAssistDisabledException("cloud_assist_disabled");
+        }
 
-        throw new InvalidOperationException($"[digest:error] Unsupported provider '{provider}' for role '{role}'.");
+        try
+        {
+            if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+            {
+                var result = await InvokeOllamaAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
+                ProviderCallSucceeded?.Invoke(provider);
+                return result;
+            }
+
+            if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
+            {
+                var result = await InvokeOpenAiAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
+                ProviderCallSucceeded?.Invoke(provider);
+                return result;
+            }
+
+            if (provider.Equals("HuggingFace", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Hugging Face", StringComparison.OrdinalIgnoreCase))
+            {
+                var result = await InvokeHuggingFaceAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
+                ProviderCallSucceeded?.Invoke(provider);
+                return result;
+            }
+
+            throw new InvalidOperationException($"[digest:error] Unsupported provider '{provider}' for role '{role}'.");
+        }
+        catch (Exception ex)
+        {
+            ProviderCallFailed?.Invoke(provider, ex);
+            throw;
+        }
     }
 
     private static async Task<string> InvokeOllamaAsync(

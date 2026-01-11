@@ -84,6 +84,12 @@ public sealed class WorkflowFacade
         _cfg = ConfigStore.Load();
         _providerManager = new ProviderManager(new ProviderState(_cfg.General.ProviderEnabled, true), msg => _trace.Emit(msg));
         _providerManager.StateChanged += state => ProviderStateChanged?.Invoke(state);
+        _providerManager.ConfigureRetryHandler(async ct =>
+        {
+            RefreshTooling();
+            await Task.CompletedTask.ConfigureAwait(false);
+            return true;
+        });
         _executor = new ExecutionOrchestrator(_state, _trace);
         _executor.OutputCardProduced += OnOutputCardProduced;
         _executor.UserFacingMessage += msg =>
@@ -94,6 +100,7 @@ public sealed class WorkflowFacade
         };
         LlmInvoker.AuditLogger = msg => _trace.Emit("[model:audit] " + msg);
         LlmInvoker.IsProviderReachable = () => _providerManager.IsReachable;
+        LlmInvoker.ProviderCallSucceeded = provider => _providerManager.RecordSuccess(provider);
         _apiHost = new ProviderApiHost(this);
         SyncGraphToHub(_cfg);
         LogRepoBanner();
@@ -107,6 +114,12 @@ public sealed class WorkflowFacade
         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
         _providerManager = new ProviderManager(new ProviderState(_cfg.General.ProviderEnabled, true), msg => _trace.Emit(msg));
         _providerManager.StateChanged += state => ProviderStateChanged?.Invoke(state);
+        _providerManager.ConfigureRetryHandler(async ct =>
+        {
+            RefreshTooling();
+            await Task.CompletedTask.ConfigureAwait(false);
+            return true;
+        });
         _executor = new ExecutionOrchestrator(_state, _trace);
         _executor.OutputCardProduced += OnOutputCardProduced;
         _executor.UserFacingMessage += msg =>
@@ -117,6 +130,7 @@ public sealed class WorkflowFacade
         };
         LlmInvoker.AuditLogger = msg => _trace.Emit("[model:audit] " + msg);
         LlmInvoker.IsProviderReachable = () => _providerManager.IsReachable;
+        LlmInvoker.ProviderCallSucceeded = provider => _providerManager.RecordSuccess(provider);
         _apiHost = new ProviderApiHost(this);
         SyncGraphToHub(_cfg);
         LogRepoBanner();
@@ -132,6 +146,11 @@ public sealed class WorkflowFacade
     }
 
     private void BroadcastEvent(string type, object payload) => SessionManager.AddEvent(_state.SessionToken, type, payload);
+
+    private void EmitWorkflowEvent(WorkflowEvent evt, string message)
+    {
+        BroadcastEvent("workflow_event", new { eventType = evt.ToString(), message });
+    }
 
     private void StartApiHostIfEnabled()
     {
@@ -311,7 +330,11 @@ public sealed class WorkflowFacade
 
     public void RetryProvider()
     {
-        _providerManager.Retry(RefreshTooling);
+        _ = _providerManager.RetryAsync(() =>
+        {
+            RefreshTooling();
+            return Task.CompletedTask;
+        });
     }
 
     public Task RouteUserInput(string text, CancellationToken ct) => RouteUserInput(_cfg, text, ct);
@@ -887,6 +910,11 @@ public sealed class WorkflowFacade
                 HandleProviderUnavailable(ex);
                 return JobSpec.Invalid("provider_unreachable");
             }
+            if (ex is CloudAssistDisabledException)
+            {
+                EmitCloudAssistDisabled();
+                return JobSpec.Invalid("cloud_assist_disabled");
+            }
             if (ex is ProviderDisabledException)
             {
                 EmitProviderDisabled();
@@ -910,6 +938,11 @@ public sealed class WorkflowFacade
                     HandleProviderUnavailable(new Exception(result.Error));
                     return null;
                 }
+                if (result.Error.Contains("cloud_assist_disabled", StringComparison.OrdinalIgnoreCase))
+                {
+                    EmitCloudAssistDisabled();
+                    return null;
+                }
                 if (result.Error.Contains("provider_disabled", StringComparison.OrdinalIgnoreCase))
                 {
                     EmitProviderDisabled();
@@ -929,6 +962,11 @@ public sealed class WorkflowFacade
             if (ex is ProviderUnavailableException)
             {
                 HandleProviderUnavailable(ex);
+                return null;
+            }
+            if (ex is CloudAssistDisabledException)
+            {
+                EmitCloudAssistDisabled();
                 return null;
             }
             if (ex is ProviderDisabledException)
@@ -958,6 +996,11 @@ public sealed class WorkflowFacade
             {
                 HandleProviderUnavailable(ex);
                 return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", "provider_unreachable", false);
+            }
+            if (ex is CloudAssistDisabledException)
+            {
+                EmitCloudAssistDisabled();
+                return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", "cloud_assist_disabled", false);
             }
             if (ex is ProviderDisabledException)
             {
@@ -1023,12 +1066,19 @@ public sealed class WorkflowFacade
             ? ex.InnerException.Message
             : ex?.Message ?? "provider unavailable";
         MarkProviderReachable(false, detail);
-        UserFacingMessage?.Invoke("Provider offline — check settings or retry.");
+        EmitWorkflowEvent(WorkflowEvent.ProviderUnavailable, "Provider currently unavailable — try ‘Retry Provider’ or check settings.");
+        UserFacingMessage?.Invoke("Provider currently unavailable — try ‘Retry Provider’ or check settings.");
     }
 
     private void EmitProviderOffline()
     {
-        UserFacingMessage?.Invoke("Provider offline — check settings or retry.");
+        EmitWorkflowEvent(WorkflowEvent.ProviderUnavailable, "Provider currently unavailable — try ‘Retry Provider’ or check settings.");
+        UserFacingMessage?.Invoke("Provider currently unavailable — try ‘Retry Provider’ or check settings.");
+    }
+
+    private void EmitCloudAssistDisabled()
+    {
+        UserFacingMessage?.Invoke("Cloud assist disabled — enable Cloud Assist in Settings to use OpenAI or HuggingFace.");
     }
 
     public SessionState BuildSessionState()
@@ -1830,6 +1880,11 @@ public sealed class WorkflowFacade
                 HandleProviderUnavailable(ex);
                 return false;
             }
+            if (ex is CloudAssistDisabledException)
+            {
+                EmitCloudAssistDisabled();
+                return false;
+            }
             if (ex is ProviderDisabledException)
             {
                 EmitProviderDisabled();
@@ -1858,6 +1913,11 @@ public sealed class WorkflowFacade
                 if (ex is ProviderUnavailableException)
                 {
                     HandleProviderUnavailable(ex);
+                    return false;
+                }
+                if (ex is CloudAssistDisabledException)
+                {
+                    EmitCloudAssistDisabled();
                     return false;
                 }
                 if (ex is ProviderDisabledException)
@@ -1892,6 +1952,11 @@ public sealed class WorkflowFacade
                 if (ex is ProviderUnavailableException)
                 {
                     HandleProviderUnavailable(ex);
+                    return false;
+                }
+                if (ex is CloudAssistDisabledException)
+                {
+                    EmitCloudAssistDisabled();
                     return false;
                 }
                 if (ex is ProviderDisabledException)
@@ -2182,6 +2247,11 @@ public sealed class WorkflowFacade
             if (ex is ProviderUnavailableException)
             {
                 HandleProviderUnavailable(ex);
+                return;
+            }
+            if (ex is CloudAssistDisabledException)
+            {
+                EmitCloudAssistDisabled();
                 return;
             }
             if (ex is ProviderDisabledException)

@@ -2,7 +2,7 @@
 
 namespace RahBuilder.Workflow.Provider;
 
-public sealed class ProviderState
+public sealed class ProviderState : IProvider
 {
     public bool Enabled { get; }
     public bool Reachable { get; set; }

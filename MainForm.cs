@@ -75,6 +75,7 @@ public sealed class MainForm : Form
         _workflow.TraceAttentionRequested += ShowTracePane;
         _workflow.PlanReady += OnPlanReady;
         _workflow.ProviderStateChanged += OnProviderStateChanged;
+        ProviderDiagnosticsHub.MetricsUpdated += _ => OnProviderMetricsUpdated();
 
         _mainTabs = new TabControl { Dock = DockStyle.Fill };
 
@@ -112,7 +113,7 @@ public sealed class MainForm : Form
             Margin = new Padding(0, 0, 0, 6)
         };
         _providerBadge.LinkClicked += (_, _) => OpenProvidersSettings();
-        _providerToolTip.SetToolTip(_providerBadge, "Provider enabled/disabled; click to open settings");
+        _providerToolTip.SetToolTip(_providerBadge, "Local Provider enabled/disabled; click to open settings");
         _providerSettingsLink = new LinkLabel
         {
             AutoSize = true,
@@ -394,9 +395,10 @@ public sealed class MainForm : Form
     {
         var enabled = _workflow.ProviderState.Enabled;
         var reachable = _workflow.ProviderState.Reachable;
+        var metrics = ProviderDiagnosticsHub.LatestMetrics;
         if (!enabled)
         {
-            _providerBadge.Text = "⚠️ Provider: OFF";
+            _providerBadge.Text = "⚠️ Local Provider: OFF";
             _providerBadge.LinkColor = Color.Goldenrod;
             _composer.SetProviderOffline(false);
             UpdateStatusLine();
@@ -405,20 +407,34 @@ public sealed class MainForm : Form
 
         if (!reachable)
         {
-            _providerBadge.Text = "⚠️ Provider: OFFLINE";
+            _providerBadge.Text = "⚠️ Local Provider: OFFLINE";
             _providerBadge.LinkColor = Color.Firebrick;
             _composer.SetProviderOffline(true);
             UpdateStatusLine();
             return;
         }
 
-        _providerBadge.Text = "🧠 Provider: ON";
-        _providerBadge.LinkColor = Color.SeaGreen;
+        if (metrics.IsStale)
+        {
+            _providerBadge.Text = "⏳ Local Provider: STALE";
+            _providerBadge.LinkColor = Color.Goldenrod;
+        }
+        else
+        {
+            _providerBadge.Text = "🧠 Local Provider: ON";
+            _providerBadge.LinkColor = Color.SeaGreen;
+        }
         _composer.SetProviderOffline(false);
         UpdateStatusLine();
     }
 
     private void OnProviderStateChanged(ProviderState state)
+    {
+        if (!IsHandleCreated) return;
+        BeginInvoke(new Action(UpdateProviderBadge));
+    }
+
+    private void OnProviderMetricsUpdated()
     {
         if (!IsHandleCreated) return;
         BeginInvoke(new Action(UpdateProviderBadge));
@@ -435,8 +451,17 @@ public sealed class MainForm : Form
     {
         var enabled = _workflow.ProviderState.Enabled;
         var reachable = _workflow.ProviderState.Reachable;
-        var providerText = enabled ? (reachable ? "Provider: ON" : "Provider: OFFLINE") : "Provider: OFF";
-        var providerColor = enabled ? (reachable ? Color.SeaGreen : Color.Firebrick) : Color.Goldenrod;
+        var metrics = ProviderDiagnosticsHub.LatestMetrics;
+        var providerText = enabled
+            ? (reachable
+                ? (metrics.IsStale ? "Local Provider: STALE" : "Local Provider: ON")
+                : "Local Provider: OFFLINE")
+            : "Local Provider: OFF";
+        var providerColor = enabled
+            ? (reachable
+                ? (metrics.IsStale ? Color.Goldenrod : Color.SeaGreen)
+                : Color.Firebrick)
+            : Color.Goldenrod;
 
         var toolchainStatus = ComputeToolchainStatus(_toolingDiagnostics);
         var toolchainText = $"Toolchain: {toolchainStatus.Text}";

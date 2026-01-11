@@ -42,7 +42,7 @@ public sealed class WorkflowFacadeProviderTests
 
         await facade.RouteUserInput("hello", CancellationToken.None);
 
-        Assert.Equal("Provider offline — check settings or retry.", message);
+        Assert.Equal("Provider currently unavailable — try ‘Retry Provider’ or check settings.", message);
     }
 
     private sealed class NullTraceSink : ITraceSink
