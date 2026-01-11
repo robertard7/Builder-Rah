@@ -392,6 +392,16 @@ public sealed class WorkflowFacade
             return;
         }
 
+        var intentDoc = _intentBuilder.BuildDocument(_state.IntentState);
+        var intentErrors = IntentValidation.Validate(intentDoc);
+        if (intentErrors.Count > 0 && action.Action == ReplyActionType.NewRequest)
+        {
+            _state.PendingQuestion = "Could you clarify your request so I can proceed?";
+            UserFacingMessage?.Invoke(_state.PendingQuestion);
+            NotifyStatus("Waiting clarification");
+            return;
+        }
+
         // If last attempt produced invalid_json, DO NOT spin. Only accept "edit ...".
         if (_forceEditBecauseInvalidJson)
         {

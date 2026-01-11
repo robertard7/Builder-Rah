@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IntentSchema.v1",
+  "type": "object",
+  "required": ["version", "goal", "ready", "actions", "constraints", "context"],
+  "properties": {
+    "version": { "type": "string", "const": "intent.v1" },
+    "goal": { "type": "string" },
+    "context": { "type": "string" },
+    "actions": { "type": "array", "items": { "type": "string" } },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "missing": { "type": "array", "items": { "type": "string" } },
+    "ready": { "type": "boolean" },
+    "clarification": { "type": "string" }
+  }
+}

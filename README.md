@@ -57,6 +57,39 @@ dotnet run -- --headless --text "Build TODO API with auth and tests" --output ./
 
 This runs the workflow once, waits for artifact completion, and copies the generated zip to `./out`.
 
+## Headless session API
+
+The headless server also exposes session endpoints for integrations:
+
+- `GET /sessions`
+- `POST /sessions`
+- `GET /sessions/{id}`
+- `GET /sessions/{id}/status`
+- `GET /sessions/{id}/plan`
+- `POST /sessions/{id}/message`
+- `POST /sessions/{id}/attachments`
+- `POST /sessions/{id}/run`
+- `POST /sessions/{id}/cancel`
+- `DELETE /sessions/{id}`
+- `GET /provider/metrics`
+- `GET /provider/events`
+
+See `openapi.yaml` for the full schema.
+
+## CLI
+
+The CLI is available via `rah`:
+
+```bash
+rah session list
+rah session start --id <id>
+rah session send --id <id> --message "text"
+rah session status --id <id>
+rah session plan --id <id>
+rah session cancel --id <id>
+rah run --id <id>
+```
+
 ## Caching
 
 - Artifact sets are hashed by job spec, constraints, attachments, and tool outputs (SHA256).

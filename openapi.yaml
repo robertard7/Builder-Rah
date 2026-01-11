@@ -1,0 +1,158 @@
+openapi: 3.0.1
+info:
+  title: Builder-Rah Headless API
+  version: "1.0.0"
+paths:
+  /sessions:
+    get:
+      summary: List sessions
+      responses:
+        "200":
+          description: Sessions list
+    post:
+      summary: Create session
+      responses:
+        "201":
+          description: Created
+  /sessions/{id}:
+    get:
+      summary: Get session metadata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session metadata
+        "404":
+          description: Not found
+    delete:
+      summary: Delete session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+  /sessions/{id}/status:
+    get:
+      summary: Get session status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Status
+        "404":
+          description: Not found
+  /sessions/{id}/plan:
+    get:
+      summary: Get pending plan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Plan
+        "404":
+          description: Not found
+  /sessions/{id}/messages:
+    get:
+      summary: Get session messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Messages
+        "404":
+          description: Not found
+  /sessions/{id}/message:
+    post:
+      summary: Send message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Response
+        "400":
+          description: Bad request
+  /sessions/{id}/attachments:
+    post:
+      summary: Add attachment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Attachment result
+        "400":
+          description: Bad request
+  /sessions/{id}/run:
+    post:
+      summary: Run plan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Execution response
+  /sessions/{id}/cancel:
+    post:
+      summary: Cancel plan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cancelled
+  /provider/metrics:
+    get:
+      summary: Provider metrics
+      responses:
+        "200":
+          description: Metrics
+  /provider/events:
+    get:
+      summary: Provider events
+      responses:
+        "200":
+          description: Events
+components:
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object

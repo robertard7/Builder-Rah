@@ -56,6 +56,34 @@ public sealed class IntentBuilder
         return BuildUpdate(state, false, null);
     }
 
+    public IntentDocumentV1 BuildDocument(IntentState state)
+    {
+        var goal = state.CurrentGoal ?? "";
+        var missing = new List<string>();
+        var actions = new List<string>();
+        var constraints = new List<string>();
+        var clarification = "";
+
+        if (string.IsNullOrWhiteSpace(goal))
+            missing.Add("goal");
+
+        if (state.Status == IntentStatus.Clarifying)
+            clarification = "Clarification required.";
+
+        if (!string.IsNullOrWhiteSpace(goal))
+            actions.Add(goal);
+
+        return new IntentDocumentV1(
+            "intent.v1",
+            goal,
+            "",
+            actions,
+            constraints,
+            missing,
+            state.Status == IntentStatus.Ready,
+            clarification);
+    }
+
     private static IntentState CloneOrCreate(IntentState? priorState)
     {
         if (priorState == null)

@@ -305,7 +305,8 @@ public sealed class MainForm : Form
         // ALWAYS marshal to UI thread.
         BeginInvoke(new Action(() =>
         {
-            AppendChat(s + "\n");
+            var sanitized = OutputSanitizer.Sanitize(s);
+            AppendChat(sanitized + "\n");
         }));
     }
 

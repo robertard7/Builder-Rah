@@ -7,6 +7,8 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using RahBuilder.Common.Json;
+using RahBuilder.Headless.Api;
 using RahBuilder.Settings;
 using RahBuilder.Workflow.Provider;
 using RahOllamaOnly.Tracing;
@@ -69,7 +71,7 @@ public sealed class HeadlessApiServer
         {
             if (!Authorize(ctx))
             {
-                await WriteJsonAsync(ctx, 401, new { error = "unauthorized" }, ct).ConfigureAwait(false);
+                await WriteErrorAsync(ctx, 401, ApiError.Unauthorized(), ct).ConfigureAwait(false);
                 return;
             }
 
@@ -81,6 +83,13 @@ public sealed class HeadlessApiServer
             {
                 var metrics = ProviderDiagnosticsHub.LatestMetrics;
                 await WriteJsonAsync(ctx, 200, metrics, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "GET" && path == "/provider/events")
+            {
+                var eventsList = ProviderDiagnosticsHub.Events;
+                await WriteJsonAsync(ctx, 200, eventsList, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -109,7 +118,7 @@ public sealed class HeadlessApiServer
                     var state = _store.Load(sessionId);
                     if (state == null)
                     {
-                        await WriteJsonAsync(ctx, 404, new { error = "not_found" }, ct).ConfigureAwait(false);
+                        await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
                         return;
                     }
                     await WriteJsonAsync(ctx, 200, new { sessionId = state.SessionId, lastTouched = state.LastTouched }, ct).ConfigureAwait(false);
@@ -121,10 +130,40 @@ public sealed class HeadlessApiServer
                     var state = _store.Load(sessionId);
                     if (state == null)
                     {
-                        await WriteJsonAsync(ctx, 404, new { error = "not_found" }, ct).ConfigureAwait(false);
+                        await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
                         return;
                     }
                     await WriteJsonAsync(ctx, 200, state.Messages, ct).ConfigureAwait(false);
+                    return;
+                }
+
+                if (parts.Length == 3 && parts[2] == "status" && req.HttpMethod == "GET")
+                {
+                    var state = _store.Load(sessionId);
+                    if (state == null)
+                    {
+                        await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
+                        return;
+                    }
+                    var workflow = new WorkflowFacade(_cfg, _trace);
+                    workflow.ApplySessionState(state);
+                    var status = workflow.GetPublicSnapshot();
+                    await WriteJsonAsync(ctx, 200, new { sessionId, status }, ct).ConfigureAwait(false);
+                    return;
+                }
+
+                if (parts.Length == 3 && parts[2] == "plan" && req.HttpMethod == "GET")
+                {
+                    var state = _store.Load(sessionId);
+                    if (state == null)
+                    {
+                        await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
+                        return;
+                    }
+                    var workflow = new WorkflowFacade(_cfg, _trace);
+                    workflow.ApplySessionState(state);
+                    var plan = workflow.GetPendingPlan();
+                    await WriteJsonAsync(ctx, 200, new { sessionId, plan }, ct).ConfigureAwait(false);
                     return;
                 }
 
@@ -134,7 +173,7 @@ public sealed class HeadlessApiServer
                     var text = payload.TryGetProperty("text", out var t) ? t.GetString() ?? "" : "";
                     if (string.IsNullOrWhiteSpace(text))
                     {
-                        await WriteJsonAsync(ctx, 400, new { error = "text_required" }, ct).ConfigureAwait(false);
+                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("text_required"), ct).ConfigureAwait(false);
                         return;
                     }
                     var response = await RunMessageAsync(sessionId, text, ct).ConfigureAwait(false);
@@ -148,7 +187,7 @@ public sealed class HeadlessApiServer
                     var pathValue = payload.TryGetProperty("path", out var p) ? p.GetString() ?? "" : "";
                     if (string.IsNullOrWhiteSpace(pathValue) || !File.Exists(pathValue))
                     {
-                        await WriteJsonAsync(ctx, 400, new { error = "path_required" }, ct).ConfigureAwait(false);
+                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("path_required"), ct).ConfigureAwait(false);
                         return;
                     }
 
@@ -169,13 +208,37 @@ public sealed class HeadlessApiServer
                     await WriteJsonAsync(ctx, 200, response, ct).ConfigureAwait(false);
                     return;
                 }
+
+                if (parts.Length == 3 && parts[2] == "cancel" && req.HttpMethod == "POST")
+                {
+                    var state = _store.Load(sessionId);
+                    if (state == null)
+                    {
+                        await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
+                        return;
+                    }
+                    var workflow = new WorkflowFacade(_cfg, _trace);
+                    workflow.ApplySessionState(state);
+                    workflow.StopPlan();
+                    var updated = workflow.BuildSessionState();
+                    _store.Save(updated);
+                    await WriteJsonAsync(ctx, 200, new { sessionId, status = workflow.GetPublicSnapshot() }, ct).ConfigureAwait(false);
+                    return;
+                }
+
+                if (parts.Length == 2 && req.HttpMethod == "DELETE")
+                {
+                    _store.Delete(sessionId);
+                    await WriteJsonAsync(ctx, 200, new { ok = true, sessionId }, ct).ConfigureAwait(false);
+                    return;
+                }
             }
 
-            await WriteJsonAsync(ctx, 404, new { error = "not_found" }, ct).ConfigureAwait(false);
+            await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            await WriteJsonAsync(ctx, 500, new { error = ex.Message }, ct).ConfigureAwait(false);
+            await WriteErrorAsync(ctx, 500, ApiError.ServerError(ex.Message), ct).ConfigureAwait(false);
         }
     }
 
@@ -232,7 +295,7 @@ public sealed class HeadlessApiServer
 
     private static async Task WriteJsonAsync(HttpListenerContext ctx, int statusCode, object payload, CancellationToken ct)
     {
-        var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonDefaults.Serialize(payload);
         var bytes = Encoding.UTF8.GetBytes(json);
         ctx.Response.StatusCode = statusCode;
         ctx.Response.ContentType = "application/json";
@@ -240,5 +303,10 @@ public sealed class HeadlessApiServer
         ctx.Response.ContentLength64 = bytes.Length;
         await ctx.Response.OutputStream.WriteAsync(bytes.AsMemory(0, bytes.Length), ct).ConfigureAwait(false);
         ctx.Response.OutputStream.Close();
+    }
+
+    private static Task WriteErrorAsync(HttpListenerContext ctx, int statusCode, ApiError error, CancellationToken ct)
+    {
+        return WriteJsonAsync(ctx, statusCode, error, ct);
     }
 }
