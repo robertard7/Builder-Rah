@@ -16,6 +16,8 @@ using RahOllamaOnly.Tracing;
 
 namespace RahBuilder.Workflow;
 
+public sealed record ProviderState(bool Enabled, bool Reachable);
+
 public sealed class WorkflowFacade
 {
     private readonly RunTrace _trace;
