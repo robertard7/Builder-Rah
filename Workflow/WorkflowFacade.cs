@@ -31,7 +31,7 @@ public sealed class WorkflowFacade
     private IReadOnlyList<string> _toolingValidationErrors = Array.Empty<string>();
     private IReadOnlyList<string> _toolingWarnings = Array.Empty<string>();
     private bool _toolingValid = true;
-    private bool _providerReachable = true;
+    private ProviderState _providerState = new(true, true);
 
     private string _lastGraphHash = "";
     private bool _recentlyCompleted;
@@ -72,14 +72,15 @@ public sealed class WorkflowFacade
     public event Action? TraceAttentionRequested;
     public event Action<OutputCard>? OutputCardProduced;
     public event Action<PlanDefinition>? PlanReady;
-    public event Action<bool>? ProviderReachabilityChanged;
+    public event Action<ProviderState>? ProviderStateChanged;
 
-    public bool ProviderReachable => _providerReachable;
+    public ProviderState ProviderState => _providerState;
 
     public WorkflowFacade(RunTrace trace)
     {
         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
         _cfg = ConfigStore.Load();
+        _providerState = new ProviderState(_cfg.General.ProviderEnabled, true);
         _executor = new ExecutionOrchestrator(_state, _trace);
         _executor.OutputCardProduced += OnOutputCardProduced;
         _executor.UserFacingMessage += msg =>
@@ -89,6 +90,7 @@ public sealed class WorkflowFacade
             UserFacingMessage?.Invoke(msg);
         };
         LlmInvoker.AuditLogger = msg => _trace.Emit("[model:audit] " + msg);
+        LlmInvoker.IsProviderReachable = () => _providerState.Reachable;
         _apiHost = new ProviderApiHost(this);
         SyncGraphToHub(_cfg);
         LogRepoBanner();
@@ -100,6 +102,7 @@ public sealed class WorkflowFacade
     {
         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
+        _providerState = new ProviderState(_cfg.General.ProviderEnabled, true);
         _executor = new ExecutionOrchestrator(_state, _trace);
         _executor.OutputCardProduced += OnOutputCardProduced;
         _executor.UserFacingMessage += msg =>
@@ -109,6 +112,7 @@ public sealed class WorkflowFacade
             UserFacingMessage?.Invoke(msg);
         };
         LlmInvoker.AuditLogger = msg => _trace.Emit("[model:audit] " + msg);
+        LlmInvoker.IsProviderReachable = () => _providerState.Reachable;
         _apiHost = new ProviderApiHost(this);
         SyncGraphToHub(_cfg);
         LogRepoBanner();
@@ -290,18 +294,33 @@ public sealed class WorkflowFacade
         _state.WaitLoopCount = 0;
     }
 
-    public void MarkProviderReachable(bool reachable, string reason)
+    public void UpdateProviderEnabled(bool enabled)
     {
-        if (_providerReachable == reachable) return;
-        _providerReachable = reachable;
-        _trace.Emit(reason);
-        ProviderReachabilityChanged?.Invoke(reachable);
+        if (_providerState.Enabled == enabled) return;
+        _providerState = _providerState with { Enabled = enabled };
+        var stamp = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        var evt = enabled ? "ProviderEnabled" : "ProviderDisabled";
+        _trace.Emit($"[provider] {evt} at {stamp}");
+        ProviderStateChanged?.Invoke(_providerState);
+    }
+
+    public void MarkProviderReachable(bool reachable, string detail)
+    {
+        if (_providerState.Reachable == reachable) return;
+        _providerState = _providerState with { Reachable = reachable };
+        var stamp = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        var evt = reachable ? "ProviderReachable" : "ProviderUnreachable";
+        var message = string.IsNullOrWhiteSpace(detail) ? "" : $" ({detail})";
+        _trace.Emit($"[provider] {evt} at {stamp}{message}");
+        ProviderStateChanged?.Invoke(_providerState);
     }
 
     public void RetryProvider()
     {
         var stamp = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        MarkProviderReachable(true, $"[provider] Provider retry requested at {stamp}");
+        _trace.Emit($"[provider] ProviderRetryInitiated at {stamp}");
+        RefreshTooling();
+        MarkProviderReachable(true, "retry");
     }
 
     public Task RouteUserInput(string text, CancellationToken ct) => RouteUserInput(_cfg, text, ct);
@@ -317,9 +336,14 @@ public sealed class WorkflowFacade
             return;
         }
 
-        if (!_cfg.General.ProviderEnabled)
+        if (!_providerState.Enabled)
         {
             EmitProviderDisabled();
+            return;
+        }
+        if (!_providerState.Reachable)
+        {
+            EmitProviderOffline();
             return;
         }
 
@@ -1001,9 +1025,16 @@ public sealed class WorkflowFacade
 
     private void HandleProviderUnavailable(Exception ex)
     {
-        var detail = ex?.Message ?? "provider unavailable";
-        MarkProviderReachable(false, "[provider:offline] " + detail);
-        UserFacingMessage?.Invoke("Currently offline or provider unreachable. Try again later.");
+        var detail = ex is ProviderUnavailableException && ex.InnerException != null
+            ? ex.InnerException.Message
+            : ex?.Message ?? "provider unavailable";
+        MarkProviderReachable(false, detail);
+        UserFacingMessage?.Invoke("Provider offline — check settings or retry.");
+    }
+
+    private void EmitProviderOffline()
+    {
+        UserFacingMessage?.Invoke("Provider offline — check settings or retry.");
     }
 
     private void SyncGraphToHub(AppConfig cfg)

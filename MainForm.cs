@@ -36,6 +36,7 @@ public sealed class MainForm : Form
     private readonly ToolStripStatusLabel _workflowStatus;
     private readonly LinkLabel _providerBadge;
     private readonly ToolTip _providerToolTip;
+    private readonly LinkLabel _providerSettingsLink;
     private readonly TabPage _settingsTab;
     private readonly SettingsHostControl _settingsControl;
     private bool _lastProviderEnabled;
@@ -67,7 +68,7 @@ public sealed class MainForm : Form
         _workflow.OutputCardProduced += OnOutputCardProduced;
         _workflow.TraceAttentionRequested += ShowTracePane;
         _workflow.PlanReady += OnPlanReady;
-        _workflow.ProviderReachabilityChanged += OnProviderReachabilityChanged;
+        _workflow.ProviderStateChanged += OnProviderStateChanged;
 
         _mainTabs = new TabControl { Dock = DockStyle.Fill };
 
@@ -103,6 +104,14 @@ public sealed class MainForm : Form
         };
         _providerBadge.LinkClicked += (_, _) => OpenProvidersSettings();
         _providerToolTip.SetToolTip(_providerBadge, "Provider enabled/disabled; click to open settings");
+        _providerSettingsLink = new LinkLabel
+        {
+            AutoSize = true,
+            Text = "Settings",
+            LinkBehavior = LinkBehavior.NeverUnderline,
+            Margin = new Padding(8, 0, 0, 6)
+        };
+        _providerSettingsLink.LinkClicked += (_, _) => OpenProvidersSettings();
 
         var providerHeader = new FlowLayoutPanel
         {
@@ -113,6 +122,7 @@ public sealed class MainForm : Form
             Padding = new Padding(6, 6, 6, 0)
         };
         providerHeader.Controls.Add(_providerBadge);
+        providerHeader.Controls.Add(_providerSettingsLink);
 
         var chatPanel = new Panel { Dock = DockStyle.Fill };
         chatPanel.Controls.Add(_chatView);
@@ -251,7 +261,7 @@ public sealed class MainForm : Form
             _workflow.OutputCardProduced -= OnOutputCardProduced;
             _workflow.TraceAttentionRequested -= ShowTracePane;
             _workflow.PlanReady -= OnPlanReady;
-            _workflow.ProviderReachabilityChanged -= OnProviderReachabilityChanged;
+            _workflow.ProviderStateChanged -= OnProviderStateChanged;
         };
 
         UpdateStatus(null);
@@ -282,10 +292,14 @@ public sealed class MainForm : Form
         _composer.ReloadAttachments(_inbox.List());
         _workflow.SetAttachments(_inbox.List());
 
-        if (_lastProviderEnabled != _config.General.ProviderEnabled && _config.General.ProviderEnabled)
+        if (_lastProviderEnabled != _config.General.ProviderEnabled)
         {
-            _workflow.ResetProviderState();
-            _workflow.MarkProviderReachable(true, $"[provider] Provider enabled at {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss}");
+            _workflow.UpdateProviderEnabled(_config.General.ProviderEnabled);
+            if (_config.General.ProviderEnabled)
+            {
+                _workflow.ResetProviderState();
+                _workflow.MarkProviderReachable(true, "enabled");
+            }
         }
         _lastProviderEnabled = _config.General.ProviderEnabled;
         UpdateProviderBadge();
@@ -347,12 +361,12 @@ public sealed class MainForm : Form
 
     private void UpdateProviderBadge()
     {
-        var enabled = _config.General.ProviderEnabled;
-        var reachable = _workflow.ProviderReachable;
+        var enabled = _workflow.ProviderState.Enabled;
+        var reachable = _workflow.ProviderState.Reachable;
         if (!enabled)
         {
             _providerBadge.Text = "⚠️ Provider: OFF";
-            _providerBadge.LinkColor = Color.Firebrick;
+            _providerBadge.LinkColor = Color.Goldenrod;
             _composer.SetProviderOffline(false);
             return;
         }
@@ -360,7 +374,7 @@ public sealed class MainForm : Form
         if (!reachable)
         {
             _providerBadge.Text = "⚠️ Provider: OFFLINE";
-            _providerBadge.LinkColor = Color.DarkGoldenrod;
+            _providerBadge.LinkColor = Color.Firebrick;
             _composer.SetProviderOffline(true);
             return;
         }
@@ -370,7 +384,7 @@ public sealed class MainForm : Form
         _composer.SetProviderOffline(false);
     }
 
-    private void OnProviderReachabilityChanged(bool reachable)
+    private void OnProviderStateChanged(ProviderState state)
     {
         if (!IsHandleCreated) return;
         BeginInvoke(new Action(UpdateProviderBadge));

@@ -17,6 +17,7 @@ public static class LlmInvoker
 {
     private static readonly HttpClient _http = new HttpClient();
     public static Action<string>? AuditLogger { get; set; }
+    public static Func<bool>? IsProviderReachable { get; set; }
 
     public static async Task<string> InvokeChatAsync(
         AppConfig cfg,
@@ -32,6 +33,8 @@ public static class LlmInvoker
         if (role.Length == 0) throw new InvalidOperationException("Role is required.");
         if (cfg.General != null && !cfg.General.ProviderEnabled)
             throw new ProviderDisabledException("provider_disabled");
+        if (IsProviderReachable != null && !IsProviderReachable())
+            throw new ProviderUnavailableException("provider_unreachable");
 
         // Try exact role first, then case-insensitive match.
         var rc = cfg.Orchestrator?.Roles?

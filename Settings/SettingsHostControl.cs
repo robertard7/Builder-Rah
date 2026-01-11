@@ -35,7 +35,7 @@ public sealed class SettingsHostControl : UserControl
     {
         var tabs = new TabControl { Dock = DockStyle.Fill };
 
-        _providersPage = new ProvidersSettingsPage(_config, _trace);
+        _providersPage = new ProvidersSettingsPage(_config);
 
         AddTab(tabs, "General", new GeneralSettingsPage(_config, _trace));
         AddTab(tabs, "Providers", _providersPage);

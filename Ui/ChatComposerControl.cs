@@ -104,8 +104,8 @@ public sealed class ChatComposerControl : UserControl
         _providerHint = new Label
         {
             AutoSize = true,
-            ForeColor = Color.DarkGoldenrod,
-            Text = "Currently offline or provider unreachable. Try again later.",
+            ForeColor = Color.Firebrick,
+            Text = "Provider offline — check settings or retry.",
             Visible = false
         };
         _retryProvider = new Button

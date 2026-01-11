@@ -2,20 +2,19 @@
 using System;
 using System.Windows.Forms;
 using RahBuilder.Settings;
-using RahOllamaOnly.Tracing;
 
 namespace RahBuilder.Settings.Pages;
 
 public sealed class ProvidersSettingsPage : UserControl
 {
     private readonly AppConfig _config;
-    private readonly RunTrace? _trace;
     private readonly CheckBox _providerEnabled;
+    private readonly ToolTip _providerTip;
 
-    public ProvidersSettingsPage(AppConfig config, RunTrace? trace = null)
+    public ProvidersSettingsPage(AppConfig config)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
-        _trace = trace;
+        _providerTip = new ToolTip();
 
         var root = new TableLayoutPanel
         {
@@ -39,9 +38,6 @@ public sealed class ProvidersSettingsPage : UserControl
         {
             _config.General.ProviderEnabled = _providerEnabled.Checked;
             AutoSave.Touch();
-            var status = _providerEnabled.Checked ? "enabled" : "disabled";
-            var stamp = DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            _trace?.Emit($"[provider] Provider {status} at {stamp}");
         };
 
         var providerBox = new GroupBox { Text = "Provider", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(10) };
@@ -58,6 +54,7 @@ public sealed class ProvidersSettingsPage : UserControl
             MaximumSize = new Size(760, 0),
             Text = "When off, all language model calls are suppressed; workflow will request you re-enable this before running."
         };
+        _providerTip.SetToolTip(_providerEnabled, desc.Text);
         providerPanel.Controls.Add(_providerEnabled);
         providerPanel.Controls.Add(desc);
         providerBox.Controls.Add(providerPanel);
