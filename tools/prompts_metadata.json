@@ -1,6 +1,7 @@
 {
   "version": 1,
   "description": "Prompt template metadata for tool handlers",
+  "notes": "Canonical prompt metadata registry for tool templates.",
   "categories": [
     "CLI",
     "IDE",
