@@ -1,0 +1,12 @@
+name: openapi-validate
+on:
+  push:
+  pull_request:
+jobs:
+  validate:
+    runs-on: [self-hosted, Windows, X64, Builder-Rah]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate OpenAPI
+        shell: pwsh
+        run: ./scripts/validate-openapi.ps1

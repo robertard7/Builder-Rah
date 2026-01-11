@@ -42,6 +42,8 @@ public sealed class GeneralSettings
     public bool ContainerOnly { get; set; } = true;
     public bool EnableGlobalClipboardShortcuts { get; set; } = true;
     public string ExecutionTarget { get; set; } = OperatingSystem.IsWindows() ? "WindowsHost" : "LinuxContainer";
+    public bool ProviderEnabled { get; set; } = true;
+    public bool CloudAssistEnabled { get; set; } = false;
     public bool EnableProviderApi { get; set; } = true;
     public int ProviderApiPort { get; set; } = 5050;
 

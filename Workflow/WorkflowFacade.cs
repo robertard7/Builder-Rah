@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using RahBuilder.Settings;
 using RahBuilder.Tools.BlueprintTemplates;
+using RahBuilder.Workflow.Provider;
 using RahOllamaOnly.Tools;
 using RahOllamaOnly.Tools.Diagnostics;
 using RahOllamaOnly.Tools.Prompt;
@@ -29,7 +30,10 @@ public sealed class WorkflowFacade
     private ToolManifest _toolManifest = new();
     private ToolPromptRegistry _toolPrompts = new();
     private IReadOnlyList<string> _toolingValidationErrors = Array.Empty<string>();
+    private IReadOnlyList<string> _toolingWarnings = Array.Empty<string>();
     private bool _toolingValid = true;
+    private readonly ProviderManager _providerManager;
+    private readonly SessionStore _sessionStore = new();
 
     private string _lastGraphHash = "";
     private bool _recentlyCompleted;
@@ -70,11 +74,22 @@ public sealed class WorkflowFacade
     public event Action? TraceAttentionRequested;
     public event Action<OutputCard>? OutputCardProduced;
     public event Action<PlanDefinition>? PlanReady;
+    public event Action<ProviderState>? ProviderStateChanged;
+
+    public ProviderState ProviderState => _providerManager.State;
 
     public WorkflowFacade(RunTrace trace)
     {
         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
         _cfg = ConfigStore.Load();
+        _providerManager = new ProviderManager(new ProviderState(_cfg.General.ProviderEnabled, true), msg => _trace.Emit(msg));
+        _providerManager.StateChanged += state => ProviderStateChanged?.Invoke(state);
+        _providerManager.ConfigureRetryHandler(async ct =>
+        {
+            RefreshTooling();
+            await Task.CompletedTask.ConfigureAwait(false);
+            return true;
+        });
         _executor = new ExecutionOrchestrator(_state, _trace);
         _executor.OutputCardProduced += OnOutputCardProduced;
         _executor.UserFacingMessage += msg =>
@@ -84,6 +99,8 @@ public sealed class WorkflowFacade
             UserFacingMessage?.Invoke(msg);
         };
         LlmInvoker.AuditLogger = msg => _trace.Emit("[model:audit] " + msg);
+        LlmInvoker.IsProviderReachable = () => _providerManager.IsReachable;
+        LlmInvoker.ProviderCallSucceeded = provider => _providerManager.RecordSuccess(provider);
         _apiHost = new ProviderApiHost(this);
         SyncGraphToHub(_cfg);
         LogRepoBanner();
@@ -95,6 +112,14 @@ public sealed class WorkflowFacade
     {
         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
+        _providerManager = new ProviderManager(new ProviderState(_cfg.General.ProviderEnabled, true), msg => _trace.Emit(msg));
+        _providerManager.StateChanged += state => ProviderStateChanged?.Invoke(state);
+        _providerManager.ConfigureRetryHandler(async ct =>
+        {
+            RefreshTooling();
+            await Task.CompletedTask.ConfigureAwait(false);
+            return true;
+        });
         _executor = new ExecutionOrchestrator(_state, _trace);
         _executor.OutputCardProduced += OnOutputCardProduced;
         _executor.UserFacingMessage += msg =>
@@ -104,6 +129,8 @@ public sealed class WorkflowFacade
             UserFacingMessage?.Invoke(msg);
         };
         LlmInvoker.AuditLogger = msg => _trace.Emit("[model:audit] " + msg);
+        LlmInvoker.IsProviderReachable = () => _providerManager.IsReachable;
+        LlmInvoker.ProviderCallSucceeded = provider => _providerManager.RecordSuccess(provider);
         _apiHost = new ProviderApiHost(this);
         SyncGraphToHub(_cfg);
         LogRepoBanner();
@@ -119,6 +146,11 @@ public sealed class WorkflowFacade
     }
 
     private void BroadcastEvent(string type, object payload) => SessionManager.AddEvent(_state.SessionToken, type, payload);
+
+    private void EmitWorkflowEvent(WorkflowEvent evt, string message)
+    {
+        BroadcastEvent("workflow_event", new { eventType = evt.ToString(), message });
+    }
 
     private void StartApiHostIfEnabled()
     {
@@ -153,6 +185,7 @@ public sealed class WorkflowFacade
         _state.ClearPlan();
         _state.PendingUserRequest = "";
         _state.ClearClarifications();
+        _state.Canceled = false;
         PendingStepChanged?.Invoke("", false);
         NotifyStatus();
         _planNeedsArtifacts = false;
@@ -164,8 +197,21 @@ public sealed class WorkflowFacade
         _state.ClearPlan();
         _state.PendingUserRequest = "";
         _state.ClearClarifications();
+        _state.Canceled = false;
         PendingStepChanged?.Invoke("", false);
         EmitWaitUser("Plan cleared. Tell me what you’d like instead.");
+        NotifyStatus();
+    }
+
+    public void CancelPlan()
+    {
+        _recentlyCompleted = false;
+        _state.Canceled = true;
+        _state.ClearPlan();
+        _state.ClearClarifications();
+        _state.PendingUserRequest = "";
+        _state.PendingQuestion = null;
+        PendingStepChanged?.Invoke("", false);
         NotifyStatus();
     }
 
@@ -173,6 +219,7 @@ public sealed class WorkflowFacade
     {
         _attachments = (attachments ?? Array.Empty<AttachmentInbox.AttachmentEntry>()).ToList();
         NotifyStatus();
+        SaveSessionSnapshot();
     }
 
     public ToolPlan? GetPendingPlan() => _state.PendingToolPlan;
@@ -257,9 +304,51 @@ public sealed class WorkflowFacade
             _trace.Emit("[tooling:error] tools manifest validation failed: " + summary);
         }
 
-        var diag = ToolingValidator.Validate(_toolManifest, _toolPrompts, _toolingValidationErrors);
+        var repoScope = RepoScope.Resolve(_cfg);
+        var settingsWarning = RepoScope.GetTrackedLocalSettingsWarning(repoScope);
+        _toolingWarnings = string.IsNullOrWhiteSpace(settingsWarning)
+            ? Array.Empty<string>()
+            : new[] { settingsWarning };
+
+        var diag = ToolingValidator.Validate(_toolManifest, _toolPrompts, _toolingValidationErrors, _toolingWarnings);
         ToolingDiagnosticsHub.Publish(diag);
         _trace.Emit($"[tooling] tools={manifest.ToolsById.Count} toolPrompts(files)={promptFiles}");
+    }
+
+    public void ResetProviderState()
+    {
+        _state.ClearPlan();
+        _state.ClearClarifications();
+        _state.PendingQuestion = null;
+        _state.PendingUserRequest = "";
+        _state.LastJobSpecJson = null;
+        _state.LastIntent = null;
+        _state.LastIntentResult = null;
+        _state.IntentState = new IntentState();
+        _state.ChatIntakeCompleted = false;
+        _state.LastRoute = "";
+        _state.LastRouteBeforeWait = "";
+        _state.WaitLoopKey = "";
+        _state.WaitLoopCount = 0;
+    }
+
+    public void UpdateProviderEnabled(bool enabled)
+    {
+        _providerManager.UpdateEnabled(enabled);
+    }
+
+    public void MarkProviderReachable(bool reachable, string detail)
+    {
+        _providerManager.MarkReachable(reachable, detail);
+    }
+
+    public void RetryProvider()
+    {
+        _ = _providerManager.RetryAsync(() =>
+        {
+            RefreshTooling();
+            return Task.CompletedTask;
+        });
     }
 
     public Task RouteUserInput(string text, CancellationToken ct) => RouteUserInput(_cfg, text, ct);
@@ -268,10 +357,22 @@ public sealed class WorkflowFacade
     {
         if (cfg != null) _cfg = cfg;
         text ??= "";
+        _state.Canceled = false;
 
         if (string.IsNullOrWhiteSpace(text))
         {
             EmitWaitUser("You must start with user chat input.");
+            return;
+        }
+
+        if (!_providerManager.IsEnabled)
+        {
+            EmitProviderDisabled();
+            return;
+        }
+        if (!_providerManager.IsReachable)
+        {
+            EmitProviderOffline();
             return;
         }
 
@@ -282,6 +383,7 @@ public sealed class WorkflowFacade
         SessionManager.AddHistoryEvent(_state.SessionToken, "user_message", new { text });
         BroadcastEvent("history_update", new { type = "user_message", text });
         _recentlyCompleted = false;
+        SaveSessionSnapshot();
 
         var action = UserReplyInterpreter.Interpret(_cfg, _state, text);
         NotifyStatus("Digesting intent");
@@ -301,6 +403,16 @@ public sealed class WorkflowFacade
             _state.PendingQuestion = intentUpdate.NextQuestion;
             if (!string.IsNullOrWhiteSpace(intentUpdate.NextQuestion))
                 UserFacingMessage?.Invoke(intentUpdate.NextQuestion);
+            NotifyStatus("Waiting clarification");
+            return;
+        }
+
+        var intentDoc = _intentBuilder.BuildDocument(_state.IntentState);
+        var intentErrors = IntentValidation.Validate(intentDoc);
+        if (intentErrors.Count > 0 && action.Action == ReplyActionType.NewRequest)
+        {
+            _state.PendingQuestion = "Could you clarify your request so I can proceed?";
+            UserFacingMessage?.Invoke(_state.PendingQuestion);
             NotifyStatus("Waiting clarification");
             return;
         }
@@ -733,6 +845,7 @@ public sealed class WorkflowFacade
         _state.PendingToolPlanJson = JsonSerializer.Serialize(new { steps = steps });
         _state.PendingStepIndex = 0;
         _state.PlanConfirmed = true;
+        SaveSessionSnapshot();
         if (recordHistory)
             SessionManager.AddHistoryEvent(_state.SessionToken, "plan_updated", new { steps = steps.Select(s => s.Title).ToList() });
         BroadcastEvent("plan", new { version = SessionManager.GetPlanVersions(_state.SessionToken).Count, steps });
@@ -742,9 +855,11 @@ public sealed class WorkflowFacade
 
     public object GetPublicSnapshot()
     {
+        var status = GetSessionStatus();
         return new
         {
-            status = ComputeWorkflowPhase(),
+            status = status.ToString(),
+            statusDisplay = StatusMapper.ToDisplay(status),
             stepIndex = _state.PendingStepIndex,
             steps = _state.PendingToolPlan?.Steps?.Count ?? 0,
             pendingQuestion = _state.PendingQuestion,
@@ -817,6 +932,22 @@ public sealed class WorkflowFacade
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+            {
+                HandleProviderUnavailable(ex);
+                return JobSpec.Invalid("provider_unreachable");
+            }
+            if (ex is CloudAssistDisabledException)
+            {
+                EmitCloudAssistDisabled();
+                return JobSpec.Invalid("cloud_assist_disabled");
+            }
+            if (ex is ProviderDisabledException)
+            {
+                EmitProviderDisabled();
+                return JobSpec.Invalid("provider_disabled");
+            }
+
             _trace.Emit("[digest:error] Digest invocation failed: " + ex.Message);
             return JobSpec.Invalid("digest_invoke_failed");
         }
@@ -829,6 +960,21 @@ public sealed class WorkflowFacade
             var result = await IntentExtractor.ExtractAsync(_cfg, userText, GetActiveAttachments(), _state.Memory, _state.MemoryStore, ct).ConfigureAwait(false);
             if (!result.Ok || result.Extraction == null)
             {
+                if (result.Error.Contains("provider_unreachable", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleProviderUnavailable(new Exception(result.Error));
+                    return null;
+                }
+                if (result.Error.Contains("cloud_assist_disabled", StringComparison.OrdinalIgnoreCase))
+                {
+                    EmitCloudAssistDisabled();
+                    return null;
+                }
+                if (result.Error.Contains("provider_disabled", StringComparison.OrdinalIgnoreCase))
+                {
+                    EmitProviderDisabled();
+                    return null;
+                }
                 _trace.Emit("[intent:error] " + result.Error);
                 return null;
             }
@@ -840,6 +986,21 @@ public sealed class WorkflowFacade
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+            {
+                HandleProviderUnavailable(ex);
+                return null;
+            }
+            if (ex is CloudAssistDisabledException)
+            {
+                EmitCloudAssistDisabled();
+                return null;
+            }
+            if (ex is ProviderDisabledException)
+            {
+                EmitProviderDisabled();
+                return null;
+            }
             _trace.Emit("[intent:error] " + ex.Message);
             return null;
         }
@@ -858,6 +1019,21 @@ public sealed class WorkflowFacade
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+            {
+                HandleProviderUnavailable(ex);
+                return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", "provider_unreachable", false);
+            }
+            if (ex is CloudAssistDisabledException)
+            {
+                EmitCloudAssistDisabled();
+                return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", "cloud_assist_disabled", false);
+            }
+            if (ex is ProviderDisabledException)
+            {
+                EmitProviderDisabled();
+                return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", "provider_disabled", false);
+            }
             _trace.Emit("[intent:error] " + ex.Message);
             return new SemanticIntent("", Array.Empty<string>(), Array.Empty<string>(), "", ex.Message, false);
         }
@@ -868,6 +1044,7 @@ public sealed class WorkflowFacade
         if (string.IsNullOrWhiteSpace(text)) return;
         _state.Memory.Add("assistant", text);
         _state.MemoryStore.AddAssistantMessage(text);
+        SaveSessionSnapshot();
     }
 
     private void EmitWaitUser(string reason, string? friendly = null, string? preview = null)
@@ -902,6 +1079,127 @@ public sealed class WorkflowFacade
         }
         if (!string.IsNullOrWhiteSpace(preview))
             _state.MemoryStore.AddClarificationQuestion(preview);
+    }
+
+    private void EmitProviderDisabled()
+    {
+        _trace.Emit("[provider:disabled] Provider disabled; skipping workflow.");
+        UserFacingMessage?.Invoke("Provider disabled — enable in Settings to continue.");
+    }
+
+    private void HandleProviderUnavailable(Exception ex)
+    {
+        var detail = ex is ProviderUnavailableException && ex.InnerException != null
+            ? ex.InnerException.Message
+            : ex?.Message ?? "provider unavailable";
+        MarkProviderReachable(false, detail);
+        EmitWorkflowEvent(WorkflowEvent.ProviderUnavailable, "Provider currently unavailable — try ‘Retry Provider’ or check settings.");
+        UserFacingMessage?.Invoke("Provider currently unavailable — try ‘Retry Provider’ or check settings.");
+    }
+
+    private void EmitProviderOffline()
+    {
+        EmitWorkflowEvent(WorkflowEvent.ProviderUnavailable, "Provider currently unavailable — try ‘Retry Provider’ or check settings.");
+        UserFacingMessage?.Invoke("Provider currently unavailable — try ‘Retry Provider’ or check settings.");
+    }
+
+    private void EmitCloudAssistDisabled()
+    {
+        UserFacingMessage?.Invoke("Cloud assist disabled — enable Cloud Assist in Settings to use OpenAI or HuggingFace.");
+    }
+
+    public SessionState BuildSessionState()
+    {
+        var state = new SessionState
+        {
+            SessionId = _state.SessionToken,
+            LastJobSpecJson = _state.LastJobSpecJson ?? "",
+            PendingToolPlanJson = _state.PendingToolPlanJson ?? "",
+            PendingStepIndex = _state.PendingStepIndex,
+            PlanConfirmed = _state.PlanConfirmed,
+            Canceled = _state.Canceled,
+            LastTouched = DateTimeOffset.UtcNow
+        };
+
+        state.Messages = _state.Memory.Turns
+            .Select(t => new SessionMessage(t.Role, t.Content, t.Timestamp))
+            .ToList();
+
+        state.Attachments = _attachments
+            .Select(a => new SessionAttachment(
+                a.StoredName,
+                a.OriginalName,
+                a.Kind,
+                a.SizeBytes,
+                a.Sha256,
+                a.Active))
+            .ToList();
+
+        state.Intent = CloneIntentState(_state.IntentState);
+        return state;
+    }
+
+    public void ApplySessionState(SessionState state)
+    {
+        if (state == null) return;
+        if (!string.IsNullOrWhiteSpace(state.SessionId))
+            _state.SessionToken = state.SessionId;
+
+        _state.LastJobSpecJson = state.LastJobSpecJson ?? "";
+        _state.PendingToolPlanJson = state.PendingToolPlanJson ?? "";
+        _state.PendingStepIndex = state.PendingStepIndex;
+        _state.PlanConfirmed = state.PlanConfirmed;
+        _state.Canceled = state.Canceled;
+        if (!string.IsNullOrWhiteSpace(_state.PendingToolPlanJson))
+        {
+            var plan = ToolPlanParser.TryParse(_state.PendingToolPlanJson);
+            _state.PendingToolPlan = plan;
+        }
+        _state.IntentState = CloneIntentState(state.Intent ?? new IntentState());
+        _state.Memory.SetTurns(state.Messages?.Select(m => new ChatTurn(m.Sender, m.Text, m.Timestamp)) ?? Array.Empty<ChatTurn>());
+        _state.MemoryStore.Clear();
+        foreach (var msg in state.Messages ?? new List<SessionMessage>())
+        {
+            if (string.Equals(msg.Sender, "user", StringComparison.OrdinalIgnoreCase))
+                _state.MemoryStore.AddUserMessage(msg.Text);
+            else if (string.Equals(msg.Sender, "assistant", StringComparison.OrdinalIgnoreCase))
+                _state.MemoryStore.AddAssistantMessage(msg.Text);
+        }
+    }
+
+    private void SaveSessionSnapshot()
+    {
+        try
+        {
+            var snapshot = BuildSessionState();
+            _sessionStore.Save(snapshot);
+        }
+        catch
+        {
+        }
+    }
+
+    private static IntentState CloneIntentState(IntentState source)
+    {
+        source ??= new IntentState();
+        var clone = new IntentState
+        {
+            SessionId = source.SessionId ?? "",
+            CurrentGoal = source.CurrentGoal,
+            Status = source.Status
+        };
+        clone.Slots = new Dictionary<string, string>(source.Slots ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+        if (source.ContextWindow != null)
+        {
+            foreach (var msg in source.ContextWindow)
+            {
+                var attachments = msg.Attachments?.Select(a =>
+                        new Attachment(a.Path, a.Name, a.Mime, a.Size, null))
+                    .ToList() ?? new List<Attachment>();
+                clone.ContextWindow.Add(new UserMessage(msg.Text, attachments, msg.CreatedUtc));
+            }
+        }
+        return clone;
     }
 
     private void SyncGraphToHub(AppConfig cfg)
@@ -969,13 +1267,15 @@ public sealed class WorkflowFacade
             }
 
             var validationErrors = _toolingValidationErrors ?? Array.Empty<string>();
+            var warnings = _toolingWarnings ?? Array.Empty<string>();
+            var blockingErrors = validationErrors.Where(e => !IsWarning(e)).ToList();
             var state = _toolManifest.ToolsById.Count == 0
                 ? "tools inactive"
                 : (missingPrompts.Count == 0 ? "tools active" : "tools gated (missing prompts)");
             var activeCount = Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count);
-            if (validationErrors.Count > 0)
+            if (blockingErrors.Count > 0)
             {
-                state = $"tools invalid ({validationErrors.Count} manifest errors)";
+                state = $"tools invalid ({blockingErrors.Count} manifest errors)";
                 activeCount = 0;
             }
 
@@ -984,6 +1284,7 @@ public sealed class WorkflowFacade
                 PromptCount: _toolPrompts.AllToolIds.Count,
                 ActiveToolCount: activeCount,
                 MissingPrompts: missingPrompts,
+                Warnings: warnings,
                 ValidationErrors: validationErrors,
                 State: state,
                 BlueprintTotal: selection.AvailableCount,
@@ -1023,6 +1324,8 @@ public sealed class WorkflowFacade
                 PromptCount: _toolPrompts.AllToolIds.Count,
                 ActiveToolCount: Math.Max(0, _toolManifest.ToolsById.Count - missingPrompts.Count),
                 MissingPrompts: missingPrompts,
+                Warnings: _toolingWarnings ?? Array.Empty<string>(),
+                ValidationErrors: Array.Empty<string>(),
                 State: string.IsNullOrWhiteSpace(info) ? "tools status unknown" : info,
                 BlueprintTotal: 0,
                 BlueprintSelectable: 0,
@@ -1045,6 +1348,13 @@ public sealed class WorkflowFacade
             "code" => "code",
             _ => "other"
         };
+    }
+
+    public SessionStatus GetSessionStatusSnapshot() => GetSessionStatus();
+
+    private static bool IsWarning(string message)
+    {
+        return message.StartsWith("[config:warn]", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsTextualAttachment(string kind)
@@ -1135,27 +1445,12 @@ public sealed class WorkflowFacade
 
     private string ComputeWorkflowPhase()
     {
-        if (_recentlyCompleted)
-            return "Done";
+        return StatusMapper.ToDisplay(GetSessionStatus());
+    }
 
-        if (_state.PendingToolPlan != null)
-        {
-            var idx = Math.Max(0, _state.PendingStepIndex);
-            var count = _state.PendingToolPlan.Steps.Count;
-            if (idx >= count)
-                return "Done";
-            if (_state.ToolOutputs.Count > 0 || idx > 0 || _state.AutoApproveAll)
-                return "Tool execution";
-            return "Planning";
-        }
-
-        if (!string.IsNullOrWhiteSpace(_state.PendingQuestion))
-            return "Waiting clarification";
-
-        if (!string.IsNullOrWhiteSpace(_state.PendingUserRequest))
-            return "Digesting intent";
-
-        return "Idle";
+    private SessionStatus GetSessionStatus()
+    {
+        return StatusMapper.GetStatus(_state, _recentlyCompleted);
     }
 
     private static string ShortRepo(string repoRoot)
@@ -1596,6 +1891,21 @@ public sealed class WorkflowFacade
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+            {
+                HandleProviderUnavailable(ex);
+                return false;
+            }
+            if (ex is CloudAssistDisabledException)
+            {
+                EmitCloudAssistDisabled();
+                return false;
+            }
+            if (ex is ProviderDisabledException)
+            {
+                EmitProviderDisabled();
+                return false;
+            }
             _trace.Emit("[toolplan:error] invoke failed: " + ex.Message);
             EmitWaitUser("ToolPlan invocation failed. Reply with: edit <rewrite your request>");
             return false;
@@ -1616,6 +1926,21 @@ public sealed class WorkflowFacade
             }
             catch (Exception ex)
             {
+                if (ex is ProviderUnavailableException)
+                {
+                    HandleProviderUnavailable(ex);
+                    return false;
+                }
+                if (ex is CloudAssistDisabledException)
+                {
+                    EmitCloudAssistDisabled();
+                    return false;
+                }
+                if (ex is ProviderDisabledException)
+                {
+                    EmitProviderDisabled();
+                    return false;
+                }
                 _trace.Emit("[toolplan:error] retry failed: " + ex.Message);
             }
         }
@@ -1640,6 +1965,21 @@ public sealed class WorkflowFacade
             }
             catch (Exception ex)
             {
+                if (ex is ProviderUnavailableException)
+                {
+                    HandleProviderUnavailable(ex);
+                    return false;
+                }
+                if (ex is CloudAssistDisabledException)
+                {
+                    EmitCloudAssistDisabled();
+                    return false;
+                }
+                if (ex is ProviderDisabledException)
+                {
+                    EmitProviderDisabled();
+                    return false;
+                }
                 _trace.Emit("[toolplan:error] unknown toolId retry failed: " + ex.Message);
             }
         }
@@ -1685,6 +2025,7 @@ public sealed class WorkflowFacade
         var version = SessionManager.AddPlanVersion(_state.SessionToken, plan, toolPlanText);
         BroadcastEvent("plan", new { version = version.Version, plan = version });
         NotifyStatus("Planning");
+        SaveSessionSnapshot();
         return true;
     }
 
@@ -1835,6 +2176,16 @@ public sealed class WorkflowFacade
             var result = await _executor.RunNextAsync(_cfg, _attachments, _toolManifest, _toolPrompts, ct).ConfigureAwait(false);
             if (!result.Ok)
             {
+                if (result.Message.Contains("provider unreachable", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleProviderUnavailable(new Exception(result.Message));
+                    return;
+                }
+                if (result.Message.Contains("provider disabled", StringComparison.OrdinalIgnoreCase))
+                {
+                    EmitProviderDisabled();
+                    return;
+                }
                 var errorCard = new OutputCard
                 {
                     Kind = OutputCardKind.Error,
@@ -1909,6 +2260,21 @@ public sealed class WorkflowFacade
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+            {
+                HandleProviderUnavailable(ex);
+                return;
+            }
+            if (ex is CloudAssistDisabledException)
+            {
+                EmitCloudAssistDisabled();
+                return;
+            }
+            if (ex is ProviderDisabledException)
+            {
+                EmitProviderDisabled();
+                return;
+            }
             _trace.Emit("[final:error] " + ex.Message);
             EmitWaitUser("Final response failed. Reply with: edit <rewrite your request>");
             return;
@@ -1985,6 +2351,16 @@ public sealed class WorkflowFacade
         var result = await _artifactGenerator.BuildProjectArtifacts(spec, _state.ToolOutputs, _cfg, GetActiveAttachments(), repo.RepoRoot, _state.SessionToken, ct).ConfigureAwait(false);
         if (!result.Ok)
         {
+            if (string.Equals(result.Message, "provider_unreachable", StringComparison.OrdinalIgnoreCase))
+            {
+                HandleProviderUnavailable(new Exception(result.Message));
+                return;
+            }
+            if (string.Equals(result.Message, "provider_disabled", StringComparison.OrdinalIgnoreCase))
+            {
+                EmitProviderDisabled();
+                return;
+            }
             _trace.Emit("[program:error] " + result.Message);
             return;
         }

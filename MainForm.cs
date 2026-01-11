@@ -9,7 +9,9 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using RahBuilder.Settings;
 using RahBuilder.Workflow;
+using RahBuilder.Workflow.Provider;
 using RahBuilder.Ui;
+using RahOllamaOnly.Tools.Diagnostics;
 using RahOllamaOnly.Tracing;
 using RahOllamaOnly.Ui;
 
@@ -34,6 +36,15 @@ public sealed class MainForm : Form
     private readonly ToolStripStatusLabel _repoStatus;
     private readonly ToolStripStatusLabel _attachmentsStatus;
     private readonly ToolStripStatusLabel _workflowStatus;
+    private readonly LinkLabel _providerBadge;
+    private readonly ToolTip _providerToolTip;
+    private readonly LinkLabel _providerSettingsLink;
+    private readonly TabPage _settingsTab;
+    private readonly SettingsHostControl _settingsControl;
+    private bool _lastProviderEnabled;
+    private ToolingDiagnostics _toolingDiagnostics = ToolingDiagnostics.Empty;
+    private readonly SessionStore _sessionStore;
+    private readonly SessionPanel _sessionPanel;
     private readonly List<OutputCard> _cards = new();
     private readonly Button _downloadButton;
     private readonly ListBox _cardList;
@@ -54,6 +65,7 @@ public sealed class MainForm : Form
         _trace = new RunTrace(new RahOllamaOnly.Tracing.TracePanelTraceSink(_traceWriter));
 
         _config = ConfigStore.Load();
+        _sessionStore = new SessionStore();
         _inbox = new AttachmentInbox(_config.General, _trace);
 
         _workflow = new WorkflowFacade(_trace);
@@ -62,6 +74,8 @@ public sealed class MainForm : Form
         _workflow.OutputCardProduced += OnOutputCardProduced;
         _workflow.TraceAttentionRequested += ShowTracePane;
         _workflow.PlanReady += OnPlanReady;
+        _workflow.ProviderStateChanged += OnProviderStateChanged;
+        ProviderDiagnosticsHub.MetricsUpdated += _ => OnProviderMetricsUpdated();
 
         _mainTabs = new TabControl { Dock = DockStyle.Fill };
 
@@ -81,11 +95,51 @@ public sealed class MainForm : Form
         _composer = new ChatComposerControl(_inbox);
         _composer.SendRequested += text => _ = SendNowAsync(text);
         _composer.AttachmentsChanged += att => _workflow.SetAttachments(att);
+        _composer.RetryProviderRequested += () =>
+        {
+            _workflow.RetryProvider();
+            NotifyProviderRetry();
+        };
+        _composer.ProviderStatusClicked += OpenProvidersSettings;
+        _composer.ToolchainStatusClicked += OpenToolchainSettings;
+        _composer.ExecutionStatusClicked += OpenGeneralSettings;
         _workflow.SetAttachments(_inbox.List());
+        _providerToolTip = new ToolTip();
+        _providerBadge = new LinkLabel
+        {
+            AutoSize = true,
+            LinkBehavior = LinkBehavior.NeverUnderline,
+            Text = "Provider: -",
+            Margin = new Padding(0, 0, 0, 6)
+        };
+        _providerBadge.LinkClicked += (_, _) => OpenProvidersSettings();
+        _providerToolTip.SetToolTip(_providerBadge, "Local Provider enabled/disabled; click to open settings");
+        _providerSettingsLink = new LinkLabel
+        {
+            AutoSize = true,
+            Text = "Settings",
+            LinkBehavior = LinkBehavior.NeverUnderline,
+            Margin = new Padding(8, 0, 0, 6)
+        };
+        _providerSettingsLink.LinkClicked += (_, _) => OpenProvidersSettings();
+
+        var providerHeader = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Padding = new Padding(6, 6, 6, 0)
+        };
+        providerHeader.Controls.Add(_providerBadge);
+        providerHeader.Controls.Add(_providerSettingsLink);
+
         var chatPanel = new Panel { Dock = DockStyle.Fill };
         chatPanel.Controls.Add(_chatView);
         chatPanel.Controls.Add(_composer);
+        chatPanel.Controls.Add(providerHeader);
         _composer.BringToFront();
+        providerHeader.BringToFront();
         _chatView.SendToBack();
 
         // Diagnostics: trace + output cards
@@ -168,8 +222,25 @@ public sealed class MainForm : Form
         outputSplit.Panel2.Controls.Add(detailTabs);
 
         var auxTabs = new TabControl { Dock = DockStyle.Fill };
-        auxTabs.TabPages.Add(new TabPage("Trace") { Controls = { _traceBox } });
+        var tracePanel = new Panel { Dock = DockStyle.Fill };
+        var reinitProvider = new Button
+        {
+            Text = "Reinitialize Provider",
+            Dock = DockStyle.Top,
+            Height = 28
+        };
+        reinitProvider.Click += (_, _) =>
+        {
+            _workflow.RetryProvider();
+            NotifyProviderRetry();
+        };
+        tracePanel.Controls.Add(_traceBox);
+        tracePanel.Controls.Add(reinitProvider);
+        auxTabs.TabPages.Add(new TabPage("Trace") { Controls = { tracePanel } });
         auxTabs.TabPages.Add(new TabPage("Outputs") { Controls = { outputSplit } });
+        _sessionPanel = new SessionPanel(_sessionStore);
+        _sessionPanel.SessionLoaded += LoadSessionState;
+        auxTabs.TabPages.Add(new TabPage("Sessions") { Controls = { _sessionPanel } });
 
         _traceWriter.Updated += () =>
         {
@@ -188,13 +259,9 @@ public sealed class MainForm : Form
         _mainTabs.TabPages.Add(_diagnosticsTab);
 
         // Settings tab
-        _mainTabs.TabPages.Add(new TabPage("Settings")
-        {
-            Controls =
-            {
-                new SettingsHostControl(_config, AfterSettingsSaved, _trace) { Dock = DockStyle.Fill }
-            }
-        });
+        _settingsControl = new SettingsHostControl(_config, AfterSettingsSaved, _trace) { Dock = DockStyle.Fill };
+        _settingsTab = new TabPage("Settings") { Controls = { _settingsControl } };
+        _mainTabs.TabPages.Add(_settingsTab);
 
         Controls.Add(_mainTabs);
 
@@ -207,6 +274,10 @@ public sealed class MainForm : Form
         Controls.Add(_statusStrip);
 
         PublishConfigToRuntime();
+        _lastProviderEnabled = _config.General.ProviderEnabled;
+        UpdateProviderBadge();
+        UpdateStatusLine();
+        TryLoadLastSession();
 
         if (_config.General.EnableGlobalClipboardShortcuts)
             ClipboardPolicy.Apply(this);
@@ -219,8 +290,11 @@ public sealed class MainForm : Form
             _workflow.OutputCardProduced -= OnOutputCardProduced;
             _workflow.TraceAttentionRequested -= ShowTracePane;
             _workflow.PlanReady -= OnPlanReady;
+            _workflow.ProviderStateChanged -= OnProviderStateChanged;
+            ToolingDiagnosticsHub.Updated -= OnToolingDiagnosticsUpdated;
         };
 
+        ToolingDiagnosticsHub.Updated += OnToolingDiagnosticsUpdated;
         UpdateStatus(null);
     }
 
@@ -231,7 +305,8 @@ public sealed class MainForm : Form
         // ALWAYS marshal to UI thread.
         BeginInvoke(new Action(() =>
         {
-            AppendChat(s + "\n");
+            var sanitized = OutputSanitizer.Sanitize(s);
+            AppendChat(sanitized + "\n");
         }));
     }
 
@@ -248,6 +323,19 @@ public sealed class MainForm : Form
         _composer.SetInbox(_inbox);
         _composer.ReloadAttachments(_inbox.List());
         _workflow.SetAttachments(_inbox.List());
+
+        if (_lastProviderEnabled != _config.General.ProviderEnabled)
+        {
+            _workflow.UpdateProviderEnabled(_config.General.ProviderEnabled);
+            if (_config.General.ProviderEnabled)
+            {
+                _workflow.ResetProviderState();
+                _workflow.MarkProviderReachable(true, "enabled");
+            }
+        }
+        _lastProviderEnabled = _config.General.ProviderEnabled;
+        UpdateProviderBadge();
+        UpdateStatusLine();
 
         if (_config.General.EnableGlobalClipboardShortcuts)
             ClipboardPolicy.Apply(this);
@@ -296,6 +384,157 @@ public sealed class MainForm : Form
         _repoStatus.Text = $"Repo: {snapshot.Repo}";
         _attachmentsStatus.Text = $"Attachments: {snapshot.AttachmentsActive}/{snapshot.AttachmentsTotal}";
         _workflowStatus.Text = $"Workflow: {snapshot.Workflow}";
+    }
+
+    private void OpenProvidersSettings()
+    {
+        _mainTabs.SelectedTab = _settingsTab;
+        _settingsControl.FocusProvidersTab();
+    }
+
+    private void UpdateProviderBadge()
+    {
+        var enabled = _workflow.ProviderState.Enabled;
+        var reachable = _workflow.ProviderState.Reachable;
+        var metrics = ProviderDiagnosticsHub.LatestMetrics;
+        if (!enabled)
+        {
+            _providerBadge.Text = "⚠️ Local Provider: OFF";
+            _providerBadge.LinkColor = Color.Goldenrod;
+            _composer.SetProviderOffline(false);
+            UpdateStatusLine();
+            return;
+        }
+
+        if (!reachable)
+        {
+            _providerBadge.Text = "⚠️ Local Provider: OFFLINE";
+            _providerBadge.LinkColor = Color.Firebrick;
+            _composer.SetProviderOffline(true);
+            UpdateStatusLine();
+            return;
+        }
+
+        if (metrics.IsStale)
+        {
+            _providerBadge.Text = "⏳ Local Provider: STALE";
+            _providerBadge.LinkColor = Color.Goldenrod;
+        }
+        else
+        {
+            _providerBadge.Text = "🧠 Local Provider: ON";
+            _providerBadge.LinkColor = Color.SeaGreen;
+        }
+        _composer.SetProviderOffline(false);
+        UpdateStatusLine();
+    }
+
+    private void OnProviderStateChanged(ProviderState state)
+    {
+        if (!IsHandleCreated) return;
+        BeginInvoke(new Action(UpdateProviderBadge));
+    }
+
+    private void OnProviderMetricsUpdated()
+    {
+        if (!IsHandleCreated) return;
+        BeginInvoke(new Action(UpdateProviderBadge));
+    }
+
+    private void OnToolingDiagnosticsUpdated(ToolingDiagnostics diag)
+    {
+        _toolingDiagnostics = diag ?? ToolingDiagnostics.Empty;
+        if (!IsHandleCreated) return;
+        BeginInvoke(new Action(UpdateStatusLine));
+    }
+
+    private void UpdateStatusLine()
+    {
+        var enabled = _workflow.ProviderState.Enabled;
+        var reachable = _workflow.ProviderState.Reachable;
+        var metrics = ProviderDiagnosticsHub.LatestMetrics;
+        var providerText = enabled
+            ? (reachable
+                ? (metrics.IsStale ? "Local Provider: STALE" : "Local Provider: ON")
+                : "Local Provider: OFFLINE")
+            : "Local Provider: OFF";
+        var providerColor = enabled
+            ? (reachable
+                ? (metrics.IsStale ? Color.Goldenrod : Color.SeaGreen)
+                : Color.Firebrick)
+            : Color.Goldenrod;
+
+        var toolchainStatus = ComputeToolchainStatus(_toolingDiagnostics);
+        var toolchainText = $"Toolchain: {toolchainStatus.Text}";
+
+        var executionText = $"Execution: {_config.General.ExecutionTarget}";
+        var executionColor = Color.DimGray;
+
+        _composer.UpdateStatusLine(providerText, providerColor, toolchainText, toolchainStatus.Color, executionText, executionColor);
+    }
+
+    private static (string Text, Color Color) ComputeToolchainStatus(ToolingDiagnostics diag)
+    {
+        if (diag == null) return ("WARN", Color.Goldenrod);
+        if (diag.ValidationErrors != null && diag.ValidationErrors.Count > 0)
+            return ("FAIL", Color.Firebrick);
+        if (diag.MissingPrompts != null && diag.MissingPrompts.Count > 0)
+            return ("WARN", Color.Goldenrod);
+        if (diag.ToolCount == 0)
+            return ("WARN", Color.Goldenrod);
+        return ("OK", Color.SeaGreen);
+    }
+
+    private void OpenToolchainSettings()
+    {
+        _mainTabs.SelectedTab = _settingsTab;
+        _settingsControl.FocusToolchainTab();
+    }
+
+    private void OpenGeneralSettings()
+    {
+        _mainTabs.SelectedTab = _settingsTab;
+        _settingsControl.FocusGeneralTab();
+    }
+
+    private void NotifyProviderRetry()
+    {
+        AppendChat("Provider retry initiated.\n");
+        UpdateProviderBadge();
+    }
+
+    private void TryLoadLastSession()
+    {
+        var sessions = _sessionStore.ListSessions();
+        var last = sessions.FirstOrDefault();
+        if (last != null)
+            LoadSessionState(last);
+    }
+
+    private void LoadSessionState(SessionState state)
+    {
+        if (state == null) return;
+        _workflow.ApplySessionState(state);
+
+        _chatView.Clear();
+        foreach (var msg in state.Messages ?? new List<SessionMessage>())
+        {
+            if (string.Equals(msg.Sender, "user", StringComparison.OrdinalIgnoreCase))
+                AppendChat($"> {msg.Text}\n");
+            else
+                AppendChat(msg.Text + "\n");
+        }
+
+        var desired = (state.Attachments ?? new List<SessionAttachment>())
+            .ToDictionary(a => a.StoredName, a => a.Active, StringComparer.OrdinalIgnoreCase);
+        foreach (var item in _inbox.List())
+        {
+            if (desired.TryGetValue(item.StoredName, out var active))
+                _inbox.SetActive(item.StoredName, active);
+        }
+        _composer.ReloadAttachments(_inbox.List());
+        _workflow.SetAttachments(_inbox.List());
+        UpdateStatusLine();
     }
 
     private void OnOutputCardProduced(OutputCard card)

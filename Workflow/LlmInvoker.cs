@@ -17,6 +17,9 @@ public static class LlmInvoker
 {
     private static readonly HttpClient _http = new HttpClient();
     public static Action<string>? AuditLogger { get; set; }
+    public static Func<bool>? IsProviderReachable { get; set; }
+    public static Action<string>? ProviderCallSucceeded { get; set; }
+    public static Action<string, Exception>? ProviderCallFailed { get; set; }
 
     public static async Task<string> InvokeChatAsync(
         AppConfig cfg,
@@ -30,6 +33,10 @@ public static class LlmInvoker
         if (cfg == null) throw new ArgumentNullException(nameof(cfg));
         role = (role ?? "").Trim();
         if (role.Length == 0) throw new InvalidOperationException("Role is required.");
+        if (cfg.General != null && !cfg.General.ProviderEnabled)
+            throw new ProviderDisabledException("provider_disabled");
+        if (IsProviderReachable != null && !IsProviderReachable())
+            throw new ProviderUnavailableException("provider_unreachable");
 
         // Try exact role first, then case-insensitive match.
         var rc = cfg.Orchestrator?.Roles?
@@ -62,17 +69,45 @@ public static class LlmInvoker
             // audit is best-effort
         }
 
-        if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
-            return await InvokeOllamaAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
-
-        if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
-            return await InvokeOpenAiAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
-
-        if (provider.Equals("HuggingFace", StringComparison.OrdinalIgnoreCase) ||
+        if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase) ||
+            provider.Equals("HuggingFace", StringComparison.OrdinalIgnoreCase) ||
             provider.Equals("Hugging Face", StringComparison.OrdinalIgnoreCase))
-            return await InvokeHuggingFaceAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
+        {
+            if (cfg.General?.CloudAssistEnabled != true)
+                throw new CloudAssistDisabledException("cloud_assist_disabled");
+        }
 
-        throw new InvalidOperationException($"[digest:error] Unsupported provider '{provider}' for role '{role}'.");
+        try
+        {
+            if (provider.Equals("Ollama", StringComparison.OrdinalIgnoreCase))
+            {
+                var result = await InvokeOllamaAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
+                ProviderCallSucceeded?.Invoke(provider);
+                return result;
+            }
+
+            if (provider.Equals("OpenAI", StringComparison.OrdinalIgnoreCase))
+            {
+                var result = await InvokeOpenAiAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
+                ProviderCallSucceeded?.Invoke(provider);
+                return result;
+            }
+
+            if (provider.Equals("HuggingFace", StringComparison.OrdinalIgnoreCase) ||
+                provider.Equals("Hugging Face", StringComparison.OrdinalIgnoreCase))
+            {
+                var result = await InvokeHuggingFaceAsync(cfg, model, systemPrompt, userText, ct).ConfigureAwait(false);
+                ProviderCallSucceeded?.Invoke(provider);
+                return result;
+            }
+
+            throw new InvalidOperationException($"[digest:error] Unsupported provider '{provider}' for role '{role}'.");
+        }
+        catch (Exception ex)
+        {
+            ProviderCallFailed?.Invoke(provider, ex);
+            throw;
+        }
     }
 
     private static async Task<string> InvokeOllamaAsync(
@@ -85,53 +120,64 @@ public static class LlmInvoker
         if (cfg.Providers?.Ollama?.Enabled != true)
             throw new InvalidOperationException("[digest:error] Ollama provider is disabled.");
 
-        var baseUrl = (cfg.Providers.Ollama.BaseUrl ?? "").Trim().TrimEnd('/');
-        if (baseUrl.Length == 0)
-            throw new InvalidOperationException("[digest:error] Ollama BaseUrl is empty (Providers.Ollama.BaseUrl).");
-
-        var url = baseUrl + "/api/generate";
-
-        var combinedPrompt =
-            (systemPrompt ?? "").Trim() +
-            "\n\nUSER REQUEST:\n" +
-            (userText ?? "").Trim() +
-            "\n\nReturn EXACTLY one JSON object and nothing else.";
-
-        var payload = new
-        {
-            model,
-            prompt = combinedPrompt,
-            stream = false,
-            format = "json",
-            options = new
-            {
-                temperature = 0.0
-            }
-        };
-
-        using var req = new HttpRequestMessage(HttpMethod.Post, url)
-        {
-            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
-        };
-
-        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
-        var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-
-        if (!resp.IsSuccessStatusCode)
-            throw new InvalidOperationException($"[digest:error] Ollama /api/generate HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
-
         try
         {
-            using var doc = JsonDocument.Parse(body);
-            if (doc.RootElement.TryGetProperty("response", out var r) && r.ValueKind == JsonValueKind.String)
-                return r.GetString() ?? "";
-        }
-        catch
-        {
-            // fall through
-        }
+            var baseUrl = (cfg.Providers.Ollama.BaseUrl ?? "").Trim().TrimEnd('/');
+            if (baseUrl.Length == 0)
+                throw new InvalidOperationException("[digest:error] Ollama BaseUrl is empty (Providers.Ollama.BaseUrl).");
 
-        return body;
+            var url = baseUrl + "/api/generate";
+
+            var combinedPrompt =
+                (systemPrompt ?? "").Trim() +
+                "\n\nUSER REQUEST:\n" +
+                (userText ?? "").Trim() +
+                "\n\nReturn EXACTLY one JSON object and nothing else.";
+
+            var payload = new
+            {
+                model,
+                prompt = combinedPrompt,
+                stream = false,
+                format = "json",
+                options = new
+                {
+                    temperature = 0.0
+                }
+            };
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+            };
+
+            using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+            var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
+            if (!resp.IsSuccessStatusCode)
+                throw new InvalidOperationException($"[digest:error] Ollama /api/generate HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
+
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("response", out var r) && r.ValueKind == JsonValueKind.String)
+                    return r.GetString() ?? "";
+            }
+            catch
+            {
+                // fall through
+            }
+
+            return body;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new ProviderUnavailableException("provider_unreachable", ex);
+        }
+        catch (TaskCanceledException ex)
+        {
+            throw new ProviderUnavailableException("provider_unreachable", ex);
+        }
     }
 
     private static async Task<string> InvokeOpenAiAsync(
@@ -144,57 +190,68 @@ public static class LlmInvoker
         if (cfg.Providers?.OpenAI?.Enabled != true)
             throw new InvalidOperationException("[digest:error] OpenAI provider is disabled.");
 
-        var baseUrl = (cfg.Providers.OpenAI.BaseUrl ?? "").Trim().TrimEnd('/');
-        if (baseUrl.Length == 0)
-            throw new InvalidOperationException("[digest:error] OpenAI BaseUrl is empty (Providers.OpenAI.BaseUrl).");
-
-        var apiKey = (cfg.Providers.OpenAI.ApiKey ?? "").Trim();
-        if (apiKey.Length == 0)
-            throw new InvalidOperationException("[digest:error] OpenAI ApiKey is empty (Providers.OpenAI.ApiKey).");
-
-        var url = baseUrl + "/chat/completions";
-
-        var payload = new
-        {
-            model,
-            temperature = 0.2,
-            messages = new object[]
-            {
-                new { role = "system", content = systemPrompt ?? "" },
-                new { role = "user", content = userText ?? "" }
-            }
-        };
-
-        using var req = new HttpRequestMessage(HttpMethod.Post, url)
-        {
-            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
-        };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-
-        if (!string.IsNullOrWhiteSpace(cfg.Providers.OpenAI.Organization))
-            req.Headers.Add("OpenAI-Organization", cfg.Providers.OpenAI.Organization);
-        if (!string.IsNullOrWhiteSpace(cfg.Providers.OpenAI.Project))
-            req.Headers.Add("OpenAI-Project", cfg.Providers.OpenAI.Project);
-
-        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
-        var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-
-        if (!resp.IsSuccessStatusCode)
-            throw new InvalidOperationException($"[digest:error] OpenAI chat/completions HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
-
         try
         {
-            using var doc = JsonDocument.Parse(body);
-            var choices = doc.RootElement.GetProperty("choices");
-            if (choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
-            {
-                var msg = choices[0].GetProperty("message");
-                return msg.GetProperty("content").GetString() ?? "";
-            }
-        }
-        catch { }
+            var baseUrl = (cfg.Providers.OpenAI.BaseUrl ?? "").Trim().TrimEnd('/');
+            if (baseUrl.Length == 0)
+                throw new InvalidOperationException("[digest:error] OpenAI BaseUrl is empty (Providers.OpenAI.BaseUrl).");
 
-        return body;
+            var apiKey = (cfg.Providers.OpenAI.ApiKey ?? "").Trim();
+            if (apiKey.Length == 0)
+                throw new InvalidOperationException("[digest:error] OpenAI ApiKey is empty (Providers.OpenAI.ApiKey).");
+
+            var url = baseUrl + "/chat/completions";
+
+            var payload = new
+            {
+                model,
+                temperature = 0.2,
+                messages = new object[]
+                {
+                    new { role = "system", content = systemPrompt ?? "" },
+                    new { role = "user", content = userText ?? "" }
+                }
+            };
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+            };
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+            if (!string.IsNullOrWhiteSpace(cfg.Providers.OpenAI.Organization))
+                req.Headers.Add("OpenAI-Organization", cfg.Providers.OpenAI.Organization);
+            if (!string.IsNullOrWhiteSpace(cfg.Providers.OpenAI.Project))
+                req.Headers.Add("OpenAI-Project", cfg.Providers.OpenAI.Project);
+
+            using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+            var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
+            if (!resp.IsSuccessStatusCode)
+                throw new InvalidOperationException($"[digest:error] OpenAI chat/completions HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
+
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                var choices = doc.RootElement.GetProperty("choices");
+                if (choices.ValueKind == JsonValueKind.Array && choices.GetArrayLength() > 0)
+                {
+                    var msg = choices[0].GetProperty("message");
+                    return msg.GetProperty("content").GetString() ?? "";
+                }
+            }
+            catch { }
+
+            return body;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new ProviderUnavailableException("provider_unreachable", ex);
+        }
+        catch (TaskCanceledException ex)
+        {
+            throw new ProviderUnavailableException("provider_unreachable", ex);
+        }
     }
 
     private static async Task<string> InvokeHuggingFaceAsync(
@@ -207,52 +264,63 @@ public static class LlmInvoker
         if (cfg.Providers?.HuggingFace?.Enabled != true)
             throw new InvalidOperationException("[digest:error] HuggingFace provider is disabled.");
 
-        var baseUrl = (cfg.Providers.HuggingFace.BaseUrl ?? "").Trim().TrimEnd('/');
-        if (baseUrl.Length == 0)
-            throw new InvalidOperationException("[digest:error] HuggingFace BaseUrl is empty (Providers.HuggingFace.BaseUrl).");
-
-        var apiKey = (cfg.Providers.HuggingFace.ApiKey ?? "").Trim();
-        if (apiKey.Length == 0)
-            throw new InvalidOperationException("[digest:error] HuggingFace ApiKey is empty (Providers.HuggingFace.ApiKey).");
-
-        var url = baseUrl + "/models/" + model;
-
-        var combined = (systemPrompt ?? "") + "\n\n" + (userText ?? "");
-
-        var payload = new
-        {
-            inputs = combined,
-            parameters = new { return_full_text = false }
-        };
-
-        using var req = new HttpRequestMessage(HttpMethod.Post, url)
-        {
-            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
-        };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-
-        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
-        var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-
-        if (!resp.IsSuccessStatusCode)
-            throw new InvalidOperationException($"[digest:error] HuggingFace inference HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
-
         try
         {
-            using var doc = JsonDocument.Parse(body);
-            if (doc.RootElement.ValueKind == JsonValueKind.Array && doc.RootElement.GetArrayLength() > 0)
+            var baseUrl = (cfg.Providers.HuggingFace.BaseUrl ?? "").Trim().TrimEnd('/');
+            if (baseUrl.Length == 0)
+                throw new InvalidOperationException("[digest:error] HuggingFace BaseUrl is empty (Providers.HuggingFace.BaseUrl).");
+
+            var apiKey = (cfg.Providers.HuggingFace.ApiKey ?? "").Trim();
+            if (apiKey.Length == 0)
+                throw new InvalidOperationException("[digest:error] HuggingFace ApiKey is empty (Providers.HuggingFace.ApiKey).");
+
+            var url = baseUrl + "/models/" + model;
+
+            var combined = (systemPrompt ?? "") + "\n\n" + (userText ?? "");
+
+            var payload = new
             {
-                var first = doc.RootElement[0];
-                if (first.ValueKind == JsonValueKind.Object &&
-                    first.TryGetProperty("generated_text", out var gt) &&
-                    gt.ValueKind == JsonValueKind.String)
+                inputs = combined,
+                parameters = new { return_full_text = false }
+            };
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+            };
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+            using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
+            var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+
+            if (!resp.IsSuccessStatusCode)
+                throw new InvalidOperationException($"[digest:error] HuggingFace inference HTTP {(int)resp.StatusCode} {resp.ReasonPhrase}. Body: {body}");
+
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.ValueKind == JsonValueKind.Array && doc.RootElement.GetArrayLength() > 0)
                 {
-                    return gt.GetString() ?? "";
+                    var first = doc.RootElement[0];
+                    if (first.ValueKind == JsonValueKind.Object &&
+                        first.TryGetProperty("generated_text", out var gt) &&
+                        gt.ValueKind == JsonValueKind.String)
+                    {
+                        return gt.GetString() ?? "";
+                    }
                 }
             }
-        }
-        catch { }
+            catch { }
 
-        return body;
+            return body;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new ProviderUnavailableException("provider_unreachable", ex);
+        }
+        catch (TaskCanceledException ex)
+        {
+            throw new ProviderUnavailableException("provider_unreachable", ex);
+        }
     }
 }

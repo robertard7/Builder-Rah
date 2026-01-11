@@ -7,6 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <UserSecretsId>RahBuilder</UserSecretsId>
   </PropertyGroup>
 
   <!-- If you have any xUnit test .cs files accidentally living in this WinForms project,
@@ -14,5 +15,13 @@
   <ItemGroup>
     <Compile Remove="**\*Tests.cs" />
     <Compile Remove="**\*Test.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0" />
   </ItemGroup>
 </Project>

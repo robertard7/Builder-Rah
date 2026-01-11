@@ -1,0 +1,387 @@
+openapi: 3.0.1
+info:
+  title: Builder-Rah Headless API
+  version: "1.0.0"
+servers:
+  - url: http://localhost:5050
+paths:
+  /sessions:
+    get:
+      summary: List sessions
+      responses:
+        "200":
+          description: Sessions list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionSummary"
+    post:
+      summary: Create session
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionSummary"
+  /sessions/{id}:
+    get:
+      summary: Get session metadata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionSummary"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      summary: Delete session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  sessionId:
+                    type: string
+  /sessions/{id}/status:
+    get:
+      summary: Get session status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+                  status:
+                    $ref: "#/components/schemas/SessionStatus"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /sessions/{id}/plan:
+    get:
+      summary: Get pending plan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Plan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+                  plan:
+                    type: object
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /sessions/{id}/messages:
+    get:
+      summary: Get session messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionMessage"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /sessions/{id}/message:
+    post:
+      summary: Send message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+      responses:
+        "200":
+          description: Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRunResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /sessions/{id}/attachments:
+    post:
+      summary: Add attachment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                path:
+                  type: string
+      responses:
+        "200":
+          description: Attachment result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
+                  added:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SessionAttachment"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /sessions/{id}/run:
+    post:
+      summary: Run plan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Execution response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRunResponse"
+  /sessions/{id}/cancel:
+    post:
+      summary: Cancel plan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+                  status:
+                    type: object
+  /provider/metrics:
+    get:
+      summary: Provider metrics
+      responses:
+        "200":
+          description: Metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderMetrics"
+  /healthz:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Health
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        "200":
+          description: Readiness
+  /provider/events:
+    get:
+      summary: Provider events
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProviderEvent"
+components:
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+    SessionSummary:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        lastTouched:
+          type: string
+          format: date-time
+    SessionMessage:
+      type: object
+      properties:
+        sender:
+          type: string
+        text:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    SessionAttachment:
+      type: object
+      properties:
+        storedName:
+          type: string
+        originalName:
+          type: string
+        kind:
+          type: string
+        sizeBytes:
+          type: integer
+        sha256:
+          type: string
+        active:
+          type: boolean
+    SessionStatus:
+      type: object
+      properties:
+        status:
+          type: string
+        display:
+          type: string
+    SessionRunResponse:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        responses:
+          type: array
+          items:
+            type: string
+        status:
+          type: object
+    ProviderMetrics:
+      type: object
+      additionalProperties: true
+    ProviderEvent:
+      type: object
+      properties:
+        eventType:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        message:
+          type: string
+        metadata:
+          type: object

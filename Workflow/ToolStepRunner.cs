@@ -154,6 +154,10 @@ public static class ToolStepRunner
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+                return new ToolRunResult(false, "[tool:error] provider unreachable.");
+            if (ex is ProviderDisabledException)
+                return new ToolRunResult(false, "[tool:error] provider disabled.");
             return new ToolRunResult(false, "[tool:error] vision.describe.image failed: " + ex.Message);
         }
     }

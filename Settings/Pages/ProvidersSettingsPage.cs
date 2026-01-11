@@ -8,27 +8,90 @@ namespace RahBuilder.Settings.Pages;
 public sealed class ProvidersSettingsPage : UserControl
 {
     private readonly AppConfig _config;
+    private readonly CheckBox _providerEnabled;
+    private readonly CheckBox _cloudAssistEnabled;
+    private readonly ToolTip _providerTip;
 
     public ProvidersSettingsPage(AppConfig config)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
+        _providerTip = new ToolTip();
 
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 3,
+            RowCount = 4,
             AutoScroll = true
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        root.Controls.Add(BuildOpenAI(), 0, 0);
-        root.Controls.Add(BuildHuggingFace(), 0, 1);
-        root.Controls.Add(BuildOllama(), 0, 2);
+        _providerEnabled = new CheckBox
+        {
+            Text = "Provider Enabled",
+            Checked = _config.General.ProviderEnabled,
+            AutoSize = true
+        };
+        _providerEnabled.CheckedChanged += (_, _) =>
+        {
+            _config.General.ProviderEnabled = _providerEnabled.Checked;
+            AutoSave.Touch();
+        };
+
+        _cloudAssistEnabled = new CheckBox
+        {
+            Text = "Cloud Assist Enabled (OpenAI/HuggingFace)",
+            Checked = _config.General.CloudAssistEnabled,
+            AutoSize = true
+        };
+        _cloudAssistEnabled.CheckedChanged += (_, _) =>
+        {
+            _config.General.CloudAssistEnabled = _cloudAssistEnabled.Checked;
+            AutoSave.Touch();
+        };
+
+        var providerBox = new GroupBox { Text = "Provider", Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(10) };
+        var providerPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false
+        };
+        var desc = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(760, 0),
+            Text = "When off, all language model calls are suppressed; workflow will request you re-enable this before running."
+        };
+        var cloudAssistDesc = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(760, 0),
+            Text = "Cloud Assist enables OpenAI/HuggingFace helpers; keep off for local-only workflows."
+        };
+        _providerTip.SetToolTip(_providerEnabled, desc.Text);
+        providerPanel.Controls.Add(_providerEnabled);
+        providerPanel.Controls.Add(desc);
+        providerPanel.Controls.Add(_cloudAssistEnabled);
+        providerPanel.Controls.Add(cloudAssistDesc);
+        providerBox.Controls.Add(providerPanel);
+
+        root.Controls.Add(providerBox, 0, 0);
+        root.Controls.Add(BuildOpenAI(), 0, 1);
+        root.Controls.Add(BuildHuggingFace(), 0, 2);
+        root.Controls.Add(BuildOllama(), 0, 3);
 
         Controls.Add(root);
+    }
+
+    public void FocusProviderToggle()
+    {
+        if (_providerEnabled.CanFocus)
+            _providerEnabled.Focus();
     }
 
     private Control BuildOpenAI()

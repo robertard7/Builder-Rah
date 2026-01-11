@@ -93,6 +93,10 @@ public static class IntentExtractor
         }
         catch (Exception ex)
         {
+            if (ex is ProviderUnavailableException)
+                return IntentExtractionResult.Failure("provider_unreachable");
+            if (ex is ProviderDisabledException)
+                return IntentExtractionResult.Failure("provider_disabled");
             return IntentExtractionResult.Failure("intent_invoke_failed: " + ex.Message);
         }
 
@@ -106,6 +110,10 @@ public static class IntentExtractor
             }
             catch (Exception ex)
             {
+                if (ex is ProviderUnavailableException)
+                    return IntentExtractionResult.Failure("provider_unreachable", raw);
+                if (ex is ProviderDisabledException)
+                    return IntentExtractionResult.Failure("provider_disabled", raw);
                 return IntentExtractionResult.Failure("intent_retry_failed: " + ex.Message, raw);
             }
             parsed = IntentExtractionParser.TryParse(raw);

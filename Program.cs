@@ -11,7 +11,7 @@ internal static class Program
     [STAThread]
     static void Main(string[] args)
     {
-        if (args.Contains("--headless", StringComparer.OrdinalIgnoreCase))
+        if (args.Contains("--headless", StringComparer.OrdinalIgnoreCase) || IsHeadlessEnv())
         {
             RunHeadless(args);
             return;
@@ -27,12 +27,15 @@ internal static class Program
         var trace = new RahOllamaOnly.Tracing.RunTrace(new RahOllamaOnly.Tracing.TracePanelTraceSink(writer));
         var cfg = RahBuilder.Settings.ConfigStore.Load();
         var workflow = new RahBuilder.Workflow.WorkflowFacade(cfg, trace);
+        var store = new RahBuilder.Workflow.SessionStore();
+        var server = new RahBuilder.Workflow.HeadlessApiServer(cfg, trace, store);
         var textArg = GetArgument(args, "--text");
         var outArg = GetArgument(args, "--output");
 
         if (string.IsNullOrWhiteSpace(textArg))
         {
-            trace.Emit("[headless] Provider API ready. Use /api/jobs to submit work.");
+            server.Start(CancellationToken.None);
+            trace.Emit("[headless] API server running.");
             Thread.Sleep(Timeout.Infinite);
             return;
         }
@@ -72,5 +75,13 @@ internal static class Program
                 return args[i + 1];
         }
         return null;
+    }
+
+    private static bool IsHeadlessEnv()
+    {
+        var value = Environment.GetEnvironmentVariable("BUILDER_RAH_HEADLESS") ?? "";
+        return value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("yes", StringComparison.OrdinalIgnoreCase);
     }
 }
