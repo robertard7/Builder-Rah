@@ -23,6 +23,13 @@ public sealed class ChatMemory
         _turns.Add(new ChatTurn(r, c, DateTimeOffset.UtcNow));
     }
 
+    public void SetTurns(IEnumerable<ChatTurn> turns)
+    {
+        _turns.Clear();
+        if (turns == null) return;
+        _turns.AddRange(turns.Where(t => t != null));
+    }
+
     public string Summarize(int maxTurns)
     {
         if (maxTurns <= 0) return "";

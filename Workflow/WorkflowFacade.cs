@@ -32,6 +32,7 @@ public sealed class WorkflowFacade
     private IReadOnlyList<string> _toolingWarnings = Array.Empty<string>();
     private bool _toolingValid = true;
     private ProviderState _providerState = new(true, true);
+    private readonly SessionStore _sessionStore = new();
 
     private string _lastGraphHash = "";
     private bool _recentlyCompleted;
@@ -182,6 +183,7 @@ public sealed class WorkflowFacade
     {
         _attachments = (attachments ?? Array.Empty<AttachmentInbox.AttachmentEntry>()).ToList();
         NotifyStatus();
+        SaveSessionSnapshot();
     }
 
     public ToolPlan? GetPendingPlan() => _state.PendingToolPlan;
@@ -354,6 +356,7 @@ public sealed class WorkflowFacade
         SessionManager.AddHistoryEvent(_state.SessionToken, "user_message", new { text });
         BroadcastEvent("history_update", new { type = "user_message", text });
         _recentlyCompleted = false;
+        SaveSessionSnapshot();
 
         var action = UserReplyInterpreter.Interpret(_cfg, _state, text);
         NotifyStatus("Digesting intent");
@@ -805,6 +808,7 @@ public sealed class WorkflowFacade
         _state.PendingToolPlanJson = JsonSerializer.Serialize(new { steps = steps });
         _state.PendingStepIndex = 0;
         _state.PlanConfirmed = true;
+        SaveSessionSnapshot();
         if (recordHistory)
             SessionManager.AddHistoryEvent(_state.SessionToken, "plan_updated", new { steps = steps.Select(s => s.Title).ToList() });
         BroadcastEvent("plan", new { version = SessionManager.GetPlanVersions(_state.SessionToken).Count, steps });
@@ -981,6 +985,7 @@ public sealed class WorkflowFacade
         if (string.IsNullOrWhiteSpace(text)) return;
         _state.Memory.Add("assistant", text);
         _state.MemoryStore.AddAssistantMessage(text);
+        SaveSessionSnapshot();
     }
 
     private void EmitWaitUser(string reason, string? friendly = null, string? preview = null)
@@ -1035,6 +1040,98 @@ public sealed class WorkflowFacade
     private void EmitProviderOffline()
     {
         UserFacingMessage?.Invoke("Provider offline — check settings or retry.");
+    }
+
+    public SessionState BuildSessionState()
+    {
+        var state = new SessionState
+        {
+            SessionId = _state.SessionToken,
+            LastJobSpecJson = _state.LastJobSpecJson ?? "",
+            PendingToolPlanJson = _state.PendingToolPlanJson ?? "",
+            PendingStepIndex = _state.PendingStepIndex,
+            PlanConfirmed = _state.PlanConfirmed,
+            LastTouched = DateTimeOffset.UtcNow
+        };
+
+        state.Messages = _state.Memory.Turns
+            .Select(t => new SessionMessage(t.Role, t.Content, t.Timestamp))
+            .ToList();
+
+        state.Attachments = _attachments
+            .Select(a => new SessionAttachment(
+                a.StoredName,
+                a.OriginalName,
+                a.Kind,
+                a.SizeBytes,
+                a.Sha256,
+                a.Active))
+            .ToList();
+
+        state.Intent = CloneIntentState(_state.IntentState);
+        return state;
+    }
+
+    public void ApplySessionState(SessionState state)
+    {
+        if (state == null) return;
+        if (!string.IsNullOrWhiteSpace(state.SessionId))
+            _state.SessionToken = state.SessionId;
+
+        _state.LastJobSpecJson = state.LastJobSpecJson ?? "";
+        _state.PendingToolPlanJson = state.PendingToolPlanJson ?? "";
+        _state.PendingStepIndex = state.PendingStepIndex;
+        _state.PlanConfirmed = state.PlanConfirmed;
+        if (!string.IsNullOrWhiteSpace(_state.PendingToolPlanJson))
+        {
+            var plan = ToolPlanParser.TryParse(_state.PendingToolPlanJson);
+            _state.PendingToolPlan = plan;
+        }
+        _state.IntentState = CloneIntentState(state.Intent ?? new IntentState());
+        _state.Memory.SetTurns(state.Messages?.Select(m => new ChatTurn(m.Sender, m.Text, m.Timestamp)) ?? Array.Empty<ChatTurn>());
+        _state.MemoryStore.Clear();
+        foreach (var msg in state.Messages ?? new List<SessionMessage>())
+        {
+            if (string.Equals(msg.Sender, "user", StringComparison.OrdinalIgnoreCase))
+                _state.MemoryStore.AddUserMessage(msg.Text);
+            else if (string.Equals(msg.Sender, "assistant", StringComparison.OrdinalIgnoreCase))
+                _state.MemoryStore.AddAssistantMessage(msg.Text);
+        }
+    }
+
+    private void SaveSessionSnapshot()
+    {
+        try
+        {
+            var snapshot = BuildSessionState();
+            _sessionStore.Save(snapshot);
+        }
+        catch
+        {
+        }
+    }
+
+    private static IntentState CloneIntentState(IntentState source)
+    {
+        source ??= new IntentState();
+        var clone = new IntentState
+        {
+            SessionId = source.SessionId ?? "",
+            CurrentGoal = source.CurrentGoal,
+            Status = source.Status
+        };
+        clone.Slots = new Dictionary<string, string>(source.Slots ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+        if (source.ContextWindow != null)
+        {
+            foreach (var msg in source.ContextWindow)
+            {
+                var attachments = msg.Attachments?.Select(a =>
+                        new Attachment(a.Path, a.Name, a.Mime, a.Size, null))
+                    .ToList() ?? new List<Attachment>();
+                clone.ContextWindow.Add(new UserMessage(msg.Text, attachments, msg.CreatedUtc));
+            }
+        }
+        return clone;
     }
 
     private void SyncGraphToHub(AppConfig cfg)
@@ -1858,6 +1955,7 @@ public sealed class WorkflowFacade
         var version = SessionManager.AddPlanVersion(_state.SessionToken, plan, toolPlanText);
         BroadcastEvent("plan", new { version = version.Version, plan = version });
         NotifyStatus("Planning");
+        SaveSessionSnapshot();
         return true;
     }
 

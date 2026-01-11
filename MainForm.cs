@@ -42,6 +42,8 @@ public sealed class MainForm : Form
     private readonly SettingsHostControl _settingsControl;
     private bool _lastProviderEnabled;
     private ToolingDiagnostics _toolingDiagnostics = ToolingDiagnostics.Empty;
+    private readonly SessionStore _sessionStore;
+    private readonly SessionPanel _sessionPanel;
     private readonly List<OutputCard> _cards = new();
     private readonly Button _downloadButton;
     private readonly ListBox _cardList;
@@ -62,6 +64,7 @@ public sealed class MainForm : Form
         _trace = new RunTrace(new RahOllamaOnly.Tracing.TracePanelTraceSink(_traceWriter));
 
         _config = ConfigStore.Load();
+        _sessionStore = new SessionStore();
         _inbox = new AttachmentInbox(_config.General, _trace);
 
         _workflow = new WorkflowFacade(_trace);
@@ -233,6 +236,9 @@ public sealed class MainForm : Form
         tracePanel.Controls.Add(reinitProvider);
         auxTabs.TabPages.Add(new TabPage("Trace") { Controls = { tracePanel } });
         auxTabs.TabPages.Add(new TabPage("Outputs") { Controls = { outputSplit } });
+        _sessionPanel = new SessionPanel(_sessionStore);
+        _sessionPanel.SessionLoaded += LoadSessionState;
+        auxTabs.TabPages.Add(new TabPage("Sessions") { Controls = { _sessionPanel } });
 
         _traceWriter.Updated += () =>
         {
@@ -269,6 +275,7 @@ public sealed class MainForm : Form
         _lastProviderEnabled = _config.General.ProviderEnabled;
         UpdateProviderBadge();
         UpdateStatusLine();
+        TryLoadLastSession();
 
         if (_config.General.EnableGlobalClipboardShortcuts)
             ClipboardPolicy.Apply(this);
@@ -467,6 +474,40 @@ public sealed class MainForm : Form
     {
         AppendChat("Provider retry initiated.\n");
         UpdateProviderBadge();
+    }
+
+    private void TryLoadLastSession()
+    {
+        var sessions = _sessionStore.ListSessions();
+        var last = sessions.FirstOrDefault();
+        if (last != null)
+            LoadSessionState(last);
+    }
+
+    private void LoadSessionState(SessionState state)
+    {
+        if (state == null) return;
+        _workflow.ApplySessionState(state);
+
+        _chatView.Clear();
+        foreach (var msg in state.Messages ?? new List<SessionMessage>())
+        {
+            if (string.Equals(msg.Sender, "user", StringComparison.OrdinalIgnoreCase))
+                AppendChat($"> {msg.Text}\n");
+            else
+                AppendChat(msg.Text + "\n");
+        }
+
+        var desired = (state.Attachments ?? new List<SessionAttachment>())
+            .ToDictionary(a => a.StoredName, a => a.Active, StringComparer.OrdinalIgnoreCase);
+        foreach (var item in _inbox.List())
+        {
+            if (desired.TryGetValue(item.StoredName, out var active))
+                _inbox.SetActive(item.StoredName, active);
+        }
+        _composer.ReloadAttachments(_inbox.List());
+        _workflow.SetAttachments(_inbox.List());
+        UpdateStatusLine();
     }
 
     private void OnOutputCardProduced(OutputCard card)

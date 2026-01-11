@@ -15,6 +15,16 @@ public sealed class ConversationMemory
     public List<string> PlanNotes { get; } = new();
     public List<string> ToolOutputs { get; } = new();
 
+    public void Clear()
+    {
+        UserMessages.Clear();
+        AssistantMessages.Clear();
+        ClarificationQuestions.Clear();
+        ClarificationAnswers.Clear();
+        PlanNotes.Clear();
+        ToolOutputs.Clear();
+    }
+
     public void AddUserMessage(string message)
     {
         if (!string.IsNullOrWhiteSpace(message))
