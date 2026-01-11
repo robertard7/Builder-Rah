@@ -1,0 +1,34 @@
+# Prompt Template
+version: 1
+category: CLI
+
+tool_name: <cli-tool-name>
+use_case: Execute a CLI command with safe flags and capture structured output.
+
+input_template:
+  description: Provide command arguments and optional working directory.
+  fields:
+    - name: args
+      type: string
+      required: true
+      example: "--version"
+    - name: workingDirectory
+      type: path
+      required: false
+      example: "./"
+
+output_spec:
+  success:
+    summary: Command output captured as text and exit code.
+    fields:
+      - name: exitCode
+        type: number
+        description: Process exit code.
+      - name: stdout
+        type: string
+        description: Standard output.
+      - name: stderr
+        type: string
+        description: Standard error output.
+  failure:
+    summary: Error payload with exit code and diagnostic message.

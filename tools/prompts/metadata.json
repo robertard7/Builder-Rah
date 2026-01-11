@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "description": "Prompt templates for tool handlers",
+  "tags": [
+    "tools",
+    "prompts",
+    "handlers"
+  ]
+}

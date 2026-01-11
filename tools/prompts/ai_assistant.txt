@@ -1,0 +1,31 @@
+# Prompt Template
+version: 1
+category: ai assistant
+
+tool_name: <assistant-name>
+use_case: Provide developer assistance with code, docs, or reasoning.
+
+input_template:
+  description: Provide the task request and relevant context.
+  fields:
+    - name: request
+      type: string
+      required: true
+      example: "Summarize the API usage"
+    - name: context
+      type: string
+      required: false
+      example: "Relevant code snippets or links"
+
+output_spec:
+  success:
+    summary: Structured response with actionable guidance.
+    fields:
+      - name: response
+        type: string
+        description: Assistant response text.
+      - name: references
+        type: list
+        description: Optional supporting references.
+  failure:
+    summary: Error with clarification questions.

@@ -1,0 +1,23 @@
+# Tool Prompt Template v1
+version: 1
+
+tool_name: <tool-name>
+use_case: <what this tool is used for>
+
+input_template:
+  description: <what the user provides>
+  fields:
+    - name: <field-name>
+      type: <string|number|boolean|path|list>
+      required: <true|false>
+      example: <example value>
+
+output_spec:
+  success:
+    summary: <short summary of expected output>
+    fields:
+      - name: <field-name>
+        type: <string|number|boolean|list|object>
+        description: <field description>
+  failure:
+    summary: <error format and required details>
