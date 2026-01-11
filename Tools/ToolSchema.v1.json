@@ -56,7 +56,7 @@
         "notes": {
           "type": "string"
         },
-        "url": {
+        "sourceUrl": {
           "type": "string",
           "format": "uri"
         }

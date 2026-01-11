@@ -1,11 +1,11 @@
 {
   "categories": [
     "editors",
-    "IDEs",
-    "CLI utils",
-    "package managers",
-    "QA/testing",
-    "AI assistants",
+    "ide",
+    "cli-util",
+    "package-manager",
+    "qa-testing",
+    "ai-assistant",
     "monitoring",
     "networking",
     "security"
