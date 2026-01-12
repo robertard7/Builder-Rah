@@ -5,5 +5,8 @@ namespace RahOllamaOnly.Tools.Handlers;
 
 public sealed record ExecutionOptions(
     string? ToolId = null,
+    string? Role = null,
     TimeSpan? Timeout = null,
-    int MaxRetries = 0);
+    int MaxRetries = 0,
+    bool UseNoOp = false,
+    System.Threading.CancellationToken CancellationToken = default);

@@ -34,6 +34,20 @@ public sealed class PromptRunner
         var execution = await executor.ExecuteAsync(resolution.Prompt, options).ConfigureAwait(false);
         return new PromptRunResult(resolution, execution);
     }
+
+    public Task<PromptRunResult> RunAsync(
+        string template,
+        IReadOnlyDictionary<string, string?> inputs,
+        IReadOnlyCollection<string>? requiredInputs,
+        PromptExecutorFactory executorFactory,
+        ExecutionOptions options)
+    {
+        if (executorFactory == null)
+            throw new ArgumentNullException(nameof(executorFactory));
+
+        var executor = executorFactory.Create(options);
+        return RunAsync(template, inputs, requiredInputs, executor, options);
+    }
 }
 
 public sealed record PromptRunResult(
