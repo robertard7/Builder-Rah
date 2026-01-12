@@ -101,6 +101,10 @@ export class ResilienceClient {
     return this.getJson(`/metrics/resilience/history?${query.toString()}`);
   }
 
+  async getHistoryRange(start: string, end: string, options?: { limit?: number; bucketMinutes?: number; page?: number; perPage?: number }): Promise<ResilienceHistoryResponse> {
+    return this.getHistory({ start, end, ...options });
+  }
+
   async resetMetrics(): Promise<ResilienceResetResponse> {
     return this.sendJson<ResilienceResetResponse>("/metrics/resilience/reset", { method: "PUT" });
   }
@@ -130,6 +134,10 @@ export class ResilienceClient {
     return this.getJson(`/alerts?${query.toString()}`);
   }
 
+  async getAlertsBySeverity(severity: ResilienceSeverity, limit = 50): Promise<ResilienceAlertsResponse> {
+    return this.getAlerts(limit, { severity });
+  }
+
   async deleteAlerts(ruleId?: string): Promise<AlertDeleteResponse> {
     const query = new URLSearchParams();
     if (ruleId) query.set("ruleId", ruleId);
@@ -149,6 +157,23 @@ export class ResilienceClient {
     return this.sendJson<ResilienceAlertEvent>(`/alerts/events/${eventId}`, {
       method: "PATCH",
       body: JSON.stringify({ acknowledged: true })
+    });
+  }
+
+  async *watchAlerts(intervalMs = 5000, options?: { severity?: ResilienceSeverity; includeAcknowledged?: boolean }): AsyncGenerator<ResilienceAlertEvent[]> {
+    while (true) {
+      const response = await this.getAlerts(50, options);
+      yield response.events;
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  }
+
+  watchAlertsObservable(intervalMs = 5000, options?: { severity?: ResilienceSeverity; includeAcknowledged?: boolean }): Observable<ResilienceAlertEvent[]> {
+    return createObservable(async (next, stop) => {
+      for await (const events of this.watchAlerts(intervalMs, options)) {
+        if (stop.aborted) return;
+        next(events);
+      }
     });
   }
 

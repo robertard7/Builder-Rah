@@ -9,6 +9,8 @@ public static class ResilienceAlertsCommand
 {
     public static int Execute(CommandContext context, string[] args, bool jsonOutput)
     {
+        if (args.Length > 0 && string.Equals(args[0], "list", StringComparison.OrdinalIgnoreCase))
+            args = args.Skip(1).ToArray();
         var severity = GetArgument(args, "--severity");
         var includeAcknowledged = !args.Any(a => string.Equals(a, "--active-only", StringComparison.OrdinalIgnoreCase));
         var rules = ResilienceDiagnosticsHub.ListAlertRules();
