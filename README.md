@@ -1,190 +1,117 @@
-Builder Rah
+<p align="center">
+  <img src="https://raw.githubusercontent.com/robertard7/Builder-Rah/main/docs/rah-logo.png" alt="Builder Rah Logo" width="200" />
+  <br />
+  <strong>Builder Rah</strong> — deterministic artifact generation + API + headless automation
+</p>
 
-Builder Rah is a WinForms-based AI workflow runner that plans, executes, and packages generated program artifacts in a deterministic, cacheable way. It supports interactive UI usage, full headless operation, a REST API, and a CLI for automation and integrations.
+<p align="center">
+  <a href="https://github.com/robertard7/Builder-Rah/stargazers"><img src="https://img.shields.io/github/stars/robertard7/Builder-Rah?style=flat-square" /></a>
+  <a href="https://github.com/robertard7/Builder-Rah/actions"><img src="https://img.shields.io/github/actions/workflow/status/robertard7/Builder-Rah/ci.yml?style=flat-square" /></a>
+  <a href="https://github.com/robertard7/Builder-Rah/network/members"><img src="https://img.shields.io/github/forks/robertard7/Builder-Rah?style=flat-square" /></a>
+  <a href="https://github.com/robertard7/Builder-Rah/blob/main/LICENSE"><img src="https://img.shields.io/github/license/robertard7/Builder-Rah?style=flat-square" /></a>
+</p>
 
-At its core, Builder Rah turns natural-language jobs into reproducible software artifacts, complete with file trees, previews, and downloadable archives.
+---
 
-This is not a chat app. It is a build system that happens to talk to models.
+## 🚀 What is Builder Rah?
 
-What Builder Rah Does
+**Builder Rah** is a hybrid WinForms + headless build automation engine. It turns **text-driven jobs** into **reproducible code artifacts** with:
 
-Plans multi-step workflows from natural language input
+- deterministic execution
+- cacheable project artifacts
+- preview & downloadable zips
+- REST API and CLI control
+- session orchestration for workflows
 
-Executes tools and providers deterministically
+It’s not just a code generator. It is a **build system that can be scripted, automated, and integrated** into larger tooling pipelines.
 
-Generates real project files on disk
+---
 
-Packages results as cached, hash-addressed artifacts
+## 🧠 Core Concepts
 
-Serves artifacts via UI, API, CLI, or headless mode
+**Artifacts**
 
-Tracks provider health, metrics, and events
-
-If a job can produce code, Builder Rah can package it, cache it, and ship it.
-
-Artifact System Overview
-
-Artifact generation is a first-class feature.
-
-Artifact Flow
-
-A workflow plan includes one or more generation steps
-
-The artifact generator runs or reuses a cached result
-
-Generated files are written to:
+A job produces a *artifact set*:
 
 Workflow/ProgramArtifacts/<timestamp>-<session>-<hash>/
 
 
-A ZIP archive is created alongside the folder
+Each set includes:
 
-Artifacts are cached by semantic SHA-256 hash
+- full project tree
+- file previews
+- a `.zip` archive
+- semantic cache key (SHA-256)
 
-UI output cards expose:
+➡ Artifacts are cached so repeated runs are fast and deterministic. :contentReference[oaicite:0]{index=0}
 
-Project tree
+---
 
-File previews
+## 📡 REST API
 
-Summary metadata
+### Submit a Job
+**POST** `/api/jobs`
 
-Download links
-
-When inputs match, artifacts are reused instead of regenerated.
-
-Artifact Cache
-
-Hash inputs include:
-
-Job spec text
-
-Constraints
-
-Attachments
-
-Tool outputs
-
-Cache metadata lives at:
-
-Workflow/ProgramArtifacts/cache/cache.json
-
-
-Cache hits reuse:
-
-ZIP archive
-
-File tree
-
-Previews
-
-This makes runs reproducible and fast instead of expensive and chaotic.
-
-Running the App
-UI Mode (Default)
-dotnet run
-
-
-Starts the WinForms UI with full workflow, output, and artifact browsing.
-
-Headless Mode (API Server)
-dotnet run -- --headless
-
-
-Runs Builder Rah as an API-only service. No UI. Suitable for automation, CI, or integrations.
-
-One-Shot Headless Execution
-dotnet run -- --headless --text "Build TODO API with auth and tests" --output ./out
-
-
-Runs a single workflow
-
-Waits for artifact completion
-
-Copies the generated ZIP to ./out
-
-Exits
-
-REST API
-Submit a Job
-
-POST /api/jobs
-
+```json
 {
-  "text": "Build TODO API with tests",
+  "text": "Build TODO API with auth and tests",
   "session": "abc"
 }
 
-
-Session overrides are allowed only on this endpoint.
-
+This starts a new execution plan based on natural language.
 List Artifacts
 
 GET /api/artifacts?session=<token>
 
-Returns:
-
-Artifact hashes
-
-File tree previews
-
-ZIP paths
-
-Metadata for the active session
-
+Returns metadata, preview trees, hashes, and ZIP paths.
 Download Artifacts
 
 GET /api/artifacts/download?session=<token>&hash=<hash>
 
-Streams the ZIP archive
+Streams the ZIP. Latest if hash omitted.
+🖥 UI Features
 
-If hash is omitted, the latest artifact is returned
+    Side-pane tree view of generated artifacts
 
-Session mismatches return:
+    File previews on click
 
-{ "error": "session_mismatch" }
+    Downloadable ZIP per artifact card
 
-Output Cards
+    Real-time workflow status
 
-GET /api/output?session=<token>
+These make your generated projects easy to browse without cloning.
+🧰 Headless Mode
 
-Returns all output cards, including artifact summaries and previews.
+Run without GUI:
 
-Session API (Headless)
+dotnet run -- --headless
 
-The headless server exposes full session lifecycle control:
+Submit jobs via API. Perfect for CI or automation.
 
-GET /sessions
+One-shot generation
 
-POST /sessions
+dotnet run -- --headless --text "Build TODO API with auth and tests" --output ./out
 
-GET /sessions/{id}
+Produces an artifact zip and exits.
+💬 Session API (headless)
 
-GET /sessions/{id}/status
+Control sessions programmatically:
+Endpoint	Description
+GET /sessions	list all
+POST /sessions	create new
+GET /sessions/{id}/status	check state
+POST /sessions/{id}/run	run workflow
+POST /sessions/{id}/cancel	stop active session
+DELETE /sessions/{id}	remove session
 
-GET /sessions/{id}/plan
+Plus provider diagnostics:
 
-POST /sessions/{id}/message
+    GET /provider/metrics
 
-POST /sessions/{id}/attachments
+    GET /provider/events 
 
-POST /sessions/{id}/run
-
-POST /sessions/{id}/cancel
-
-DELETE /sessions/{id}
-
-Provider diagnostics:
-
-GET /provider/metrics
-
-GET /provider/events
-
-See openapi.yaml for the complete schema.
-
-CLI (rah)
-
-Builder Rah includes a CLI for scripting and automation.
+Full schema in openapi.yaml.
+📟 CLI (rah)
 
 rah session list
 rah session start --id <id>
@@ -194,68 +121,47 @@ rah session plan --id <id>
 rah session run --id <id>
 rah session cancel --id <id>
 rah session delete --id <id>
-
 rah provider metrics
 rah provider events
 
+Uniform control surface for automation and tooling.
+🧠 Design Philosophy
 
-The CLI talks to the same API as the UI and headless server.
+Builder Rah values:
 
-UI Features
+    determinism over guesswork
 
-Output tab shows artifact trees using a tree view
+    cache reuse over redundant generation
 
-File selection shows inline previews
+    automation over manual steps
 
-Artifact cards include:
+    self-service artifacts over opaque code dumps
 
-Summary
+This is a tool for building consistent portable projects that anyone or anything can consume.
+🔧 Getting Started
 
-File list
+    Clone the repo
 
-Download ZIP action
+    Restore dependencies
 
-Provider health and metrics are surfaced in real time
+    Run dotnet run
 
-Providers
+        UI mode by default
 
-Providers are modular, state-tracked execution backends.
+        Add --headless for API only
 
-Features include:
+Artifacts appear under Workflow/ProgramArtifacts/ once jobs complete.
+📄 Resources
 
-Enable/disable controls
+    OpenAPI spec: openapi.yaml
 
-Reachability checks
+    Example settings: appsettings.example.json
 
-Retry and backoff
+    API usage examples: see docs folder
 
-Metrics and event logging
+🏷️ Tags
 
-Health surfaced in UI and API
+builder artifact-generation headless automation api cli
+🛡 License
 
-The workflow routes execution based on provider availability instead of guessing.
-
-Project Structure (Relevant Bits)
-Workflow/
-  ProgramArtifacts/
-    cache/
-    <timestamp>-<session>-<hash>/
-Ui/
-Api/
-Cli/
-Providers/
-openapi.yaml
-
-Philosophy (Short Version)
-
-Deterministic over clever
-
-Cached over regenerated
-
-Observable over magical
-
-Build artifacts, not vibes
-
-If it generated files, you should be able to download them, hash them, and reuse them.
-
-Builder Rah enforces that.
+MIT © Robert Ard
