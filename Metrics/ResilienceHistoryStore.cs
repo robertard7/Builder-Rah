@@ -22,7 +22,12 @@ public sealed class ResilienceHistoryStore
 
     public void Add(CircuitMetricsSnapshot snapshot)
     {
-        _samples.Enqueue(new ResilienceMetricsSample(DateTimeOffset.UtcNow, snapshot));
+        Add(snapshot, DateTimeOffset.UtcNow);
+    }
+
+    public void Add(CircuitMetricsSnapshot snapshot, DateTimeOffset timestamp)
+    {
+        _samples.Enqueue(new ResilienceMetricsSample(timestamp, snapshot));
         Trim();
     }
 

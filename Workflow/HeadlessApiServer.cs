@@ -682,6 +682,11 @@ public sealed class HeadlessApiServer
     {
         var endpoint = ctx.Request.Url?.AbsolutePath ?? "";
         ctx.Response.Headers["Retry-After"] = "30";
+        return WriteErrorAsync(ctx, 503, BuildCircuitOpenError(endpoint), ct);
+    }
+
+    public static ApiError BuildCircuitOpenError(string endpoint)
+    {
         var details = new Dictionary<string, object>
         {
             ["retryAfterSeconds"] = 30,
@@ -690,7 +695,7 @@ public sealed class HeadlessApiServer
             ["endpoint"] = endpoint,
             ["errorCode"] = "circuit_open"
         };
-        return WriteErrorAsync(ctx, 503, ApiError.ServiceUnavailable("circuit_open", details), ct);
+        return ApiError.ServiceUnavailable("circuit_open", details);
     }
 
     private sealed record RunResponse(string SessionId, List<string> Responses, object Status);
