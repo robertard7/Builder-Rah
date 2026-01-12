@@ -47,7 +47,9 @@ public static class PromptMetadataValidator
         else if (metadata.Categories.Any(category => string.IsNullOrWhiteSpace(category)))
             errors.Add("Prompt metadata categories cannot contain empty values.");
 
-        if (metadata.TagHints != null && metadata.TagHints.Any(tag => string.IsNullOrWhiteSpace(tag)))
+        if (metadata.TagHints == null || metadata.TagHints.Count == 0)
+            errors.Add("Prompt metadata tagHints must include at least one entry.");
+        else if (metadata.TagHints.Any(tag => string.IsNullOrWhiteSpace(tag)))
             errors.Add("Prompt metadata tagHints cannot contain empty values.");
 
         return errors;
