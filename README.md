@@ -1,80 +1,112 @@
-# Builder Rah Artifact Generation
+<p align="center">
+  <img src="https://raw.githubusercontent.com/robertard7/Builder-Rah/main/docs/rah-logo.png" alt="Builder Rah Logo" width="200" />
+  <br />
+  <strong>Builder Rah</strong> — deterministic artifact generation + API + headless automation
+</p>
 
-This WinForms tool can now package generated program artifacts, expose them over an API, and run in headless script mode.
+<p align="center">
+  <a href="https://github.com/robertard7/Builder-Rah/stargazers"><img src="https://img.shields.io/github/stars/robertard7/Builder-Rah?style=flat-square" /></a>
+  <a href="https://github.com/robertard7/Builder-Rah/actions"><img src="https://img.shields.io/github/actions/workflow/status/robertard7/Builder-Rah/ci.yml?style=flat-square" /></a>
+  <a href="https://github.com/robertard7/Builder-Rah/network/members"><img src="https://img.shields.io/github/forks/robertard7/Builder-Rah?style=flat-square" /></a>
+  <a href="https://github.com/robertard7/Builder-Rah/blob/main/LICENSE"><img src="https://img.shields.io/github/license/robertard7/Builder-Rah?style=flat-square" /></a>
+</p>
 
-## Artifact flow
+---
 
-1. Plans that include generation steps trigger the artifact generator (or reuse cache).
-2. Generated files are written under `Workflow/ProgramArtifacts/<timestamp>-<session>-<hash>/`.
-3. A zip of the project is created beside the folder and cached by semantic hash.
-4. Output cards include a project tree, file previews, a summary card, and a download card.
+## 🚀 What is Builder Rah?
 
-## API endpoints
+**Builder Rah** is a hybrid WinForms + headless build automation engine. It turns **text-driven jobs** into **reproducible code artifacts** with:
 
-- `GET /api/artifacts?session=<token>` — lists artifacts, tree previews, hashes, and zip paths for the active session.
-- `GET /api/artifacts/download?session=<token>&hash=<hash>` — streams the artifact zip (latest if hash omitted).
-- `GET /api/output?session=<token>` — existing output cards (includes new artifact cards).
-- `POST /api/jobs` with `{ "text": "...", "session": "<token>" }` — submit work; session overrides are allowed only here.
+- deterministic execution
+- cacheable project artifacts
+- preview & downloadable zips
+- REST API and CLI control
+- session orchestration for workflows
 
-Sessions must match the workflow’s current session token for artifact endpoints; mismatches return `session_mismatch`.
+It’s not just a code generator. It is a **build system that can be scripted, automated, and integrated** into larger tooling pipelines.
 
-### Example (PowerShell)
+---
 
-```pwsh
-Invoke-RestMethod "http://localhost:5050/api/jobs" -Method Post -Body '{\"text\":\"Build TODO API with tests\",\"session\":\"abc\"}' -ContentType "application/json"
-Invoke-RestMethod "http://localhost:5050/api/artifacts?session=abc"
-Invoke-WebRequest "http://localhost:5050/api/artifacts/download?session=abc" -OutFile artifacts.zip
-```
+## 🧠 Core Concepts
 
-### Example (curl)
+**Artifacts**
 
-```bash
-curl -X POST http://localhost:5050/api/jobs -H "Content-Type: application/json" -d '{"text":"Build TODO API with tests","session":"abc"}'
-curl http://localhost:5050/api/artifacts?session=abc
-curl -o artifacts.zip "http://localhost:5050/api/artifacts/download?session=abc"
-```
+A job produces a *artifact set*:
 
-## UI updates
+Workflow/ProgramArtifacts/<timestamp>-<session>-<hash>/
 
-- Output tab shows project tree and file preview cards using a tree view.
-- Select files in the tree to view previews; “Download ZIP” saves the generated archive for the selected artifact card.
 
-## Headless/script mode
+Each set includes:
 
-Run without UI to serve API-only workflows:
+- full project tree
+- file previews
+- a `.zip` archive
+- semantic cache key (SHA-256)
 
-```bash
+➡ Artifacts are cached so repeated runs are fast and deterministic. :contentReference[oaicite:0]{index=0}
+
+---
+
+## 📡 REST API
+
+### Submit a Job
+**POST** `/api/jobs`
+
+```json
+{
+  "text": "Build TODO API with auth and tests",
+  "session": "abc"
+}
+
+This starts a new execution plan based on natural language.
+List Artifacts
+
+GET /api/artifacts?session=<token>
+
+Returns metadata, preview trees, hashes, and ZIP paths.
+Download Artifacts
+
+GET /api/artifacts/download?session=<token>&hash=<hash>
+
+Streams the ZIP. Latest if hash omitted.
+🖥 UI Features
+
+    Side-pane tree view of generated artifacts
+
+    File previews on click
+
+    Downloadable ZIP per artifact card
+
+    Real-time workflow status
+
+These make your generated projects easy to browse without cloning.
+🧰 Headless Mode
+
+Run without GUI:
+
 dotnet run -- --headless
-```
 
-The provider API will start using your configured settings; submit jobs via `/api/jobs`.
+Submit jobs via API. Perfect for CI or automation.
 
-Generate artifacts directly without UI:
+One-shot generation
 
-```bash
 dotnet run -- --headless --text "Build TODO API with auth and tests" --output ./out
-```
 
-This runs the workflow once, waits for artifact completion, and copies the generated zip to `./out`.
+Produces an artifact zip and exits.
+💬 Session API (headless)
 
-## Headless session API
+Control sessions programmatically:
+Endpoint	Description
+GET /sessions	list all
+POST /sessions	create new
+GET /sessions/{id}/status	check state
+POST /sessions/{id}/run	run workflow
+POST /sessions/{id}/cancel	stop active session
+DELETE /sessions/{id}	remove session
 
-The headless server also exposes session endpoints for integrations:
+Plus provider diagnostics:
 
-- `GET /sessions`
-- `POST /sessions`
-- `GET /sessions/{id}`
-- `GET /sessions/{id}/status`
-- `GET /sessions/{id}/plan`
-- `POST /sessions/{id}/message`
-- `POST /sessions/{id}/attachments`
-- `POST /sessions/{id}/run`
-- `POST /sessions/{id}/cancel`
-- `DELETE /sessions/{id}`
-- `GET /provider/metrics`
-- `GET /provider/events`
-
-See `openapi.yaml` for the full schema.
+    GET /provider/metrics
 
 ### Resilience API examples
 
@@ -185,17 +217,17 @@ When using the TypeScript client, a `ResilienceClientError` includes `status`, `
 
 ## CLI
 
-The CLI is available via `rah`:
+Full schema in openapi.yaml.
+📟 CLI (rah)
 
-```bash
 rah session list
 rah session start --id <id>
 rah session send --id <id> --message "text"
 rah session status --id <id>
 rah session plan --id <id>
+rah session run --id <id>
 rah session cancel --id <id>
 rah session delete --id <id>
-rah run --id <id>
 rah provider metrics
 rah provider events
 rah resilience alerts list --severity critical
@@ -217,6 +249,4 @@ Label usage is intentionally limited to avoid high-cardinality metrics.
 
 ## Caching
 
-- Artifact sets are hashed by job spec, constraints, attachments, and tool outputs (SHA256).
-- Cache is stored under `Workflow/ProgramArtifacts/cache/cache.json`.
-- When a hash matches, the generator reuses the cached zip and previews instead of regenerating.
+MIT © Robert Ard
