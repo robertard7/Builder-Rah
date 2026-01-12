@@ -10,6 +10,10 @@ public sealed class CircuitBreaker
     private readonly TimeSpan _breakDuration;
     private int _failureCount;
     private DateTimeOffset? _openedUntil;
+    private CircuitState _state = CircuitState.Closed;
+    private bool _halfOpenInFlight;
+
+    public event Action<CircuitState, CircuitState>? StateChanged;
 
     public CircuitBreaker(int failureThreshold = 3, TimeSpan? breakDuration = null)
     {
@@ -21,13 +25,23 @@ public sealed class CircuitBreaker
     {
         lock (_lock)
         {
-            if (_openedUntil == null)
+            if (_state == CircuitState.Closed)
                 return true;
 
-            if (_openedUntil <= DateTimeOffset.UtcNow)
+            if (_state == CircuitState.Open)
             {
-                _openedUntil = null;
-                _failureCount = 0;
+                if (_openedUntil != null && _openedUntil <= DateTimeOffset.UtcNow)
+                    TransitionTo(CircuitState.HalfOpen);
+                else
+                    return false;
+            }
+
+            if (_state == CircuitState.HalfOpen)
+            {
+                if (_halfOpenInFlight)
+                    return false;
+
+                _halfOpenInFlight = true;
                 return true;
             }
 
@@ -41,6 +55,8 @@ public sealed class CircuitBreaker
         {
             _failureCount = 0;
             _openedUntil = null;
+            _halfOpenInFlight = false;
+            TransitionTo(CircuitState.Closed);
         }
     }
 
@@ -48,9 +64,39 @@ public sealed class CircuitBreaker
     {
         lock (_lock)
         {
+            _halfOpenInFlight = false;
+            if (_state == CircuitState.HalfOpen)
+            {
+                OpenCircuit();
+                return;
+            }
+
             _failureCount++;
             if (_failureCount >= _failureThreshold)
-                _openedUntil = DateTimeOffset.UtcNow.Add(_breakDuration);
+                OpenCircuit();
         }
     }
+
+    private void OpenCircuit()
+    {
+        _openedUntil = DateTimeOffset.UtcNow.Add(_breakDuration);
+        TransitionTo(CircuitState.Open);
+    }
+
+    private void TransitionTo(CircuitState next)
+    {
+        if (_state == next)
+            return;
+
+        var previous = _state;
+        _state = next;
+        StateChanged?.Invoke(previous, next);
+    }
+}
+
+public enum CircuitState
+{
+    Closed,
+    Open,
+    HalfOpen
 }
