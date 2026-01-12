@@ -54,6 +54,7 @@ public sealed class MainForm : Form
     private readonly Dictionary<string, string> _filePreviews = new(StringComparer.OrdinalIgnoreCase);
     private readonly TabControl _mainTabs;
     private readonly TabPage _diagnosticsTab;
+    private readonly ResilienceMetricsPanel _resiliencePanel;
 
     public MainForm()
     {
@@ -241,6 +242,9 @@ public sealed class MainForm : Form
         _sessionPanel = new SessionPanel(_sessionStore);
         _sessionPanel.SessionLoaded += LoadSessionState;
         auxTabs.TabPages.Add(new TabPage("Sessions") { Controls = { _sessionPanel } });
+        _resiliencePanel = new ResilienceMetricsPanel();
+        _resiliencePanel.AlertTriggered += msg => _trace.Emit("[resilience:alert] " + msg);
+        auxTabs.TabPages.Add(new TabPage("Resilience") { Controls = { _resiliencePanel } });
 
         _traceWriter.Updated += () =>
         {

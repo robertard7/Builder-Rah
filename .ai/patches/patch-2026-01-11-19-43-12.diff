@@ -1,0 +1,85 @@
+diff --git a/Metrics/ResilienceDiagnosticsHub.cs b/Metrics/ResilienceDiagnosticsHub.cs
+index fd288f8..01bc725 100644
+--- a/Metrics/ResilienceDiagnosticsHub.cs
++++ b/Metrics/ResilienceDiagnosticsHub.cs
+@@ -11,6 +11,7 @@ public static class ResilienceDiagnosticsHub
+ {
+     private static readonly CircuitMetricsStore Store = new();
+     private static readonly ConcurrentDictionary<CircuitBreaker, EventHandler<CircuitBreakerStateChangedEventArgs>> Subscriptions = new();
++    private static readonly ConcurrentDictionary<CircuitBreaker, CircuitState> BreakerStates = new();
+     private static readonly ConcurrentDictionary<string, CircuitMetricsStore> ToolStores = new(StringComparer.OrdinalIgnoreCase);
+     private static readonly ResilienceHistoryStore History = new();
+     private static readonly ResilienceAlertStore Alerts = new();
+@@ -21,7 +22,10 @@ public static class ResilienceDiagnosticsHub
+             throw new ArgumentNullException(nameof(breaker));
+ 
+         var handler = new EventHandler<CircuitBreakerStateChangedEventArgs>((_, args) =>
+-            Store.RecordStateChange(args.Previous, args.Current));
++        {
++            Store.RecordStateChange(args.Previous, args.Current);
++            BreakerStates[breaker] = args.Current;
++        });
+ 
+         if (Subscriptions.TryAdd(breaker, handler))
+             breaker.StateChanged += handler;
+@@ -64,6 +68,11 @@ public static class ResilienceDiagnosticsHub
+         return History.Snapshot(window, limit);
+     }
+ 
++    public static bool IsCircuitOpen()
++    {
++        return BreakerStates.Values.Any(state => state == CircuitState.Open);
++    }
++
+     public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes)
+     {
+         return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes);
+@@ -85,5 +94,6 @@ public static class ResilienceDiagnosticsHub
+         ToolStores.Clear();
+         History.Reset();
+         Alerts.Reset();
++        BreakerStates.Clear();
+     }
+ }
+diff --git a/Workflow/ToolStepRunner.cs b/Workflow/ToolStepRunner.cs
+index 6e09aa9..bf4ac29 100644
+--- a/Workflow/ToolStepRunner.cs
++++ b/Workflow/ToolStepRunner.cs
+@@ -60,7 +60,11 @@ public static class ToolStepRunner
+             return await RunFileReadAsync(attachment, trace, ct).ConfigureAwait(false);
+ 
+         if (step.ToolId.Equals("vision.describe.image", StringComparison.OrdinalIgnoreCase))
++        {
++            if (RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.IsCircuitOpen())
++                return new ToolRunResult(false, "[resilience] circuit OPEN; execution skipped. Retry after 30s.");
+             return await RunVisionAsync(attachment, cfg, trace, ct).ConfigureAwait(false);
++        }
+ 
+         return new ToolRunResult(false, $"[tool:error] unsupported tool: {step.ToolId}");
+     }
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 6b514f2..3e77f52 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -2186,12 +2186,19 @@ public sealed class WorkflowFacade
+                     EmitProviderDisabled();
+                     return;
+                 }
++                if (result.Message.Contains("circuit open", StringComparison.OrdinalIgnoreCase))
++                {
++                    EmitWaitUser(result.Message, "Circuit open. Retry after backoff (≈30s) or reset metrics.");
++                    NotifyStatus("Tool execution");
++                    TraceAttentionRequested?.Invoke();
++                    return;
++                }
+                 var errorCard = new OutputCard
+                 {
+                     Kind = OutputCardKind.Error,
+                     Title = "Step failed",
+-                    Summary = result.Message,
+-                    Preview = result.Message,
++                    Summary = result.Message,
++                    Preview = result.Message,
+                     FullContent = result.Message,
+                     Tags = new[] { "error" },
+                     ToolId = step.ToolId,

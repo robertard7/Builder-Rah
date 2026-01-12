@@ -1,0 +1,489 @@
+diff --git a/Metrics/ResilienceAlertStore.cs b/Metrics/ResilienceAlertStore.cs
+new file mode 100644
+index 0000000..140668a
+--- /dev/null
++++ b/Metrics/ResilienceAlertStore.cs
+@@ -0,0 +1,102 @@
++#nullable enable
++using System;
++using System.Collections.Concurrent;
++using System.Collections.Generic;
++using System.Linq;
++
++namespace RahOllamaOnly.Metrics;
++
++public sealed record ResilienceAlertRule(
++    string Id,
++    string Name,
++    int OpenThreshold,
++    int RetryThreshold,
++    int WindowMinutes,
++    bool Enabled);
++
++public sealed record ResilienceAlertEvent(
++    string Id,
++    string RuleId,
++    string Message,
++    DateTimeOffset TriggeredAt,
++    int OpenDelta,
++    int RetryDelta);
++
++public sealed class ResilienceAlertStore
++{
++    private readonly ConcurrentDictionary<string, ResilienceAlertRule> _rules = new(StringComparer.OrdinalIgnoreCase);
++    private readonly ConcurrentQueue<ResilienceAlertEvent> _events = new();
++    private readonly ConcurrentDictionary<string, bool> _activeStates = new(StringComparer.OrdinalIgnoreCase);
++    private readonly int _maxEvents;
++
++    public ResilienceAlertStore(int maxEvents = 200)
++    {
++        _maxEvents = Math.Max(1, maxEvents);
++    }
++
++    public ResilienceAlertRule AddRule(string name, int openThreshold, int retryThreshold, int windowMinutes)
++    {
++        var rule = new ResilienceAlertRule(
++            Guid.NewGuid().ToString("N"),
++            string.IsNullOrWhiteSpace(name) ? "threshold" : name.Trim(),
++            Math.Max(0, openThreshold),
++            Math.Max(0, retryThreshold),
++            Math.Max(1, windowMinutes),
++            true);
++        _rules[rule.Id] = rule;
++        _activeStates[rule.Id] = false;
++        return rule;
++    }
++
++    public IReadOnlyList<ResilienceAlertRule> ListRules() =>
++        _rules.Values.OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ToList();
++
++    public IReadOnlyList<ResilienceAlertEvent> ListEvents(int limit = 50)
++    {
++        if (limit <= 0) limit = 50;
++        return _events.Reverse().Take(limit).ToList();
++    }
++
++    public void Evaluate(CircuitMetricsSnapshot current, IReadOnlyList<ResilienceMetricsSample> history)
++    {
++        if (history.Count == 0)
++            return;
++
++        foreach (var rule in _rules.Values.Where(r => r.Enabled))
++        {
++            var window = TimeSpan.FromMinutes(rule.WindowMinutes);
++            var cutoff = DateTimeOffset.UtcNow - window;
++            var baseline = history.OrderBy(sample => sample.Timestamp).FirstOrDefault(sample => sample.Timestamp >= cutoff);
++            if (baseline == null)
++                continue;
++
++            var openDelta = Math.Max(0, current.OpenCount - baseline.Metrics.OpenCount);
++            var retryDelta = Math.Max(0, current.RetryAttempts - baseline.Metrics.RetryAttempts);
++            var triggered = (rule.OpenThreshold > 0 && openDelta > rule.OpenThreshold)
++                || (rule.RetryThreshold > 0 && retryDelta > rule.RetryThreshold);
++
++            var wasActive = _activeStates.TryGetValue(rule.Id, out var active) && active;
++            _activeStates[rule.Id] = triggered;
++
++            if (triggered && !wasActive)
++            {
++                var message = $"Alert '{rule.Name}' triggered: open/hr={openDelta}, retry/hr={retryDelta}.";
++                var alert = new ResilienceAlertEvent(Guid.NewGuid().ToString("N"), rule.Id, message, DateTimeOffset.UtcNow, openDelta, retryDelta);
++                _events.Enqueue(alert);
++                TrimEvents();
++            }
++        }
++    }
++
++    public void Reset()
++    {
++        _rules.Clear();
++        _activeStates.Clear();
++        while (_events.TryDequeue(out _)) { }
++    }
++
++    private void TrimEvents()
++    {
++        while (_events.Count > _maxEvents && _events.TryDequeue(out _)) { }
++    }
++}
+diff --git a/Metrics/ResilienceDiagnosticsHub.cs b/Metrics/ResilienceDiagnosticsHub.cs
+index 4e2c30b..fd288f8 100644
+--- a/Metrics/ResilienceDiagnosticsHub.cs
++++ b/Metrics/ResilienceDiagnosticsHub.cs
+@@ -13,6 +13,7 @@ public static class ResilienceDiagnosticsHub
+     private static readonly ConcurrentDictionary<CircuitBreaker, EventHandler<CircuitBreakerStateChangedEventArgs>> Subscriptions = new();
+     private static readonly ConcurrentDictionary<string, CircuitMetricsStore> ToolStores = new(StringComparer.OrdinalIgnoreCase);
+     private static readonly ResilienceHistoryStore History = new();
++    private static readonly ResilienceAlertStore Alerts = new();
+ 
+     public static void Attach(CircuitBreaker breaker)
+     {
+@@ -46,6 +47,7 @@ public static class ResilienceDiagnosticsHub
+     {
+         var snapshot = Store.Snapshot();
+         History.Add(snapshot);
++        Alerts.Evaluate(snapshot, History.Snapshot());
+         return snapshot;
+     }
+ 
+@@ -62,10 +64,26 @@ public static class ResilienceDiagnosticsHub
+         return History.Snapshot(window, limit);
+     }
+ 
++    public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes)
++    {
++        return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes);
++    }
++
++    public static IReadOnlyList<ResilienceAlertRule> ListAlertRules()
++    {
++        return Alerts.ListRules();
++    }
++
++    public static IReadOnlyList<ResilienceAlertEvent> ListAlertEvents(int limit = 50)
++    {
++        return Alerts.ListEvents(limit);
++    }
++
+     public static void Reset()
+     {
+         Store.Reset();
+         ToolStores.Clear();
+         History.Reset();
++        Alerts.Reset();
+     }
+ }
+diff --git a/Tests/Handlers/ResilienceAlertStoreTests.cs b/Tests/Handlers/ResilienceAlertStoreTests.cs
+new file mode 100644
+index 0000000..03628e7
+--- /dev/null
++++ b/Tests/Handlers/ResilienceAlertStoreTests.cs
+@@ -0,0 +1,32 @@
++#nullable enable
++using System;
++using System.Collections.Generic;
++using RahOllamaOnly.Metrics;
++using Xunit;
++
++namespace RahOllamaOnly.Tests.Handlers;
++
++public sealed class ResilienceAlertStoreTests
++{
++    [Fact]
++    public void Evaluate_TriggersAlertOncePerBreach()
++    {
++        var store = new ResilienceAlertStore();
++        store.AddRule("open-spike", openThreshold: 2, retryThreshold: 0, windowMinutes: 60);
++
++        var now = DateTimeOffset.UtcNow;
++        var history = new List<ResilienceMetricsSample>
++        {
++            new(now.AddMinutes(-10), new CircuitMetricsSnapshot(0, 0, 0, 0)),
++            new(now.AddMinutes(-5), new CircuitMetricsSnapshot(3, 0, 0, 0))
++        };
++
++        store.Evaluate(new CircuitMetricsSnapshot(3, 0, 0, 0), history);
++        var first = store.ListEvents(10);
++        Assert.Single(first);
++
++        store.Evaluate(new CircuitMetricsSnapshot(4, 0, 0, 0), history);
++        var second = store.ListEvents(10);
++        Assert.Single(second);
++    }
++}
+diff --git a/Tools/RahCli/Commands/ResilienceAlertsCommand.cs b/Tools/RahCli/Commands/ResilienceAlertsCommand.cs
+new file mode 100644
+index 0000000..cdc4c75
+--- /dev/null
++++ b/Tools/RahCli/Commands/ResilienceAlertsCommand.cs
+@@ -0,0 +1,31 @@
++#nullable enable
++using System;
++using RahOllamaOnly.Metrics;
++
++namespace RahCli.Commands;
++
++public static class ResilienceAlertsCommand
++{
++    public static int Execute(CommandContext context, bool jsonOutput)
++    {
++        var rules = ResilienceDiagnosticsHub.ListAlertRules();
++        var eventsList = ResilienceDiagnosticsHub.ListAlertEvents();
++        var payload = new { rules, events = eventsList };
++        if (jsonOutput)
++        {
++            Output.JsonOutput.Write(payload);
++        }
++        else
++        {
++            Console.WriteLine("Alert rules:");
++            foreach (var rule in rules)
++                Console.WriteLine($"- {rule.Name} (open>{rule.OpenThreshold}, retry>{rule.RetryThreshold}, window={rule.WindowMinutes}m, enabled={rule.Enabled})");
++
++            Console.WriteLine();
++            Console.WriteLine("Recent alerts:");
++            foreach (var alert in eventsList)
++                Console.WriteLine($"- {alert.TriggeredAt:O} {alert.Message}");
++        }
++        return ExitCodes.Success;
++    }
++}
+diff --git a/Tools/RahCli/Program.cs b/Tools/RahCli/Program.cs
+index ef4f349..9427855 100644
+--- a/Tools/RahCli/Program.cs
++++ b/Tools/RahCli/Program.cs
+@@ -147,6 +147,8 @@ public static class Program
+                 return ResilienceMetricsCommand.Execute(context, args.Skip(1).ToArray(), context.JsonOutput);
+             case "watch":
+                 return ResilienceMetricsCommand.Execute(context, new[] { "--watch" }, context.JsonOutput);
++            case "alerts":
++                return ResilienceAlertsCommand.Execute(context, context.JsonOutput);
+             case "reset":
+                 return ResilienceResetCommand.Execute(context, context.JsonOutput);
+         }
+@@ -264,6 +266,7 @@ public static class Program
+         Console.WriteLine("rah resilience metrics");
+         Console.WriteLine("rah resilience metrics --watch");
+         Console.WriteLine("rah resilience watch");
++        Console.WriteLine("rah resilience alerts");
+         Console.WriteLine("rah resilience reset");
+         Console.WriteLine("rah --headless");
+     }
+diff --git a/Ui/ResilienceMetricsPanel.cs b/Ui/ResilienceMetricsPanel.cs
+index 0cd3281..308afcd 100644
+--- a/Ui/ResilienceMetricsPanel.cs
++++ b/Ui/ResilienceMetricsPanel.cs
+@@ -13,6 +13,7 @@ public sealed class ResilienceMetricsPanel : UserControl
+ {
+     private readonly Chart _chart;
+     private readonly ListView _toolList;
++    private readonly ListView _alertList;
+     private readonly Label _alertLabel;
+     private readonly NumericUpDown _openThreshold;
+     private readonly NumericUpDown _retryThreshold;
+@@ -29,6 +30,7 @@ public sealed class ResilienceMetricsPanel : UserControl
+ 
+         _chart = BuildChart();
+         _toolList = BuildToolList();
++        _alertList = BuildAlertList();
+         _alertLabel = new Label { AutoSize = true, ForeColor = Color.SeaGreen, Text = "Alerts: OK" };
+         _openThreshold = new NumericUpDown { Minimum = 0, Maximum = 100000, Value = 5, Width = 80 };
+         _retryThreshold = new NumericUpDown { Minimum = 0, Maximum = 100000, Value = 25, Width = 80 };
+@@ -59,7 +61,15 @@ public sealed class ResilienceMetricsPanel : UserControl
+             SplitterDistance = 520
+         };
+         split.Panel1.Controls.Add(_chart);
+-        split.Panel2.Controls.Add(_toolList);
++        var rightSplit = new SplitContainer
++        {
++            Dock = DockStyle.Fill,
++            Orientation = Orientation.Horizontal,
++            SplitterDistance = 240
++        };
++        rightSplit.Panel1.Controls.Add(_toolList);
++        rightSplit.Panel2.Controls.Add(_alertList);
++        split.Panel2.Controls.Add(rightSplit);
+ 
+         Controls.Add(split);
+         Controls.Add(thresholdPanel);
+@@ -124,6 +134,19 @@ public sealed class ResilienceMetricsPanel : UserControl
+         return list;
+     }
+ 
++    private static ListView BuildAlertList()
++    {
++        var list = new ListView
++        {
++            Dock = DockStyle.Fill,
++            View = View.Details,
++            FullRowSelect = true
++        };
++        list.Columns.Add("Triggered", 140);
++        list.Columns.Add("Alert", 260);
++        return list;
++    }
++
+     private void RefreshMetrics()
+     {
+         var metrics = ResilienceDiagnosticsHub.Snapshot();
+@@ -133,6 +156,7 @@ public sealed class ResilienceMetricsPanel : UserControl
+         UpdateChart(history);
+         UpdateToolList(byTool);
+         UpdateAlerts(metrics, alertHistory);
++        UpdateAlertList();
+     }
+ 
+     private void UpdateChart(IReadOnlyList<ResilienceMetricsSample> history)
+@@ -217,6 +241,20 @@ public sealed class ResilienceMetricsPanel : UserControl
+         }
+     }
+ 
++    private void UpdateAlertList()
++    {
++        var eventsList = ResilienceDiagnosticsHub.ListAlertEvents(10);
++        _alertList.BeginUpdate();
++        _alertList.Items.Clear();
++        foreach (var alert in eventsList)
++        {
++            var item = new ListViewItem(alert.TriggeredAt.ToLocalTime().ToString("g"));
++            item.SubItems.Add(alert.Message);
++            _alertList.Items.Add(item);
++        }
++        _alertList.EndUpdate();
++    }
++
+     private void CopySnapshot()
+     {
+         var metrics = ResilienceDiagnosticsHub.Snapshot();
+diff --git a/Workflow/HeadlessApiServer.cs b/Workflow/HeadlessApiServer.cs
+index fc455a2..33d81c6 100644
+--- a/Workflow/HeadlessApiServer.cs
++++ b/Workflow/HeadlessApiServer.cs
+@@ -151,6 +151,40 @@ public sealed class HeadlessApiServer
+                 return;
+             }
+ 
++            if (req.HttpMethod == "POST" && path == "/alerts/thresholds")
++            {
++                var payload = await ReadJsonAsync(req, ct).ConfigureAwait(false);
++                var name = payload.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
++                var openThreshold = payload.TryGetProperty("openThreshold", out var openEl) && openEl.TryGetInt32(out var open)
++                    ? open
++                    : 0;
++                var retryThreshold = payload.TryGetProperty("retryThreshold", out var retryEl) && retryEl.TryGetInt32(out var retry)
++                    ? retry
++                    : 0;
++                var windowMinutes = payload.TryGetProperty("windowMinutes", out var winEl) && winEl.TryGetInt32(out var win)
++                    ? win
++                    : 60;
++                if (openThreshold <= 0 && retryThreshold <= 0)
++                {
++                    isError = true;
++                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
++                    return;
++                }
++                var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes);
++                await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
++                return;
++            }
++
++            if (req.HttpMethod == "GET" && path == "/alerts")
++            {
++                var limit = ParseQueryInt(req, "limit", 50);
++                if (limit <= 0) limit = 50;
++                var rules = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertRules();
++                var eventsList = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(limit);
++                await WriteJsonAsync(ctx, 200, new { rules, events = eventsList }, ct).ConfigureAwait(false);
++                return;
++            }
++
+             if (req.HttpMethod == "GET" && path == "/healthz")
+             {
+                 await WriteJsonAsync(ctx, 200, new { ok = true, telemetry = TelemetryRegistry.Snapshot() }, ct).ConfigureAwait(false);
+diff --git a/openapi.yaml b/openapi.yaml
+index c09f429..4dfd5d8 100644
+--- a/openapi.yaml
++++ b/openapi.yaml
+@@ -351,6 +351,53 @@ paths:
+                   resetAt:
+                     type: string
+                     format: date-time
++  /alerts/thresholds:
++    post:
++      summary: Create alert threshold rule
++      requestBody:
++        required: true
++        content:
++          application/json:
++            schema:
++              $ref: "#/components/schemas/ResilienceAlertRuleRequest"
++      responses:
++        "201":
++          description: Rule created
++          content:
++            application/json:
++              schema:
++                $ref: "#/components/schemas/ResilienceAlertRule"
++        "400":
++          description: Bad request
++          content:
++            application/json:
++              schema:
++                $ref: "#/components/schemas/ApiError"
++  /alerts:
++    get:
++      summary: List alert rules and recent events
++      parameters:
++        - name: limit
++          in: query
++          required: false
++          schema:
++            type: integer
++      responses:
++        "200":
++          description: Alerts
++          content:
++            application/json:
++              schema:
++                type: object
++                properties:
++                  rules:
++                    type: array
++                    items:
++                      $ref: "#/components/schemas/ResilienceAlertRule"
++                  events:
++                    type: array
++                    items:
++                      $ref: "#/components/schemas/ResilienceAlertEvent"
+   /healthz:
+     get:
+       summary: Health check
+@@ -491,6 +538,48 @@ components:
+           format: date-time
+         metrics:
+           $ref: "#/components/schemas/ResilienceMetrics"
++    ResilienceAlertRuleRequest:
++      type: object
++      properties:
++        name:
++          type: string
++        openThreshold:
++          type: integer
++        retryThreshold:
++          type: integer
++        windowMinutes:
++          type: integer
++    ResilienceAlertRule:
++      type: object
++      properties:
++        id:
++          type: string
++        name:
++          type: string
++        openThreshold:
++          type: integer
++        retryThreshold:
++          type: integer
++        windowMinutes:
++          type: integer
++        enabled:
++          type: boolean
++    ResilienceAlertEvent:
++      type: object
++      properties:
++        id:
++          type: string
++        ruleId:
++          type: string
++        message:
++          type: string
++        triggeredAt:
++          type: string
++          format: date-time
++        openDelta:
++          type: integer
++        retryDelta:
++          type: integer
+     ProviderEvent:
+       type: object
+       properties:

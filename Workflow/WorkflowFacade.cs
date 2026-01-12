@@ -2186,6 +2186,13 @@ public sealed class WorkflowFacade
                     EmitProviderDisabled();
                     return;
                 }
+                if (result.Message.Contains("circuit open", StringComparison.OrdinalIgnoreCase))
+                {
+                    EmitWaitUser(result.Message, "Circuit open. Retry after backoff (≈30s) or reset metrics.");
+                    NotifyStatus("Tool execution");
+                    TraceAttentionRequested?.Invoke();
+                    return;
+                }
                 var errorCard = new OutputCard
                 {
                     Kind = OutputCardKind.Error,

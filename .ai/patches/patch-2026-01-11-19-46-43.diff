@@ -1,0 +1,316 @@
+diff --git a/Headless/Api/ResilienceApiClient.cs b/Headless/Api/ResilienceApiClient.cs
+index 8bc3ddb..89d20f9 100644
+--- a/Headless/Api/ResilienceApiClient.cs
++++ b/Headless/Api/ResilienceApiClient.cs
+@@ -57,11 +57,11 @@ public sealed class ResilienceApiClient
+ 
+     public sealed record CircuitMetricsSnapshot(int OpenCount, int HalfOpenCount, int ClosedCount, int RetryAttempts);
+ 
+-    public sealed record ResilienceAlertRuleRequest(string? Name, int OpenThreshold, int RetryThreshold, int WindowMinutes);
++    public sealed record ResilienceAlertRuleRequest(string? Name, int OpenThreshold, int RetryThreshold, int WindowMinutes, string? Severity);
+ 
+-    public sealed record ResilienceAlertRule(string Id, string Name, int OpenThreshold, int RetryThreshold, int WindowMinutes, bool Enabled);
++    public sealed record ResilienceAlertRule(string Id, string Name, int OpenThreshold, int RetryThreshold, int WindowMinutes, string Severity, bool Enabled);
+ 
+-    public sealed record ResilienceAlertEvent(string Id, string RuleId, string Message, DateTimeOffset TriggeredAt, int OpenDelta, int RetryDelta);
++    public sealed record ResilienceAlertEvent(string Id, string RuleId, string Message, string Severity, DateTimeOffset TriggeredAt, int OpenDelta, int RetryDelta);
+ 
+     public sealed record ResilienceAlertsResponse(ResilienceAlertRule[] Rules, ResilienceAlertEvent[] Events);
+ 
+diff --git a/Metrics/ResilienceAlertStore.cs b/Metrics/ResilienceAlertStore.cs
+index 140668a..27f9f69 100644
+--- a/Metrics/ResilienceAlertStore.cs
++++ b/Metrics/ResilienceAlertStore.cs
+@@ -12,12 +12,14 @@ public sealed record ResilienceAlertRule(
+     int OpenThreshold,
+     int RetryThreshold,
+     int WindowMinutes,
++    string Severity,
+     bool Enabled);
+ 
+ public sealed record ResilienceAlertEvent(
+     string Id,
+     string RuleId,
+     string Message,
++    string Severity,
+     DateTimeOffset TriggeredAt,
+     int OpenDelta,
+     int RetryDelta);
+@@ -34,14 +36,18 @@ public sealed class ResilienceAlertStore
+         _maxEvents = Math.Max(1, maxEvents);
+     }
+ 
+-    public ResilienceAlertRule AddRule(string name, int openThreshold, int retryThreshold, int windowMinutes)
++    public ResilienceAlertRule AddRule(string name, int openThreshold, int retryThreshold, int windowMinutes, string severity)
+     {
++        var normalizedSeverity = string.IsNullOrWhiteSpace(severity) ? "warning" : severity.Trim().ToLowerInvariant();
++        if (normalizedSeverity != "warning" && normalizedSeverity != "critical")
++            normalizedSeverity = "warning";
+         var rule = new ResilienceAlertRule(
+             Guid.NewGuid().ToString("N"),
+             string.IsNullOrWhiteSpace(name) ? "threshold" : name.Trim(),
+             Math.Max(0, openThreshold),
+             Math.Max(0, retryThreshold),
+             Math.Max(1, windowMinutes),
++            normalizedSeverity,
+             true);
+         _rules[rule.Id] = rule;
+         _activeStates[rule.Id] = false;
+@@ -81,7 +87,7 @@ public sealed class ResilienceAlertStore
+             if (triggered && !wasActive)
+             {
+                 var message = $"Alert '{rule.Name}' triggered: open/hr={openDelta}, retry/hr={retryDelta}.";
+-                var alert = new ResilienceAlertEvent(Guid.NewGuid().ToString("N"), rule.Id, message, DateTimeOffset.UtcNow, openDelta, retryDelta);
++                var alert = new ResilienceAlertEvent(Guid.NewGuid().ToString("N"), rule.Id, message, rule.Severity, DateTimeOffset.UtcNow, openDelta, retryDelta);
+                 _events.Enqueue(alert);
+                 TrimEvents();
+             }
+diff --git a/Metrics/ResilienceDiagnosticsHub.cs b/Metrics/ResilienceDiagnosticsHub.cs
+index 01bc725..e6984c4 100644
+--- a/Metrics/ResilienceDiagnosticsHub.cs
++++ b/Metrics/ResilienceDiagnosticsHub.cs
+@@ -68,14 +68,19 @@ public static class ResilienceDiagnosticsHub
+         return History.Snapshot(window, limit);
+     }
+ 
++    public static IReadOnlyList<ResilienceMetricsSample> SnapshotHistoryRange(DateTimeOffset? start, DateTimeOffset? end, int? limit = null, int? bucketMinutes = null)
++    {
++        return History.SnapshotRange(start, end, limit, bucketMinutes);
++    }
++
+     public static bool IsCircuitOpen()
+     {
+         return BreakerStates.Values.Any(state => state == CircuitState.Open);
+     }
+ 
+-    public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes)
++    public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes, string severity)
+     {
+-        return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes);
++        return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes, severity);
+     }
+ 
+     public static IReadOnlyList<ResilienceAlertRule> ListAlertRules()
+diff --git a/Metrics/ResilienceHistoryStore.cs b/Metrics/ResilienceHistoryStore.cs
+index 54ac1dc..39422b5 100644
+--- a/Metrics/ResilienceHistoryStore.cs
++++ b/Metrics/ResilienceHistoryStore.cs
+@@ -40,6 +40,30 @@ public sealed class ResilienceHistoryStore
+         return items;
+     }
+ 
++    public IReadOnlyList<ResilienceMetricsSample> SnapshotRange(DateTimeOffset? start, DateTimeOffset? end, int? limit = null, int? bucketMinutes = null)
++    {
++        var effectiveEnd = end ?? DateTimeOffset.UtcNow;
++        var effectiveStart = start ?? effectiveEnd - _window;
++        if (effectiveEnd < effectiveStart)
++        {
++            var swap = effectiveStart;
++            effectiveStart = effectiveEnd;
++            effectiveEnd = swap;
++        }
++
++        var items = _samples.Where(s => s.Timestamp >= effectiveStart && s.Timestamp <= effectiveEnd)
++            .OrderBy(s => s.Timestamp)
++            .ToList();
++
++        if (bucketMinutes.HasValue && bucketMinutes.Value > 0)
++            items = Bucket(items, bucketMinutes.Value);
++
++        if (limit.HasValue && limit.Value > 0 && items.Count > limit.Value)
++            items = items.Skip(items.Count - limit.Value).ToList();
++
++        return items;
++    }
++
+     public void Reset()
+     {
+         while (_samples.TryDequeue(out _)) { }
+@@ -53,4 +77,17 @@ public sealed class ResilienceHistoryStore
+ 
+         while (_samples.Count > _maxSamples && _samples.TryDequeue(out _)) { }
+     }
++
++    private static List<ResilienceMetricsSample> Bucket(List<ResilienceMetricsSample> items, int bucketMinutes)
++    {
++        var buckets = new Dictionary<DateTimeOffset, ResilienceMetricsSample>();
++        var bucketSpan = TimeSpan.FromMinutes(bucketMinutes);
++        foreach (var item in items)
++        {
++            var bucketStartTicks = item.Timestamp.UtcTicks / bucketSpan.Ticks * bucketSpan.Ticks;
++            var bucketStart = new DateTimeOffset(bucketStartTicks, TimeSpan.Zero);
++            buckets[bucketStart] = item;
++        }
++        return buckets.OrderBy(kvp => kvp.Key).Select(kvp => new ResilienceMetricsSample(kvp.Key, kvp.Value.Metrics)).ToList();
++    }
+ }
+diff --git a/Workflow/HeadlessApiServer.cs b/Workflow/HeadlessApiServer.cs
+index f187a4a..9880d4b 100644
+--- a/Workflow/HeadlessApiServer.cs
++++ b/Workflow/HeadlessApiServer.cs
+@@ -136,10 +136,22 @@ public sealed class HeadlessApiServer
+             {
+                 var minutes = ParseQueryInt(req, "minutes", 60);
+                 var limit = ParseQueryInt(req, "limit", 300);
++                var bucketMinutes = ParseQueryInt(req, "bucketMinutes", 0);
++                var start = ParseQueryDateTime(req, "start");
++                var end = ParseQueryDateTime(req, "end");
+                 if (minutes <= 0) minutes = 60;
+                 if (limit <= 0) limit = 300;
+-                var window = TimeSpan.FromMinutes(minutes);
+-                var history = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotHistory(window, limit);
++                if (bucketMinutes < 0) bucketMinutes = 0;
++                IReadOnlyList<RahOllamaOnly.Metrics.ResilienceMetricsSample> history;
++                if (start.HasValue || end.HasValue)
++                {
++                    history = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotHistoryRange(start, end, limit, bucketMinutes > 0 ? bucketMinutes : null);
++                }
++                else
++                {
++                    var window = TimeSpan.FromMinutes(minutes);
++                    history = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotHistory(window, limit);
++                }
+                 await WriteJsonAsync(ctx, 200, history, ct).ConfigureAwait(false);
+                 return;
+             }
+@@ -164,13 +176,14 @@ public sealed class HeadlessApiServer
+                 var windowMinutes = payload.TryGetProperty("windowMinutes", out var winEl) && winEl.TryGetInt32(out var win)
+                     ? win
+                     : 60;
++                var severity = payload.TryGetProperty("severity", out var severityEl) ? severityEl.GetString() ?? "" : "";
+                 if (openThreshold <= 0 && retryThreshold <= 0)
+                 {
+                     isError = true;
+                     await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
+                     return;
+                 }
+-                var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes);
++                var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes, severity);
+                 await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
+                 return;
+             }
+@@ -487,6 +500,14 @@ public sealed class HeadlessApiServer
+         return fallback;
+     }
+ 
++    private static DateTimeOffset? ParseQueryDateTime(HttpListenerRequest req, string key)
++    {
++        var value = req.QueryString[key];
++        if (DateTimeOffset.TryParse(value, out var parsed))
++            return parsed;
++        return null;
++    }
++
+     private static bool TryApplyStateFilter(CircuitMetricsSnapshot metrics, string state, out CircuitMetricsSnapshot filtered)
+     {
+         switch (state.Trim().ToLowerInvariant())
+diff --git a/openapi.yaml b/openapi.yaml
+index b52389c..86ab43f 100644
+--- a/openapi.yaml
++++ b/openapi.yaml
+@@ -357,11 +357,28 @@ paths:
+           required: false
+           schema:
+             type: integer
++        - name: start
++          in: query
++          required: false
++          schema:
++            type: string
++            format: date-time
++        - name: end
++          in: query
++          required: false
++          schema:
++            type: string
++            format: date-time
+         - name: limit
+           in: query
+           required: false
+           schema:
+             type: integer
++        - name: bucketMinutes
++          in: query
++          required: false
++          schema:
++            type: integer
+       responses:
+         "200":
+           description: Resilience history
+@@ -614,11 +631,15 @@ components:
+           type: integer
+         windowMinutes:
+           type: integer
++        severity:
++          type: string
++          enum: [warning, critical]
+       example:
+         name: retry-spike
+         openThreshold: 3
+         retryThreshold: 10
+         windowMinutes: 60
++        severity: warning
+     ResilienceAlertRule:
+       type: object
+       properties:
+@@ -632,6 +653,9 @@ components:
+           type: integer
+         windowMinutes:
+           type: integer
++        severity:
++          type: string
++          enum: [warning, critical]
+         enabled:
+           type: boolean
+       example:
+@@ -640,6 +664,7 @@ components:
+         openThreshold: 3
+         retryThreshold: 10
+         windowMinutes: 60
++        severity: warning
+         enabled: true
+     ResilienceAlertEvent:
+       type: object
+@@ -650,6 +675,9 @@ components:
+           type: string
+         message:
+           type: string
++        severity:
++          type: string
++          enum: [warning, critical]
+         triggeredAt:
+           type: string
+           format: date-time
+@@ -661,6 +689,7 @@ components:
+         id: event-1
+         ruleId: rule-1
+         message: Alert 'retry-spike' triggered: open/hr=0, retry/hr=12.
++        severity: warning
+         triggeredAt: "2026-01-11T01:05:00Z"
+         openDelta: 0
+         retryDelta: 12
+diff --git a/tools/resilienceClient.ts b/tools/resilienceClient.ts
+index 21e0b62..916fa8c 100644
+--- a/tools/resilienceClient.ts
++++ b/tools/resilienceClient.ts
+@@ -15,10 +15,12 @@ export type ResilienceAlertRuleRequest = {
+   openThreshold: number;
+   retryThreshold: number;
+   windowMinutes: number;
++  severity?: "warning" | "critical";
+ };
+ 
+ export type ResilienceAlertRule = ResilienceAlertRuleRequest & {
+   id: string;
++  severity: "warning" | "critical";
+   enabled: boolean;
+ };
+ 
+@@ -26,6 +28,7 @@ export type ResilienceAlertEvent = {
+   id: string;
+   ruleId: string;
+   message: string;
++  severity: "warning" | "critical";
+   triggeredAt: string;
+   openDelta: number;
+   retryDelta: number;

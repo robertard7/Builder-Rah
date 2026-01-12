@@ -1,0 +1,141 @@
+diff --git a/Workflow/HeadlessApiServer.cs b/Workflow/HeadlessApiServer.cs
+index 33d81c6..f187a4a 100644
+--- a/Workflow/HeadlessApiServer.cs
++++ b/Workflow/HeadlessApiServer.cs
+@@ -302,7 +302,8 @@ public sealed class HeadlessApiServer
+                     var resilience = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                     var resilienceSummary = BuildResilienceSummary(resilience);
+                     var resilienceByTool = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotByTool();
+-                    await WriteJsonAsync(ctx, 200, new { sessionId, status, resilienceSummary, resilience, resilienceByTool }, ct).ConfigureAwait(false);
++                    var resilienceAlerts = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(10);
++                    await WriteJsonAsync(ctx, 200, new { sessionId, status, resilienceSummary, resilience, resilienceByTool, resilienceAlerts }, ct).ConfigureAwait(false);
+                     return;
+                 }
+ 
+@@ -517,11 +518,15 @@ public sealed class HeadlessApiServer
+ 
+     private static Task WriteCircuitOpenAsync(HttpListenerContext ctx, CancellationToken ct)
+     {
++        var endpoint = ctx.Request.Url?.AbsolutePath ?? "";
+         ctx.Response.Headers["Retry-After"] = "30";
+         var details = new Dictionary<string, object>
+         {
+             ["retryAfterSeconds"] = 30,
+-            ["hint"] = "The circuit breaker is open. Retry after backoff."
++            ["hint"] = "The circuit breaker is open. Retry after backoff.",
++            ["circuitState"] = "open",
++            ["endpoint"] = endpoint,
++            ["errorCode"] = "circuit_open"
+         };
+         return WriteErrorAsync(ctx, 503, ApiError.ServiceUnavailable("circuit_open", details), ct);
+     }
+diff --git a/openapi.yaml b/openapi.yaml
+index 8fa2a24..b52389c 100644
+--- a/openapi.yaml
++++ b/openapi.yaml
+@@ -96,6 +96,10 @@ paths:
+                     $ref: "#/components/schemas/ResilienceMetrics"
+                   resilienceByTool:
+                     $ref: "#/components/schemas/ResilienceMetricsByTool"
++                  resilienceAlerts:
++                    type: array
++                    items:
++                      $ref: "#/components/schemas/ResilienceAlertEvent"
+         "404":
+           description: Not found
+           content:
+@@ -208,6 +212,9 @@ paths:
+                     details:
+                       retryAfterSeconds: 30
+                       hint: The circuit breaker is open. Retry after backoff.
++                      circuitState: open
++                      endpoint: /sessions/abc123/message
++                      errorCode: circuit_open
+   /sessions/{id}/attachments:
+     post:
+       summary: Add attachment
+@@ -278,6 +285,9 @@ paths:
+                     details:
+                       retryAfterSeconds: 30
+                       hint: The circuit breaker is open. Retry after backoff.
++                      circuitState: open
++                      endpoint: /sessions/abc123/run
++                      errorCode: circuit_open
+   /sessions/{id}/cancel:
+     post:
+       summary: Cancel plan
+@@ -482,6 +492,8 @@ components:
+       example:
+         code: bad_request
+         message: invalid_state
++        details:
++          errorCode: invalid_state
+     SessionSummary:
+       type: object
+       properties:
+@@ -543,18 +555,23 @@ components:
+       additionalProperties: true
+     ResilienceMetrics:
+       type: object
++      readOnly: true
+       properties:
+         openCount:
+           type: integer
++          readOnly: true
+           description: OpenCount (number of circuits opened)
+         halfOpenCount:
+           type: integer
++          readOnly: true
+           description: HalfOpenCount (number of circuits half-opened)
+         closedCount:
+           type: integer
++          readOnly: true
+           description: ClosedCount (number of circuits closed)
+         retryAttempts:
+           type: integer
++          readOnly: true
+           description: RetryAttempts (number of retry attempts recorded)
+       example:
+         openCount: 1
+@@ -579,6 +596,13 @@ components:
+           format: date-time
+         metrics:
+           $ref: "#/components/schemas/ResilienceMetrics"
++      example:
++        timestamp: "2026-01-11T01:00:00Z"
++        metrics:
++          openCount: 1
++          halfOpenCount: 0
++          closedCount: 5
++          retryAttempts: 3
+     ResilienceAlertRuleRequest:
+       type: object
+       properties:
+@@ -610,6 +634,13 @@ components:
+           type: integer
+         enabled:
+           type: boolean
++      example:
++        id: rule-1
++        name: retry-spike
++        openThreshold: 3
++        retryThreshold: 10
++        windowMinutes: 60
++        enabled: true
+     ResilienceAlertEvent:
+       type: object
+       properties:
+@@ -626,6 +657,13 @@ components:
+           type: integer
+         retryDelta:
+           type: integer
++      example:
++        id: event-1
++        ruleId: rule-1
++        message: Alert 'retry-spike' triggered: open/hr=0, retry/hr=12.
++        triggeredAt: "2026-01-11T01:05:00Z"
++        openDelta: 0
++        retryDelta: 12
+     ProviderEvent:
+       type: object
+       properties:
