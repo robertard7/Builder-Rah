@@ -5,9 +5,63 @@ export type CircuitMetricsSnapshot = {
   retryAttempts: number;
 };
 
+export type ResilienceState = "open" | "halfopen" | "closed";
+
+export type ResilienceSeverity = "warning" | "critical";
+
+export type ResilienceMetricsByTool = Record<string, CircuitMetricsSnapshot>;
+
 export type ResilienceMetricsSample = {
   timestamp: string;
   metrics: CircuitMetricsSnapshot;
+};
+
+export type ResilienceMetadata = {
+  version: string;
+  timestamp: string;
+  requestId: string;
+};
+
+export type ResilienceApiError = {
+  metadata?: ResilienceMetadata;
+  error?: {
+    code?: string;
+    message?: string;
+    details?: Record<string, unknown>;
+  };
+};
+
+export class ResilienceClientError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly metadata?: ResilienceMetadata;
+  readonly details?: Record<string, unknown>;
+  readonly documentation?: string;
+
+  constructor(status: number, message: string, payload?: ResilienceApiError) {
+    super(message);
+    this.status = status;
+    this.code = payload?.error?.code;
+    this.metadata = payload?.metadata;
+    this.details = payload?.error?.details;
+    const docs = payload?.error?.details?.docs;
+    this.documentation = typeof docs === "string" ? docs : undefined;
+  }
+}
+
+export const isResilienceClientError = (error: unknown): error is ResilienceClientError => error instanceof ResilienceClientError;
+
+export type ResilienceMetricsResponse = {
+  metadata: ResilienceMetadata;
+  data: CircuitMetricsSnapshot;
+};
+
+export type ResilienceHistoryResponse = {
+  metadata: ResilienceMetadata;
+  total: number;
+  page: number;
+  perPage: number;
+  items: ResilienceMetricsSample[];
 };
 
 export type ResilienceAlertRuleRequest = {
@@ -15,79 +69,195 @@ export type ResilienceAlertRuleRequest = {
   openThreshold: number;
   retryThreshold: number;
   windowMinutes: number;
-  severity?: "warning" | "critical";
+  severity?: ResilienceSeverity;
+};
+
+export type ResilienceAlertRuleUpdate = {
+  name?: string;
+  openThreshold?: number;
+  retryThreshold?: number;
+  windowMinutes?: number;
+  severity?: ResilienceSeverity;
+  enabled?: boolean;
 };
 
 export type ResilienceAlertRule = ResilienceAlertRuleRequest & {
   id: string;
-  severity: "warning" | "critical";
+  severity: ResilienceSeverity;
   enabled: boolean;
+};
+
+export type ResilienceAlertRuleSummary = ResilienceAlertRule & {
+  recentEvents: ResilienceAlertEvent[];
 };
 
 export type ResilienceAlertEvent = {
   id: string;
   ruleId: string;
   message: string;
-  severity: "warning" | "critical";
+  severity: ResilienceSeverity;
   triggeredAt: string;
   openDelta: number;
   retryDelta: number;
+  acknowledged: boolean;
+  acknowledgedAt?: string;
+};
+
+export type ResilienceAlertRuleResponse = {
+  metadata: ResilienceMetadata;
+  data: ResilienceAlertRule;
+};
+
+export type ResilienceAlertEventResponse = {
+  metadata: ResilienceMetadata;
+  data: ResilienceAlertEvent;
 };
 
 export type ResilienceAlertsResponse = {
-  rules: ResilienceAlertRule[];
+  metadata: ResilienceMetadata;
+  rules: ResilienceAlertRuleSummary[];
   events: ResilienceAlertEvent[];
 };
 
-export type ApiOkResponse = { ok: boolean; resetAt: string };
+export type ResilienceResetResponse = { metadata: ResilienceMetadata; ok: boolean; resetAt: string };
+
+export type ResilienceDeleteResponse = { metadata: ResilienceMetadata; ok: boolean; ruleId?: string };
 
 export class ResilienceClient {
   constructor(private readonly baseUrl: string, private readonly token?: string) {}
 
-  async getMetrics(params?: { state?: string; minRetryAttempts?: number }): Promise<CircuitMetricsSnapshot> {
+  async getMetrics(params?: { state?: ResilienceState; minRetryAttempts?: number }): Promise<CircuitMetricsSnapshot> {
+    const query = new URLSearchParams();
+    if (params?.state) query.set("state", params.state);
+    if (params?.minRetryAttempts !== undefined) query.set("minRetryAttempts", String(params.minRetryAttempts));
+    const response = await this.getJson<ResilienceMetricsResponse>(`/metrics/resilience${query.toString() ? `?${query}` : ""}`);
+    return response.data;
+  }
+
+  async getMetricsResponse(params?: { state?: ResilienceState; minRetryAttempts?: number }): Promise<ResilienceMetricsResponse> {
     const query = new URLSearchParams();
     if (params?.state) query.set("state", params.state);
     if (params?.minRetryAttempts !== undefined) query.set("minRetryAttempts", String(params.minRetryAttempts));
     return this.getJson(`/metrics/resilience${query.toString() ? `?${query}` : ""}`);
   }
 
-  async getHistory(minutes = 60, limit = 300): Promise<ResilienceMetricsSample[]> {
-    const query = new URLSearchParams({ minutes: String(minutes), limit: String(limit) });
+  async getHistory(options?: {
+    minutes?: number;
+    limit?: number;
+    start?: string;
+    end?: string;
+    bucketMinutes?: number;
+    page?: number;
+    perPage?: number;
+  }): Promise<ResilienceHistoryResponse> {
+    const query = new URLSearchParams();
+    if (options?.minutes !== undefined) query.set("minutes", String(options.minutes));
+    if (options?.limit !== undefined) query.set("limit", String(options.limit));
+    if (options?.start) query.set("start", options.start);
+    if (options?.end) query.set("end", options.end);
+    if (options?.bucketMinutes !== undefined) query.set("bucketMinutes", String(options.bucketMinutes));
+    if (options?.page !== undefined) query.set("page", String(options.page));
+    if (options?.perPage !== undefined) query.set("perPage", String(options.perPage));
     return this.getJson(`/metrics/resilience/history?${query.toString()}`);
   }
 
-  async resetMetrics(): Promise<ApiOkResponse> {
-    return this.sendJson<ApiOkResponse>("/metrics/resilience/reset", { method: "PUT" });
+  async getHistoryRange(start: string, end: string, options?: { limit?: number; bucketMinutes?: number; page?: number; perPage?: number }): Promise<ResilienceHistoryResponse> {
+    return this.getHistory({ start, end, ...options });
   }
 
-  async resetMetricsPost(): Promise<ApiOkResponse> {
-    return this.sendJson<ApiOkResponse>("/metrics/resilience/reset", { method: "POST" });
+  async getHistoryPage(page: number, perPage: number, options?: { minutes?: number; limit?: number; start?: string; end?: string; bucketMinutes?: number }): Promise<ResilienceHistoryResponse> {
+    return this.getHistory({ page, perPage, ...options });
+  }
+
+  async getMetricsWithHistory(options?: { historyMinutes?: number; historyLimit?: number; historyPage?: number; historyPerPage?: number }): Promise<{
+    metrics: ResilienceMetricsResponse;
+    history: ResilienceHistoryResponse;
+  }> {
+    const [metrics, history] = await Promise.all([
+      this.getMetricsResponse(),
+      this.getHistory({
+        minutes: options?.historyMinutes,
+        limit: options?.historyLimit,
+        page: options?.historyPage,
+        perPage: options?.historyPerPage
+      })
+    ]);
+    return { metrics, history };
+  }
+
+  async resetMetrics(): Promise<ResilienceResetResponse> {
+    return this.sendJson<ResilienceResetResponse>("/metrics/resilience/reset", { method: "PUT" });
+  }
+
+  async resetMetricsPost(): Promise<ResilienceResetResponse> {
+    return this.sendJson<ResilienceResetResponse>("/metrics/resilience/reset", { method: "POST" });
   }
 
   async createAlertRule(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
-    return this.sendJson<ResilienceAlertRule>("/alerts/thresholds", {
+    const response = await this.sendJson<ResilienceAlertRuleResponse>("/alerts/thresholds", {
       method: "POST",
       body: JSON.stringify(rule)
     });
+    return response.data;
   }
 
   async createAlert(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
-    return this.sendJson<ResilienceAlertRule>("/alerts", {
+    const response = await this.sendJson<ResilienceAlertRuleResponse>("/alerts", {
       method: "POST",
       body: JSON.stringify(rule)
     });
+    return response.data;
   }
 
-  async getAlerts(limit = 50): Promise<ResilienceAlertsResponse> {
+  async getAlerts(limit = 50, options?: { severity?: ResilienceSeverity; includeAcknowledged?: boolean }): Promise<ResilienceAlertsResponse> {
     const query = new URLSearchParams({ limit: String(limit) });
+    if (options?.severity) query.set("severity", options.severity);
+    if (options?.includeAcknowledged !== undefined) query.set("includeAcknowledged", String(options.includeAcknowledged));
     return this.getJson(`/alerts?${query.toString()}`);
   }
 
-  async deleteAlerts(ruleId?: string): Promise<ApiOkResponse> {
+  async getAlertsBySeverity(severity: ResilienceSeverity, limit = 50): Promise<ResilienceAlertsResponse> {
+    return this.getAlerts(limit, { severity });
+  }
+
+  async deleteAlerts(ruleId?: string): Promise<ResilienceDeleteResponse> {
     const query = new URLSearchParams();
     if (ruleId) query.set("ruleId", ruleId);
-    return this.sendJson<ApiOkResponse>(`/alerts${query.toString() ? `?${query}` : ""}`, {
+    return this.sendJson<ResilienceDeleteResponse>(`/alerts${query.toString() ? `?${query}` : ""}`, {
       method: "DELETE"
+    });
+  }
+
+  async updateAlertRule(ruleId: string, update: ResilienceAlertRuleUpdate): Promise<ResilienceAlertRule> {
+    const response = await this.sendJson<ResilienceAlertRuleResponse>(`/alerts/${ruleId}`, {
+      method: "PATCH",
+      body: JSON.stringify(update)
+    });
+    return response.data;
+  }
+
+  async acknowledgeAlert(eventId: string): Promise<ResilienceAlertEvent> {
+    const response = await this.sendJson<ResilienceAlertEventResponse>(`/alerts/events/${eventId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ acknowledged: true })
+    });
+    return response.data;
+  }
+
+  async *watchAlerts(intervalMs = 5000, options?: { severity?: ResilienceSeverity; includeAcknowledged?: boolean }): AsyncGenerator<ResilienceAlertEvent[]> {
+    while (true) {
+      const response = await this.getAlerts(50, options);
+      yield response.events;
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  }
+
+  watchAlertsObservable(intervalMs = 5000, options?: { severity?: ResilienceSeverity; includeAcknowledged?: boolean }): Observable<ResilienceAlertEvent[]> {
+    return createObservable(async (next, stop) => {
+      for await (const events of this.watchAlerts(intervalMs, options)) {
+        if (stop.aborted) return;
+        next(events);
+      }
     });
   }
 
@@ -117,7 +287,7 @@ export class ResilienceClient {
 
   private async getJson<T>(path: string): Promise<T> {
     const res = await fetch(this.baseUrl + path, { headers: this.headers() });
-    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    if (!res.ok) throw await this.buildError(res);
     return res.json() as Promise<T>;
   }
 
@@ -129,12 +299,23 @@ export class ResilienceClient {
         "Content-Type": "application/json"
       }
     });
-    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    if (!res.ok) throw await this.buildError(res);
     return res.json() as Promise<T>;
   }
 
   private headers(): HeadersInit {
     return this.token ? { "X-Builder-Token": this.token } : {};
+  }
+
+  private async buildError(res: Response): Promise<ResilienceClientError> {
+    let payload: ResilienceApiError | undefined;
+    try {
+      payload = (await res.json()) as ResilienceApiError;
+    } catch {
+      payload = undefined;
+    }
+    const message = payload?.error?.message ?? `Request failed: ${res.status}`;
+    return new ResilienceClientError(res.status, message, payload);
   }
 }
 

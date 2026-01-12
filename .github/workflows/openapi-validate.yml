@@ -10,3 +10,10 @@ jobs:
       - name: Validate OpenAPI
         shell: pwsh
         run: ./scripts/validate-openapi.ps1
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+      - name: Validate OpenAPI client contract
+        shell: pwsh
+        run: ./scripts/validate-openapi-client.ps1

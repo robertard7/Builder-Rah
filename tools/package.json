@@ -1,0 +1,27 @@
+{
+  "name": "@builder-rah/resilience-client",
+  "version": "0.1.0",
+  "description": "TypeScript client for the Builder-Rah resilience API.",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:test": "tsc -p tsconfig.test.json",
+    "test": "npm run build:test && node --test dist-tests",
+    "lint": "node --check dist/index.js",
+    "generate:openapi-types": "openapi-typescript ../openapi.yaml --output openapi-types.d.ts",
+    "compare:openapi": "node ./scripts/compare-openapi.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@openapitools/openapi-generator-cli": "^2.13.5",
+    "openapi-typescript": "^6.7.5",
+    "typescript": "^5.4.5"
+  }
+}

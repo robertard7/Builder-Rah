@@ -108,7 +108,114 @@ Plus provider diagnostics:
 
     GET /provider/metrics
 
-    GET /provider/events 
+### Resilience API examples
+
+Reset resilience metrics:
+
+```pwsh
+Invoke-RestMethod "http://localhost:5050/metrics/resilience/reset" -Method Put
+```
+
+```bash
+curl -X PUT http://localhost:5050/metrics/resilience/reset
+```
+
+Query resilience history range:
+
+```pwsh
+Invoke-RestMethod "http://localhost:5050/metrics/resilience/history?start=2026-01-11T01:00:00Z&end=2026-01-11T02:00:00Z"
+```
+
+```bash
+curl "http://localhost:5050/metrics/resilience/history?start=2026-01-11T01:00:00Z&end=2026-01-11T02:00:00Z"
+```
+
+Create, list, and delete alert rules:
+
+```pwsh
+$rule = @{ name = "retry-spike"; openThreshold = 3; retryThreshold = 10; windowMinutes = 60; severity = "warning" } | ConvertTo-Json
+Invoke-RestMethod "http://localhost:5050/alerts" -Method Post -Body $rule -ContentType "application/json"
+Invoke-RestMethod "http://localhost:5050/alerts?limit=20"
+Invoke-RestMethod "http://localhost:5050/alerts?ruleId=rule-1" -Method Delete
+```
+
+```bash
+curl -X POST http://localhost:5050/alerts \
+  -H "Content-Type: application/json" \
+  -d '{"name":"retry-spike","openThreshold":3,"retryThreshold":10,"windowMinutes":60,"severity":"warning"}'
+curl "http://localhost:5050/alerts?limit=20"
+curl -X DELETE "http://localhost:5050/alerts?ruleId=rule-1"
+```
+
+### Resilience TypeScript client
+
+Node usage:
+
+```ts
+import { ResilienceClient } from "@builder-rah/resilience-client";
+
+const client = new ResilienceClient("http://localhost:5050");
+const metrics = await client.getMetrics();
+const history = await client.getHistoryRange("2026-01-11T01:00:00Z", "2026-01-11T02:00:00Z", { page: 1, perPage: 50 });
+console.log(metrics, history.items.length);
+```
+
+Deno usage:
+
+```ts
+import { ResilienceClient } from "npm:@builder-rah/resilience-client";
+
+const client = new ResilienceClient("http://localhost:5050");
+const alerts = await client.getAlertsBySeverity("critical", 25);
+console.log(alerts.events);
+```
+
+Browser usage:
+
+```ts
+import { ResilienceClient } from "@builder-rah/resilience-client";
+
+const client = new ResilienceClient("https://api.example.com", "<token>");
+const reset = await client.resetMetrics();
+console.log(reset.ok);
+```
+
+### Resilience OpenAPI reference
+
+All resilience endpoints return metadata-enveloped payloads. For example:
+
+```json
+{
+  "metadata": {
+    "version": "1",
+    "timestamp": "2026-01-11T01:00:00Z",
+    "requestId": "req-123"
+  },
+  "data": {
+    "openCount": 1,
+    "halfOpenCount": 0,
+    "closedCount": 4,
+    "retryAttempts": 2
+  }
+}
+```
+
+TypeScript snippet using the client:
+
+```ts
+const response = await client.getMetricsResponse();
+console.log(response.metadata.requestId, response.data.openCount);
+```
+
+### Troubleshooting common errors
+
+- `invalid_date_range`: `start` must be less than `end` for history requests.
+- `threshold_required`: alert rules must include `openThreshold` or `retryThreshold`.
+- `acknowledged_required`: alert acknowledgment requires `acknowledged: true`.
+
+When using the TypeScript client, a `ResilienceClientError` includes `status`, `code`, and `documentation` fields for quick diagnosis.
+
+## CLI
 
 Full schema in openapi.yaml.
 📟 CLI (rah)
@@ -123,45 +230,23 @@ rah session cancel --id <id>
 rah session delete --id <id>
 rah provider metrics
 rah provider events
+rah resilience alerts list --severity critical
+rah resilience alert resolve <eventId>
+```
 
-Uniform control surface for automation and tooling.
-🧠 Design Philosophy
+## Resilience Prometheus metrics
 
-Builder Rah values:
+The endpoint `GET /metrics/resilience/prometheus` exports the following metrics:
 
-    determinism over guesswork
+- `resilience_open_count`
+- `resilience_half_open_count`
+- `resilience_closed_count`
+- `resilience_retry_attempts`
+- `resilience_tool_open_count{tool="<toolId>"}`
+- `resilience_tool_retry_attempts{tool="<toolId>"}`
 
-    cache reuse over redundant generation
+Label usage is intentionally limited to avoid high-cardinality metrics.
 
-    automation over manual steps
-
-    self-service artifacts over opaque code dumps
-
-This is a tool for building consistent portable projects that anyone or anything can consume.
-🔧 Getting Started
-
-    Clone the repo
-
-    Restore dependencies
-
-    Run dotnet run
-
-        UI mode by default
-
-        Add --headless for API only
-
-Artifacts appear under Workflow/ProgramArtifacts/ once jobs complete.
-📄 Resources
-
-    OpenAPI spec: openapi.yaml
-
-    Example settings: appsettings.example.json
-
-    API usage examples: see docs folder
-
-🏷️ Tags
-
-builder artifact-generation headless automation api cli
-🛡 License
+## Caching
 
 MIT © Robert Ard

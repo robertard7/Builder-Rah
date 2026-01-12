@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using RahOllamaOnly.Tools.Handlers;
 
@@ -15,6 +16,13 @@ public static class ResilienceDiagnosticsHub
     private static readonly ConcurrentDictionary<string, CircuitMetricsStore> ToolStores = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ResilienceHistoryStore History = new();
     private static readonly ResilienceAlertStore Alerts = new();
+    public static event Action<string>? ResilienceLog;
+
+    static ResilienceDiagnosticsHub()
+    {
+        Alerts.AlertRaised += alert => ResilienceLog?.Invoke($"alert_triggered id={alert.Id} severity={alert.Severity} ruleId={alert.RuleId}");
+        Alerts.AlertAcknowledged += alert => ResilienceLog?.Invoke($"alert_acknowledged id={alert.Id} ruleId={alert.RuleId}");
+    }
 
     public static void Attach(CircuitBreaker breaker)
     {
@@ -25,6 +33,7 @@ public static class ResilienceDiagnosticsHub
         {
             Store.RecordStateChange(args.Previous, args.Current);
             BreakerStates[breaker] = args.Current;
+            ResilienceLog?.Invoke($"circuit_state traceId={GetTraceId()} toolId=unknown timestamp={args.Timestamp:O} previous={args.Previous} current={args.Current}");
         });
 
         if (Subscriptions.TryAdd(breaker, handler))
@@ -38,6 +47,7 @@ public static class ResilienceDiagnosticsHub
         Store.RecordRetryAttempt();
         if (!string.IsNullOrWhiteSpace(toolId))
             ToolStores.GetOrAdd(toolId, _ => new CircuitMetricsStore()).RecordRetryAttempt();
+        ResilienceLog?.Invoke($"retry_attempt traceId={GetTraceId()} toolId={(string.IsNullOrWhiteSpace(toolId) ? "unknown" : toolId)} timestamp={DateTimeOffset.UtcNow:O}");
     }
 
     public static void RecordCircuitOpen(string? toolId)
@@ -45,6 +55,7 @@ public static class ResilienceDiagnosticsHub
         if (string.IsNullOrWhiteSpace(toolId))
             return;
         ToolStores.GetOrAdd(toolId, _ => new CircuitMetricsStore()).RecordOpenEvent();
+        ResilienceLog?.Invoke($"circuit_open traceId={GetTraceId()} toolId={toolId} timestamp={DateTimeOffset.UtcNow:O}");
     }
 
     public static CircuitMetricsSnapshot Snapshot()
@@ -70,6 +81,8 @@ public static class ResilienceDiagnosticsHub
 
     public static IReadOnlyList<ResilienceMetricsSample> SnapshotHistoryRange(DateTimeOffset? start, DateTimeOffset? end, int? limit = null, int? bucketMinutes = null)
     {
+        if (bucketMinutes.HasValue && bucketMinutes.Value > 0)
+            ResilienceLog?.Invoke($"history_bucket traceId={GetTraceId()} start={start:O} end={end:O} bucketMinutes={bucketMinutes.Value}");
         return History.SnapshotRange(start, end, limit, bucketMinutes);
     }
 
@@ -78,9 +91,46 @@ public static class ResilienceDiagnosticsHub
         return BreakerStates.Values.Any(state => state == CircuitState.Open);
     }
 
+    public static int OpenCircuitCount()
+    {
+        return BreakerStates.Values.Count(state => state == CircuitState.Open);
+    }
+
+    public static string OverallState()
+    {
+        if (BreakerStates.Values.Any(state => state == CircuitState.Open))
+            return "open";
+        if (BreakerStates.Values.Any(state => state == CircuitState.HalfOpen))
+            return "halfopen";
+        return "closed";
+    }
+
+    public static DateTimeOffset? LastAlertTimestamp()
+    {
+        var latest = Alerts.ListEvents(1, includeAcknowledged: true).FirstOrDefault();
+        return latest?.TriggeredAt;
+    }
+
+    private static string GetTraceId()
+    {
+        return Activity.Current?.TraceId.ToString() ?? "unknown";
+    }
+
     public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes, string severity)
     {
         return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes, severity);
+    }
+
+    public static ResilienceAlertRule? UpdateAlertRule(
+        string ruleId,
+        string? name,
+        int? openThreshold,
+        int? retryThreshold,
+        int? windowMinutes,
+        string? severity,
+        bool? enabled)
+    {
+        return Alerts.UpdateRule(ruleId, name, openThreshold, retryThreshold, windowMinutes, severity, enabled);
     }
 
     public static IReadOnlyList<ResilienceAlertRule> ListAlertRules()
@@ -88,14 +138,23 @@ public static class ResilienceDiagnosticsHub
         return Alerts.ListRules();
     }
 
-    public static IReadOnlyList<ResilienceAlertEvent> ListAlertEvents(int limit = 50)
+    public static IReadOnlyList<ResilienceAlertEvent> ListAlertEvents(
+        int limit = 50,
+        string? severity = null,
+        bool includeAcknowledged = true,
+        string? ruleId = null)
     {
-        return Alerts.ListEvents(limit);
+        return Alerts.ListEvents(limit, severity, includeAcknowledged, ruleId);
     }
 
     public static bool RemoveAlertRule(string ruleId)
     {
         return Alerts.RemoveRule(ruleId);
+    }
+
+    public static ResilienceAlertEvent? AcknowledgeAlertEvent(string eventId)
+    {
+        return Alerts.Acknowledge(eventId);
     }
 
     public static void ClearAlerts()

@@ -339,7 +339,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ResilienceMetrics"
+                $ref: "#/components/schemas/ResilienceMetricsResponse"
         "204":
           description: No matching metrics
         "400":
@@ -347,7 +347,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ApiError"
+                $ref: "#/components/schemas/ResilienceErrorResponse"
   /metrics/resilience/history:
     get:
       summary: Resilience metrics history
@@ -369,6 +369,16 @@ paths:
           schema:
             type: string
             format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: perPage
+          in: query
+          required: false
+          schema:
+            type: integer
         - name: limit
           in: query
           required: false
@@ -385,9 +395,13 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ResilienceMetricsSample"
+                $ref: "#/components/schemas/ResilienceHistoryResponse"
+        "400":
+          description: Invalid date range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResilienceErrorResponse"
   /metrics/resilience/reset:
     put:
       summary: Reset resilience metrics
@@ -397,13 +411,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                  resetAt:
-                    type: string
-                    format: date-time
+                $ref: "#/components/schemas/ResilienceResetResponse"
     post:
       summary: Reset resilience metrics
       responses:
@@ -412,13 +420,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                  resetAt:
-                    type: string
-                    format: date-time
+                $ref: "#/components/schemas/ResilienceResetResponse"
+  /metrics/resilience/prometheus:
+    get:
+      summary: Resilience metrics in Prometheus format
+      responses:
+        "200":
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
   /alerts/thresholds:
     post:
       summary: Create alert threshold rule
@@ -434,13 +446,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ResilienceAlertRule"
+                $ref: "#/components/schemas/ResilienceAlertRuleResponse"
         "400":
           description: Bad request
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ApiError"
+                $ref: "#/components/schemas/ResilienceErrorResponse"
   /alerts:
     post:
       summary: Create alert rule
@@ -456,13 +468,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ResilienceAlertRule"
+                $ref: "#/components/schemas/ResilienceAlertRuleResponse"
         "400":
           description: Bad request
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ApiError"
+                $ref: "#/components/schemas/ResilienceErrorResponse"
     get:
       summary: List alert rules and recent events
       parameters:
@@ -471,22 +483,24 @@ paths:
           required: false
           schema:
             type: integer
+        - name: severity
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [warning, critical]
+        - name: includeAcknowledged
+          in: query
+          required: false
+          schema:
+            type: boolean
       responses:
         "200":
           description: Alerts
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  rules:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/ResilienceAlertRule"
-                  events:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/ResilienceAlertEvent"
+                $ref: "#/components/schemas/ResilienceAlertsResponse"
     delete:
       summary: Delete alert rules
       parameters:
@@ -501,18 +515,84 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                  ruleId:
-                    type: string
+                $ref: "#/components/schemas/ResilienceDeleteResponse"
+  /alerts/{id}:
+    patch:
+      summary: Update alert rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResilienceAlertRuleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResilienceAlertRuleResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResilienceErrorResponse"
+  /alerts/events/{id}:
+    patch:
+      summary: Acknowledge alert event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                acknowledged:
+                  type: boolean
+                resolved:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResilienceAlertEventResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResilienceErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResilienceErrorResponse"
   /healthz:
     get:
       summary: Health check
       responses:
         "200":
           description: Health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthzResponse"
   /readyz:
     get:
       summary: Readiness check
@@ -567,6 +647,14 @@ components:
         message: invalid_state
         details:
           errorCode: invalid_state
+          docs: README.md#resilience-api-examples
+    ResilienceErrorResponse:
+      type: object
+      properties:
+        metadata:
+          $ref: "#/components/schemas/ResilienceMetadata"
+        error:
+          $ref: "#/components/schemas/ApiError"
     SessionSummary:
       type: object
       properties:
@@ -651,6 +739,23 @@ components:
         halfOpenCount: 0
         closedCount: 5
         retryAttempts: 3
+    ResilienceMetadata:
+      type: object
+      properties:
+        version:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+    ResilienceMetricsResponse:
+      type: object
+      properties:
+        metadata:
+          $ref: "#/components/schemas/ResilienceMetadata"
+        data:
+          $ref: "#/components/schemas/ResilienceMetrics"
     ResilienceState:
       type: string
       enum:
@@ -676,6 +781,31 @@ components:
           halfOpenCount: 0
           closedCount: 5
           retryAttempts: 3
+    ResilienceHistoryResponse:
+      type: object
+      properties:
+        metadata:
+          $ref: "#/components/schemas/ResilienceMetadata"
+        total:
+          type: integer
+        page:
+          type: integer
+        perPage:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResilienceMetricsSample"
+    ResilienceResetResponse:
+      type: object
+      properties:
+        metadata:
+          $ref: "#/components/schemas/ResilienceMetadata"
+        ok:
+          type: boolean
+        resetAt:
+          type: string
+          format: date-time
     ResilienceAlertRuleRequest:
       type: object
       properties:
@@ -696,6 +826,22 @@ components:
         retryThreshold: 10
         windowMinutes: 60
         severity: warning
+    ResilienceAlertRuleUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        openThreshold:
+          type: integer
+        retryThreshold:
+          type: integer
+        windowMinutes:
+          type: integer
+        severity:
+          type: string
+          enum: [warning, critical]
+        enabled:
+          type: boolean
     ResilienceAlertRule:
       type: object
       properties:
@@ -722,6 +868,48 @@ components:
         windowMinutes: 60
         severity: warning
         enabled: true
+    ResilienceAlertRuleResponse:
+      type: object
+      properties:
+        metadata:
+          $ref: "#/components/schemas/ResilienceMetadata"
+        data:
+          $ref: "#/components/schemas/ResilienceAlertRule"
+    ResilienceAlertRuleSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        openThreshold:
+          type: integer
+        retryThreshold:
+          type: integer
+        windowMinutes:
+          type: integer
+        severity:
+          type: string
+          enum: [warning, critical]
+        enabled:
+          type: boolean
+        recentEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResilienceAlertEvent"
+    ResilienceAlertsResponse:
+      type: object
+      properties:
+        metadata:
+          $ref: "#/components/schemas/ResilienceMetadata"
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResilienceAlertRuleSummary"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResilienceAlertEvent"
     ResilienceAlertEvent:
       type: object
       properties:
@@ -741,6 +929,11 @@ components:
           type: integer
         retryDelta:
           type: integer
+        acknowledged:
+          type: boolean
+        acknowledgedAt:
+          type: string
+          format: date-time
       example:
         id: event-1
         ruleId: rule-1
@@ -749,6 +942,44 @@ components:
         triggeredAt: "2026-01-11T01:05:00Z"
         openDelta: 0
         retryDelta: 12
+        acknowledged: false
+    ResilienceAlertEventResponse:
+      type: object
+      properties:
+        metadata:
+          $ref: "#/components/schemas/ResilienceMetadata"
+        data:
+          $ref: "#/components/schemas/ResilienceAlertEvent"
+    ResilienceDeleteResponse:
+      type: object
+      properties:
+        metadata:
+          $ref: "#/components/schemas/ResilienceMetadata"
+        ok:
+          type: boolean
+        ruleId:
+          type: string
+    ResilienceHealthSummary:
+      type: object
+      properties:
+        state:
+          type: string
+        openCircuits:
+          type: integer
+        lastAlertAt:
+          type: string
+          format: date-time
+    HealthzResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        telemetry:
+          type: object
+        resilience:
+          $ref: "#/components/schemas/ResilienceHealthSummary"
+        metadata:
+          $ref: "#/components/schemas/ResilienceMetadata"
     ProviderEvent:
       type: object
       properties:
