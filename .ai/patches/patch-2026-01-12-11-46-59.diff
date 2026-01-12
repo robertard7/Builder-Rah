@@ -1,0 +1,114 @@
+diff --git a/Metrics/ResilienceDiagnosticsHub.cs b/Metrics/ResilienceDiagnosticsHub.cs
+index b12da06..48df13d 100644
+--- a/Metrics/ResilienceDiagnosticsHub.cs
++++ b/Metrics/ResilienceDiagnosticsHub.cs
+@@ -2,6 +2,7 @@
+ using System;
+ using System.Collections.Concurrent;
+ using System.Collections.Generic;
++using System.Diagnostics;
+ using System.Linq;
+ using RahOllamaOnly.Tools.Handlers;
+ 
+@@ -32,7 +33,7 @@ public static class ResilienceDiagnosticsHub
+         {
+             Store.RecordStateChange(args.Previous, args.Current);
+             BreakerStates[breaker] = args.Current;
+-            ResilienceLog?.Invoke($"circuit_state tool=unknown previous={args.Previous} current={args.Current}");
++            ResilienceLog?.Invoke($"circuit_state traceId={GetTraceId()} toolId=unknown timestamp={args.Timestamp:O} previous={args.Previous} current={args.Current}");
+         });
+ 
+         if (Subscriptions.TryAdd(breaker, handler))
+@@ -46,6 +47,7 @@ public static class ResilienceDiagnosticsHub
+         Store.RecordRetryAttempt();
+         if (!string.IsNullOrWhiteSpace(toolId))
+             ToolStores.GetOrAdd(toolId, _ => new CircuitMetricsStore()).RecordRetryAttempt();
++        ResilienceLog?.Invoke($"retry_attempt traceId={GetTraceId()} toolId={(string.IsNullOrWhiteSpace(toolId) ? "unknown" : toolId)} timestamp={DateTimeOffset.UtcNow:O}");
+     }
+ 
+     public static void RecordCircuitOpen(string? toolId)
+@@ -53,6 +55,7 @@ public static class ResilienceDiagnosticsHub
+         if (string.IsNullOrWhiteSpace(toolId))
+             return;
+         ToolStores.GetOrAdd(toolId, _ => new CircuitMetricsStore()).RecordOpenEvent();
++        ResilienceLog?.Invoke($"circuit_open traceId={GetTraceId()} toolId={toolId} timestamp={DateTimeOffset.UtcNow:O}");
+     }
+ 
+     public static CircuitMetricsSnapshot Snapshot()
+@@ -78,6 +81,8 @@ public static class ResilienceDiagnosticsHub
+ 
+     public static IReadOnlyList<ResilienceMetricsSample> SnapshotHistoryRange(DateTimeOffset? start, DateTimeOffset? end, int? limit = null, int? bucketMinutes = null)
+     {
++        if (bucketMinutes.HasValue && bucketMinutes.Value > 0)
++            ResilienceLog?.Invoke($"history_bucket traceId={GetTraceId()} start={start:O} end={end:O} bucketMinutes={bucketMinutes.Value}");
+         return History.SnapshotRange(start, end, limit, bucketMinutes);
+     }
+ 
+@@ -106,6 +111,11 @@ public static class ResilienceDiagnosticsHub
+         return latest?.TriggeredAt;
+     }
+ 
++    private static string GetTraceId()
++    {
++        return Activity.Current?.TraceId.ToString() ?? "unknown";
++    }
++
+     public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes, string severity)
+     {
+         return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes, severity);
+diff --git a/README.md b/README.md
+index 73404c0..8fdb65e 100644
+--- a/README.md
++++ b/README.md
+@@ -134,6 +134,19 @@ rah resilience alerts list --severity critical
+ rah resilience alert resolve <eventId>
+ ```
+ 
++## Resilience Prometheus metrics
++
++The endpoint `GET /metrics/resilience/prometheus` exports the following metrics:
++
++- `resilience_open_count`
++- `resilience_half_open_count`
++- `resilience_closed_count`
++- `resilience_retry_attempts`
++- `resilience_tool_open_count{tool="<toolId>"}`
++- `resilience_tool_retry_attempts{tool="<toolId>"}`
++
++Label usage is intentionally limited to avoid high-cardinality metrics.
++
+ ## Caching
+ 
+ - Artifact sets are hashed by job spec, constraints, attachments, and tool outputs (SHA256).
+diff --git a/Tools/RahCli/Commands/ResilienceAlertsCommand.cs b/Tools/RahCli/Commands/ResilienceAlertsCommand.cs
+index 73b023a..7d44956 100644
+--- a/Tools/RahCli/Commands/ResilienceAlertsCommand.cs
++++ b/Tools/RahCli/Commands/ResilienceAlertsCommand.cs
+@@ -33,6 +33,10 @@ public static class ResilienceAlertsCommand
+                 var status = alert.Acknowledged ? "acknowledged" : "active";
+                 Console.WriteLine($"- {alert.TriggeredAt:O} [{status}] {alert.Message}");
+             }
++
++            var criticalActive = eventsList.Count(alert => !alert.Acknowledged && string.Equals(alert.Severity, "critical", StringComparison.OrdinalIgnoreCase));
++            if (criticalActive > 0)
++                Console.Error.WriteLine($"[resilience] {criticalActive} critical alert(s) active.");
+         }
+         return ExitCodes.Success;
+     }
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 52f668c..6331fe9 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -155,7 +155,11 @@ public sealed class WorkflowFacade
+         {
+             if (_resilienceLogHooked)
+                 return;
+-            RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ResilienceLog += msg => _trace.Emit("[resilience] " + msg);
++            RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ResilienceLog += msg =>
++            {
++                _trace.Emit("[resilience] " + msg);
++                SessionManager.AddEvent(_state.SessionToken, "resilience", msg);
++            };
+             _resilienceLogHooked = true;
+         }
+     }

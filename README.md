@@ -134,6 +134,19 @@ rah resilience alerts list --severity critical
 rah resilience alert resolve <eventId>
 ```
 
+## Resilience Prometheus metrics
+
+The endpoint `GET /metrics/resilience/prometheus` exports the following metrics:
+
+- `resilience_open_count`
+- `resilience_half_open_count`
+- `resilience_closed_count`
+- `resilience_retry_attempts`
+- `resilience_tool_open_count{tool="<toolId>"}`
+- `resilience_tool_retry_attempts{tool="<toolId>"}`
+
+Label usage is intentionally limited to avoid high-cardinality metrics.
+
 ## Caching
 
 - Artifact sets are hashed by job spec, constraints, attachments, and tool outputs (SHA256).

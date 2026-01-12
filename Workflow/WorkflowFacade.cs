@@ -155,7 +155,11 @@ public sealed class WorkflowFacade
         {
             if (_resilienceLogHooked)
                 return;
-            RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ResilienceLog += msg => _trace.Emit("[resilience] " + msg);
+            RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ResilienceLog += msg =>
+            {
+                _trace.Emit("[resilience] " + msg);
+                SessionManager.AddEvent(_state.SessionToken, "resilience", msg);
+            };
             _resilienceLogHooked = true;
         }
     }

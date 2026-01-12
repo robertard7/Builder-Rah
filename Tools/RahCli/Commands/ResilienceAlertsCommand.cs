@@ -33,6 +33,10 @@ public static class ResilienceAlertsCommand
                 var status = alert.Acknowledged ? "acknowledged" : "active";
                 Console.WriteLine($"- {alert.TriggeredAt:O} [{status}] {alert.Message}");
             }
+
+            var criticalActive = eventsList.Count(alert => !alert.Acknowledged && string.Equals(alert.Severity, "critical", StringComparison.OrdinalIgnoreCase));
+            if (criticalActive > 0)
+                Console.Error.WriteLine($"[resilience] {criticalActive} critical alert(s) active.");
         }
         return ExitCodes.Success;
     }
