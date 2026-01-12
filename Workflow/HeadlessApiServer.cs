@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -131,6 +132,18 @@ public sealed class HeadlessApiServer
                 return;
             }
 
+            if (req.HttpMethod == "GET" && path == "/metrics/resilience/history")
+            {
+                var minutes = ParseQueryInt(req, "minutes", 60);
+                var limit = ParseQueryInt(req, "limit", 300);
+                if (minutes <= 0) minutes = 60;
+                if (limit <= 0) limit = 300;
+                var window = TimeSpan.FromMinutes(minutes);
+                var history = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotHistory(window, limit);
+                await WriteJsonAsync(ctx, 200, history, ct).ConfigureAwait(false);
+                return;
+            }
+
             if (req.HttpMethod == "PUT" && path == "/metrics/resilience/reset")
             {
                 RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Reset();
@@ -253,7 +266,9 @@ public sealed class HeadlessApiServer
                     var statusCode = workflow.GetSessionStatusSnapshot();
                     var status = new SessionStatusDto(statusCode.ToString(), StatusMapper.ToDisplay(statusCode));
                     var resilience = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
-                    await WriteJsonAsync(ctx, 200, new { sessionId, status, resilience }, ct).ConfigureAwait(false);
+                    var resilienceSummary = BuildResilienceSummary(resilience);
+                    var resilienceByTool = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotByTool();
+                    await WriteJsonAsync(ctx, 200, new { sessionId, status, resilienceSummary, resilience, resilienceByTool }, ct).ConfigureAwait(false);
                     return;
                 }
 
@@ -284,6 +299,12 @@ public sealed class HeadlessApiServer
                         return;
                     }
                     var response = await RunMessageAsync(sessionId, text, ct).ConfigureAwait(false);
+                    if (IsCircuitOpenResponse(response))
+                    {
+                        isError = true;
+                        await WriteCircuitOpenAsync(ctx, ct).ConfigureAwait(false);
+                        return;
+                    }
                     await WriteJsonAsync(ctx, 200, response, ct).ConfigureAwait(false);
                     return;
                 }
@@ -313,6 +334,12 @@ public sealed class HeadlessApiServer
                 if (parts.Length == 3 && parts[2] == "run" && req.HttpMethod == "POST")
                 {
                     var response = await RunPlanAsync(sessionId, ct).ConfigureAwait(false);
+                    if (IsCircuitOpenResponse(response))
+                    {
+                        isError = true;
+                        await WriteCircuitOpenAsync(ctx, ct).ConfigureAwait(false);
+                        return;
+                    }
                     await WriteJsonAsync(ctx, 200, response, ct).ConfigureAwait(false);
                     return;
                 }
@@ -373,7 +400,7 @@ public sealed class HeadlessApiServer
         return string.Equals(header, _token, StringComparison.Ordinal);
     }
 
-    private async Task<object> RunMessageAsync(string sessionId, string text, CancellationToken ct)
+    private async Task<RunResponse> RunMessageAsync(string sessionId, string text, CancellationToken ct)
     {
         var state = _store.Load(sessionId) ?? new SessionState { SessionId = sessionId };
         var workflow = new WorkflowFacade(_cfg, _trace);
@@ -388,10 +415,10 @@ public sealed class HeadlessApiServer
         await workflow.RouteUserInput(_cfg, text, ct).ConfigureAwait(false);
         var updated = workflow.BuildSessionState();
         _store.Save(updated);
-        return new { sessionId = updated.SessionId, responses, status = workflow.GetPublicSnapshot() };
+        return new RunResponse(updated.SessionId, responses, workflow.GetPublicSnapshot());
     }
 
-    private async Task<object> RunPlanAsync(string sessionId, CancellationToken ct)
+    private async Task<RunResponse> RunPlanAsync(string sessionId, CancellationToken ct)
     {
         var state = _store.Load(sessionId) ?? new SessionState { SessionId = sessionId };
         var workflow = new WorkflowFacade(_cfg, _trace);
@@ -405,7 +432,7 @@ public sealed class HeadlessApiServer
         await workflow.ApproveAllStepsAsync(ct).ConfigureAwait(false);
         var updated = workflow.BuildSessionState();
         _store.Save(updated);
-        return new { sessionId = updated.SessionId, responses, status = workflow.GetPublicSnapshot() };
+        return new RunResponse(updated.SessionId, responses, workflow.GetPublicSnapshot());
     }
 
     private static async Task<JsonElement> ReadJsonAsync(HttpListenerRequest req, CancellationToken ct)
@@ -448,6 +475,24 @@ public sealed class HeadlessApiServer
     {
         return $"retries: {metrics.RetryAttempts}, open: {metrics.OpenCount}, half-open: {metrics.HalfOpenCount}, closed: {metrics.ClosedCount}";
     }
+
+    private static bool IsCircuitOpenResponse(RunResponse response)
+    {
+        return response.Responses.Any(msg => msg.Contains("circuit is open", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static Task WriteCircuitOpenAsync(HttpListenerContext ctx, CancellationToken ct)
+    {
+        ctx.Response.Headers["Retry-After"] = "30";
+        var details = new Dictionary<string, object>
+        {
+            ["retryAfterSeconds"] = 30,
+            ["hint"] = "The circuit breaker is open. Retry after backoff."
+        };
+        return WriteErrorAsync(ctx, 503, ApiError.ServiceUnavailable("circuit_open", details), ct);
+    }
+
+    private sealed record RunResponse(string SessionId, List<string> Responses, object Status);
 
     private void DeleteArtifactsForSession(string sessionId)
     {

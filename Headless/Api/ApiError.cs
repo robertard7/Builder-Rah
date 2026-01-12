@@ -11,5 +11,6 @@ public sealed record ApiError(
     public static ApiError NotFound(string message = "not_found") => new("not_found", message);
     public static ApiError Unauthorized(string message = "unauthorized") => new("unauthorized", message);
     public static ApiError BadRequest(string message) => new("bad_request", message);
+    public static ApiError ServiceUnavailable(string message, IReadOnlyDictionary<string, object>? details = null) => new("service_unavailable", message, details);
     public static ApiError ServerError(string message) => new("server_error", message);
 }

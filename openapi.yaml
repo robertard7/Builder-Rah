@@ -89,8 +89,12 @@ paths:
                     type: string
                   status:
                     $ref: "#/components/schemas/SessionStatus"
+                  resilienceSummary:
+                    type: string
                   resilience:
                     $ref: "#/components/schemas/ResilienceMetrics"
+                  resilienceByTool:
+                    $ref: "#/components/schemas/ResilienceMetricsByTool"
         "404":
           description: Not found
           content:
@@ -179,6 +183,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+        "503":
+          description: Circuit open
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
   /sessions/{id}/attachments:
     post:
       summary: Add attachment
@@ -235,6 +245,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SessionRunResponse"
+        "503":
+          description: Circuit open
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
   /sessions/{id}/cancel:
     post:
       summary: Cancel plan
@@ -296,6 +312,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+  /metrics/resilience/history:
+    get:
+      summary: Resilience metrics history
+      parameters:
+        - name: minutes
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Resilience history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResilienceMetricsSample"
   /metrics/resilience/reset:
     put:
       summary: Reset resilience metrics
@@ -440,6 +479,18 @@ components:
         retryAttempts:
           type: integer
           description: RetryAttempts (number of retry attempts recorded)
+    ResilienceMetricsByTool:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/ResilienceMetrics"
+    ResilienceMetricsSample:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        metrics:
+          $ref: "#/components/schemas/ResilienceMetrics"
     ProviderEvent:
       type: object
       properties:

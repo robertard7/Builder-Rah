@@ -19,7 +19,6 @@ public sealed class ResilienceMetricsPanel : UserControl
     private readonly CheckBox _alertsEnabled;
     private readonly Button _copySnapshot;
     private readonly Timer _timer;
-    private readonly List<ResilienceSample> _history = new();
     private bool _alertActive;
 
     public event Action<string>? AlertTriggered;
@@ -129,23 +128,14 @@ public sealed class ResilienceMetricsPanel : UserControl
     {
         var metrics = ResilienceDiagnosticsHub.Snapshot();
         var byTool = ResilienceDiagnosticsHub.SnapshotByTool();
-        AddSample(metrics);
-        UpdateChart();
+        var history = ResilienceDiagnosticsHub.SnapshotHistory(TimeSpan.FromMinutes(30), 120);
+        var alertHistory = ResilienceDiagnosticsHub.SnapshotHistory(TimeSpan.FromHours(1), 120);
+        UpdateChart(history);
         UpdateToolList(byTool);
-        UpdateAlerts(metrics);
+        UpdateAlerts(metrics, alertHistory);
     }
 
-    private void AddSample(CircuitMetricsSnapshot metrics)
-    {
-        var sample = new ResilienceSample(DateTimeOffset.UtcNow, metrics);
-        _history.Add(sample);
-        var cutoff = DateTimeOffset.UtcNow.AddMinutes(-30);
-        _history.RemoveAll(item => item.Timestamp < cutoff);
-        if (_history.Count > 120)
-            _history.RemoveRange(0, _history.Count - 120);
-    }
-
-    private void UpdateChart()
+    private void UpdateChart(IReadOnlyList<ResilienceMetricsSample> history)
     {
         var openSeries = _chart.Series["Open"];
         var halfOpenSeries = _chart.Series["HalfOpen"];
@@ -157,7 +147,7 @@ public sealed class ResilienceMetricsPanel : UserControl
         closedSeries.Points.Clear();
         retrySeries.Points.Clear();
 
-        foreach (var sample in _history)
+        foreach (var sample in history)
         {
             var x = sample.Timestamp.UtcDateTime.ToOADate();
             openSeries.Points.AddXY(x, sample.Metrics.OpenCount);
@@ -187,7 +177,7 @@ public sealed class ResilienceMetricsPanel : UserControl
         _toolList.EndUpdate();
     }
 
-    private void UpdateAlerts(CircuitMetricsSnapshot metrics)
+    private void UpdateAlerts(CircuitMetricsSnapshot metrics, IReadOnlyList<ResilienceMetricsSample> history)
     {
         if (!_alertsEnabled.Checked)
         {
@@ -197,9 +187,7 @@ public sealed class ResilienceMetricsPanel : UserControl
             return;
         }
 
-        var window = TimeSpan.FromHours(1);
-        var cutoff = DateTimeOffset.UtcNow - window;
-        var baseline = _history.FirstOrDefault(h => h.Timestamp >= cutoff);
+        var baseline = history.FirstOrDefault();
         var openRate = baseline == null ? 0 : metrics.OpenCount - baseline.Metrics.OpenCount;
         var retryRate = baseline == null ? 0 : metrics.RetryAttempts - baseline.Metrics.RetryAttempts;
 
@@ -237,5 +225,4 @@ public sealed class ResilienceMetricsPanel : UserControl
         Clipboard.SetText(snapshot);
     }
 
-    private sealed record ResilienceSample(DateTimeOffset Timestamp, CircuitMetricsSnapshot Metrics);
 }

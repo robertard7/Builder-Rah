@@ -145,6 +145,8 @@ public static class Program
         {
             case "metrics":
                 return ResilienceMetricsCommand.Execute(context, args.Skip(1).ToArray(), context.JsonOutput);
+            case "watch":
+                return ResilienceMetricsCommand.Execute(context, new[] { "--watch" }, context.JsonOutput);
             case "reset":
                 return ResilienceResetCommand.Execute(context, context.JsonOutput);
         }
@@ -261,6 +263,7 @@ public static class Program
         Console.WriteLine("rah provider events");
         Console.WriteLine("rah resilience metrics");
         Console.WriteLine("rah resilience metrics --watch");
+        Console.WriteLine("rah resilience watch");
         Console.WriteLine("rah resilience reset");
         Console.WriteLine("rah --headless");
     }
