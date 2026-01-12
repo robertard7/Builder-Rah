@@ -137,8 +137,16 @@ public sealed class HeadlessApiServer
                 var minutes = ParseQueryInt(req, "minutes", 60);
                 var limit = ParseQueryInt(req, "limit", 300);
                 var bucketMinutes = ParseQueryInt(req, "bucketMinutes", 0);
+                var page = ParseQueryInt(req, "page", 0);
+                var perPage = ParseQueryInt(req, "perPage", 0);
                 var start = ParseQueryDateTime(req, "start");
                 var end = ParseQueryDateTime(req, "end");
+                if (start.HasValue && end.HasValue && start.Value > end.Value)
+                {
+                    isError = true;
+                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("invalid_date_range"), ct).ConfigureAwait(false);
+                    return;
+                }
                 if (minutes <= 0) minutes = 60;
                 if (limit <= 0) limit = 300;
                 if (bucketMinutes < 0) bucketMinutes = 0;
@@ -152,7 +160,11 @@ public sealed class HeadlessApiServer
                     var window = TimeSpan.FromMinutes(minutes);
                     history = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotHistory(window, limit);
                 }
-                await WriteJsonAsync(ctx, 200, history, ct).ConfigureAwait(false);
+                var total = history.Count;
+                var effectivePage = page <= 0 ? 1 : page;
+                var effectivePerPage = perPage <= 0 ? Math.Max(1, limit) : perPage;
+                var pagedItems = history.Skip((effectivePage - 1) * effectivePerPage).Take(effectivePerPage).ToList();
+                await WriteJsonAsync(ctx, 200, new { total, page = effectivePage, perPage = effectivePerPage, items = pagedItems }, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -223,9 +235,22 @@ public sealed class HeadlessApiServer
             {
                 var limit = ParseQueryInt(req, "limit", 50);
                 if (limit <= 0) limit = 50;
+                var severity = req.QueryString["severity"];
+                var includeAcknowledged = ParseQueryBool(req, "includeAcknowledged", true);
                 var rules = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertRules();
-                var eventsList = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(limit);
-                await WriteJsonAsync(ctx, 200, new { rules, events = eventsList }, ct).ConfigureAwait(false);
+                var eventsList = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(limit, severity, includeAcknowledged);
+                var rulesWithEvents = rules.Select(rule => new
+                {
+                    rule.Id,
+                    rule.Name,
+                    rule.OpenThreshold,
+                    rule.RetryThreshold,
+                    rule.WindowMinutes,
+                    rule.Severity,
+                    rule.Enabled,
+                    recentEvents = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(5, severity, includeAcknowledged, rule.Id)
+                }).ToList();
+                await WriteJsonAsync(ctx, 200, new { rules = rulesWithEvents, events = eventsList }, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -241,6 +266,69 @@ public sealed class HeadlessApiServer
                 RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ClearAlerts();
                 await WriteJsonAsync(ctx, 200, new { ok = true }, ct).ConfigureAwait(false);
                 return;
+            }
+
+            if (req.HttpMethod == "PATCH" && path.StartsWith("/alerts/", StringComparison.OrdinalIgnoreCase))
+            {
+                var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 2 && !string.Equals(parts[1], "events", StringComparison.OrdinalIgnoreCase))
+                {
+                    var payload = await ReadJsonAsync(req, ct).ConfigureAwait(false);
+                    var name = payload.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
+                    int? openThreshold = payload.TryGetProperty("openThreshold", out var openEl) && openEl.TryGetInt32(out var open)
+                        ? open
+                        : null;
+                    int? retryThreshold = payload.TryGetProperty("retryThreshold", out var retryEl) && retryEl.TryGetInt32(out var retry)
+                        ? retry
+                        : null;
+                    int? windowMinutes = payload.TryGetProperty("windowMinutes", out var winEl) && winEl.TryGetInt32(out var win)
+                        ? win
+                        : null;
+                    var severity = payload.TryGetProperty("severity", out var sevEl) ? sevEl.GetString() : null;
+                    bool? enabled = payload.TryGetProperty("enabled", out var enabledEl) && enabledEl.ValueKind == JsonValueKind.True
+                        ? true
+                        : payload.TryGetProperty("enabled", out enabledEl) && enabledEl.ValueKind == JsonValueKind.False
+                            ? false
+                            : null;
+                    var updated = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.UpdateAlertRule(
+                        parts[1],
+                        name,
+                        openThreshold,
+                        retryThreshold,
+                        windowMinutes,
+                        severity,
+                        enabled);
+                    if (updated == null)
+                    {
+                        isError = true;
+                        await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
+                        return;
+                    }
+                    await WriteJsonAsync(ctx, 200, updated, ct).ConfigureAwait(false);
+                    return;
+                }
+
+                if (parts.Length == 3 && string.Equals(parts[1], "events", StringComparison.OrdinalIgnoreCase))
+                {
+                    var payload = await ReadJsonAsync(req, ct).ConfigureAwait(false);
+                    var acknowledged = payload.TryGetProperty("acknowledged", out var ackEl) && ackEl.ValueKind == JsonValueKind.True;
+                    var resolved = payload.TryGetProperty("resolved", out var resEl) && resEl.ValueKind == JsonValueKind.True;
+                    if (!acknowledged && !resolved)
+                    {
+                        isError = true;
+                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("acknowledged_required"), ct).ConfigureAwait(false);
+                        return;
+                    }
+                    var updated = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AcknowledgeAlertEvent(parts[2]);
+                    if (updated == null)
+                    {
+                        isError = true;
+                        await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
+                        return;
+                    }
+                    await WriteJsonAsync(ctx, 200, updated, ct).ConfigureAwait(false);
+                    return;
+                }
             }
 
             if (req.HttpMethod == "GET" && path == "/healthz")
@@ -551,6 +639,14 @@ public sealed class HeadlessApiServer
         if (DateTimeOffset.TryParse(value, out var parsed))
             return parsed;
         return null;
+    }
+
+    private static bool ParseQueryBool(HttpListenerRequest req, string key, bool fallback)
+    {
+        var value = req.QueryString[key];
+        if (bool.TryParse(value, out var parsed))
+            return parsed;
+        return fallback;
     }
 
     private static bool TryApplyStateFilter(CircuitMetricsSnapshot metrics, string state, out CircuitMetricsSnapshot filtered)

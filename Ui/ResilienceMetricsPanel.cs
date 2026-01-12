@@ -144,6 +144,7 @@ public sealed class ResilienceMetricsPanel : UserControl
         };
         list.Columns.Add("Triggered", 140);
         list.Columns.Add("Alert", 260);
+        list.Columns.Add("Status", 110);
         return list;
     }
 
@@ -250,6 +251,9 @@ public sealed class ResilienceMetricsPanel : UserControl
         {
             var item = new ListViewItem(alert.TriggeredAt.ToLocalTime().ToString("g"));
             item.SubItems.Add(alert.Message);
+            item.SubItems.Add(alert.Acknowledged ? "Acknowledged" : "Active");
+            if (alert.Acknowledged)
+                item.ForeColor = Color.DimGray;
             _alertList.Items.Add(item);
         }
         _alertList.EndUpdate();

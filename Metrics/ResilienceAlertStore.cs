@@ -22,12 +22,15 @@ public sealed record ResilienceAlertEvent(
     string Severity,
     DateTimeOffset TriggeredAt,
     int OpenDelta,
-    int RetryDelta);
+    int RetryDelta,
+    bool Acknowledged,
+    DateTimeOffset? AcknowledgedAt);
 
 public sealed class ResilienceAlertStore
 {
     private readonly ConcurrentDictionary<string, ResilienceAlertRule> _rules = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentQueue<ResilienceAlertEvent> _events = new();
+    private readonly ConcurrentQueue<string> _eventIds = new();
+    private readonly ConcurrentDictionary<string, ResilienceAlertEvent> _events = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, bool> _activeStates = new(StringComparer.OrdinalIgnoreCase);
     private readonly int _maxEvents;
 
@@ -38,29 +41,69 @@ public sealed class ResilienceAlertStore
 
     public ResilienceAlertRule AddRule(string name, int openThreshold, int retryThreshold, int windowMinutes, string severity)
     {
-        var normalizedSeverity = string.IsNullOrWhiteSpace(severity) ? "warning" : severity.Trim().ToLowerInvariant();
-        if (normalizedSeverity != "warning" && normalizedSeverity != "critical")
-            normalizedSeverity = "warning";
         var rule = new ResilienceAlertRule(
             Guid.NewGuid().ToString("N"),
             string.IsNullOrWhiteSpace(name) ? "threshold" : name.Trim(),
             Math.Max(0, openThreshold),
             Math.Max(0, retryThreshold),
             Math.Max(1, windowMinutes),
-            normalizedSeverity,
+            NormalizeSeverity(severity),
             true);
         _rules[rule.Id] = rule;
         _activeStates[rule.Id] = false;
         return rule;
     }
 
+    public ResilienceAlertRule? UpdateRule(
+        string ruleId,
+        string? name,
+        int? openThreshold,
+        int? retryThreshold,
+        int? windowMinutes,
+        string? severity,
+        bool? enabled)
+    {
+        if (string.IsNullOrWhiteSpace(ruleId))
+            return null;
+        if (!_rules.TryGetValue(ruleId, out var existing))
+            return null;
+
+        var updated = existing with
+        {
+            Name = string.IsNullOrWhiteSpace(name) ? existing.Name : name.Trim(),
+            OpenThreshold = openThreshold.HasValue ? Math.Max(0, openThreshold.Value) : existing.OpenThreshold,
+            RetryThreshold = retryThreshold.HasValue ? Math.Max(0, retryThreshold.Value) : existing.RetryThreshold,
+            WindowMinutes = windowMinutes.HasValue ? Math.Max(1, windowMinutes.Value) : existing.WindowMinutes,
+            Severity = string.IsNullOrWhiteSpace(severity) ? existing.Severity : NormalizeSeverity(severity),
+            Enabled = enabled ?? existing.Enabled
+        };
+        _rules[ruleId] = updated;
+        return updated;
+    }
+
     public IReadOnlyList<ResilienceAlertRule> ListRules() =>
         _rules.Values.OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ToList();
 
-    public IReadOnlyList<ResilienceAlertEvent> ListEvents(int limit = 50)
+    public IReadOnlyList<ResilienceAlertEvent> ListEvents(
+        int limit = 50,
+        string? severity = null,
+        bool includeAcknowledged = true,
+        string? ruleId = null)
     {
         if (limit <= 0) limit = 50;
-        return _events.Reverse().Take(limit).ToList();
+        var normalizedSeverity = string.IsNullOrWhiteSpace(severity) ? null : severity.Trim().ToLowerInvariant();
+
+        var ordered = _eventIds.Reverse()
+            .Select(id => _events.TryGetValue(id, out var evt) ? evt : null)
+            .Where(evt => evt != null)
+            .Select(evt => evt!)
+            .Where(evt => string.IsNullOrWhiteSpace(ruleId) || string.Equals(evt.RuleId, ruleId, StringComparison.OrdinalIgnoreCase))
+            .Where(evt => normalizedSeverity == null || string.Equals(evt.Severity, normalizedSeverity, StringComparison.OrdinalIgnoreCase))
+            .Where(evt => includeAcknowledged || !evt.Acknowledged)
+            .Take(limit)
+            .ToList();
+
+        return ordered;
     }
 
     public bool RemoveRule(string ruleId)
@@ -75,7 +118,8 @@ public sealed class ResilienceAlertStore
     {
         _rules.Clear();
         _activeStates.Clear();
-        while (_events.TryDequeue(out _)) { }
+        while (_eventIds.TryDequeue(out _)) { }
+        _events.Clear();
     }
 
     public void Evaluate(CircuitMetricsSnapshot current, IReadOnlyList<ResilienceMetricsSample> history)
@@ -102,22 +146,53 @@ public sealed class ResilienceAlertStore
             if (triggered && !wasActive)
             {
                 var message = $"Alert '{rule.Name}' triggered: open/hr={openDelta}, retry/hr={retryDelta}.";
-                var alert = new ResilienceAlertEvent(Guid.NewGuid().ToString("N"), rule.Id, message, rule.Severity, DateTimeOffset.UtcNow, openDelta, retryDelta);
-                _events.Enqueue(alert);
+                var alert = new ResilienceAlertEvent(
+                    Guid.NewGuid().ToString("N"),
+                    rule.Id,
+                    message,
+                    rule.Severity,
+                    DateTimeOffset.UtcNow,
+                    openDelta,
+                    retryDelta,
+                    false,
+                    null);
+                _events[alert.Id] = alert;
+                _eventIds.Enqueue(alert.Id);
                 TrimEvents();
             }
         }
+    }
+
+    public ResilienceAlertEvent? Acknowledge(string eventId)
+    {
+        if (string.IsNullOrWhiteSpace(eventId))
+            return null;
+        if (!_events.TryGetValue(eventId, out var existing))
+            return null;
+        if (existing.Acknowledged)
+            return existing;
+        var updated = existing with { Acknowledged = true, AcknowledgedAt = DateTimeOffset.UtcNow };
+        _events[eventId] = updated;
+        return updated;
     }
 
     public void Reset()
     {
         _rules.Clear();
         _activeStates.Clear();
-        while (_events.TryDequeue(out _)) { }
+        while (_eventIds.TryDequeue(out _)) { }
+        _events.Clear();
     }
 
     private void TrimEvents()
     {
-        while (_events.Count > _maxEvents && _events.TryDequeue(out _)) { }
+        while (_eventIds.Count > _maxEvents && _eventIds.TryDequeue(out var id))
+            _events.TryRemove(id, out _);
+    }
+
+    private static string NormalizeSeverity(string? severity)
+    {
+        var normalized = string.IsNullOrWhiteSpace(severity) ? "warning" : severity.Trim().ToLowerInvariant();
+        return normalized is "warning" or "critical" ? normalized : "warning";
     }
 }

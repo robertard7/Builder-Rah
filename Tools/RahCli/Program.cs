@@ -147,13 +147,37 @@ public static class Program
                 return ResilienceMetricsCommand.Execute(context, args.Skip(1).ToArray(), context.JsonOutput);
             case "watch":
                 return ResilienceMetricsCommand.Execute(context, new[] { "--watch" }, context.JsonOutput);
+            case "history":
+                return ResilienceHistoryCommand.Execute(context, args.Skip(1).ToArray(), context.JsonOutput);
             case "alerts":
-                return ResilienceAlertsCommand.Execute(context, context.JsonOutput);
+                return ResilienceAlertsCommand.Execute(context, args.Skip(1).ToArray(), context.JsonOutput);
+            case "alert":
+                return HandleResilienceAlert(context, args.Skip(1).ToArray());
             case "reset":
                 return ResilienceResetCommand.Execute(context, context.JsonOutput);
         }
 
         WriteError(context, ApiError.BadRequest("unknown_resilience_command"));
+        return ExitCodes.UserError;
+    }
+
+    private static int HandleResilienceAlert(CommandContext context, string[] args)
+    {
+        if (args.Length == 0)
+        {
+            WriteError(context, ApiError.BadRequest("missing_resilience_alert_command"));
+            return ExitCodes.UserError;
+        }
+
+        var cmd = args[0].ToLowerInvariant();
+        switch (cmd)
+        {
+            case "resolve":
+                var id = args.Length > 1 ? args[1] : null;
+                return ResilienceAlertResolveCommand.Execute(context, id, context.JsonOutput);
+        }
+
+        WriteError(context, ApiError.BadRequest("unknown_resilience_alert_command"));
         return ExitCodes.UserError;
     }
 
@@ -266,7 +290,10 @@ public static class Program
         Console.WriteLine("rah resilience metrics");
         Console.WriteLine("rah resilience metrics --watch");
         Console.WriteLine("rah resilience watch");
-        Console.WriteLine("rah resilience alerts");
+        Console.WriteLine("rah resilience history --start <iso> --end <iso> [--bucketMinutes <int>] [--limit <int>]");
+        Console.WriteLine("rah resilience alerts list --severity <warning|critical>");
+        Console.WriteLine("rah resilience alerts list --active-only");
+        Console.WriteLine("rah resilience alert resolve <eventId>");
         Console.WriteLine("rah resilience reset");
         Console.WriteLine("rah --headless");
     }

@@ -130,6 +130,8 @@ rah session delete --id <id>
 rah run --id <id>
 rah provider metrics
 rah provider events
+rah resilience alerts list --severity critical
+rah resilience alert resolve <eventId>
 ```
 
 ## Caching

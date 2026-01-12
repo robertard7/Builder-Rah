@@ -16,6 +16,13 @@ export type ResilienceMetricsSample = {
   metrics: CircuitMetricsSnapshot;
 };
 
+export type ResilienceHistoryResponse = {
+  total: number;
+  page: number;
+  perPage: number;
+  items: ResilienceMetricsSample[];
+};
+
 export type ResilienceAlertRuleRequest = {
   name?: string;
   openThreshold: number;
@@ -24,10 +31,23 @@ export type ResilienceAlertRuleRequest = {
   severity?: ResilienceSeverity;
 };
 
+export type ResilienceAlertRuleUpdate = {
+  name?: string;
+  openThreshold?: number;
+  retryThreshold?: number;
+  windowMinutes?: number;
+  severity?: ResilienceSeverity;
+  enabled?: boolean;
+};
+
 export type ResilienceAlertRule = ResilienceAlertRuleRequest & {
   id: string;
   severity: ResilienceSeverity;
   enabled: boolean;
+};
+
+export type ResilienceAlertRuleSummary = ResilienceAlertRule & {
+  recentEvents: ResilienceAlertEvent[];
 };
 
 export type ResilienceAlertEvent = {
@@ -38,10 +58,12 @@ export type ResilienceAlertEvent = {
   triggeredAt: string;
   openDelta: number;
   retryDelta: number;
+  acknowledged: boolean;
+  acknowledgedAt?: string;
 };
 
 export type ResilienceAlertsResponse = {
-  rules: ResilienceAlertRule[];
+  rules: ResilienceAlertRuleSummary[];
   events: ResilienceAlertEvent[];
 };
 
@@ -65,13 +87,17 @@ export class ResilienceClient {
     start?: string;
     end?: string;
     bucketMinutes?: number;
-  }): Promise<ResilienceMetricsSample[]> {
+    page?: number;
+    perPage?: number;
+  }): Promise<ResilienceHistoryResponse> {
     const query = new URLSearchParams();
     if (options?.minutes !== undefined) query.set("minutes", String(options.minutes));
     if (options?.limit !== undefined) query.set("limit", String(options.limit));
     if (options?.start) query.set("start", options.start);
     if (options?.end) query.set("end", options.end);
     if (options?.bucketMinutes !== undefined) query.set("bucketMinutes", String(options.bucketMinutes));
+    if (options?.page !== undefined) query.set("page", String(options.page));
+    if (options?.perPage !== undefined) query.set("perPage", String(options.perPage));
     return this.getJson(`/metrics/resilience/history?${query.toString()}`);
   }
 
@@ -97,8 +123,10 @@ export class ResilienceClient {
     });
   }
 
-  async getAlerts(limit = 50): Promise<ResilienceAlertsResponse> {
+  async getAlerts(limit = 50, options?: { severity?: ResilienceSeverity; includeAcknowledged?: boolean }): Promise<ResilienceAlertsResponse> {
     const query = new URLSearchParams({ limit: String(limit) });
+    if (options?.severity) query.set("severity", options.severity);
+    if (options?.includeAcknowledged !== undefined) query.set("includeAcknowledged", String(options.includeAcknowledged));
     return this.getJson(`/alerts?${query.toString()}`);
   }
 
@@ -107,6 +135,20 @@ export class ResilienceClient {
     if (ruleId) query.set("ruleId", ruleId);
     return this.sendJson<AlertDeleteResponse>(`/alerts${query.toString() ? `?${query}` : ""}`, {
       method: "DELETE"
+    });
+  }
+
+  async updateAlertRule(ruleId: string, update: ResilienceAlertRuleUpdate): Promise<ResilienceAlertRule> {
+    return this.sendJson<ResilienceAlertRule>(`/alerts/${ruleId}`, {
+      method: "PATCH",
+      body: JSON.stringify(update)
+    });
+  }
+
+  async acknowledgeAlert(eventId: string): Promise<ResilienceAlertEvent> {
+    return this.sendJson<ResilienceAlertEvent>(`/alerts/events/${eventId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ acknowledged: true })
     });
   }
 

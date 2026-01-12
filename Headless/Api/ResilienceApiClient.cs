@@ -24,12 +24,26 @@ public sealed class ResilienceApiClient
         return await _http.GetFromJsonAsync<CircuitMetricsSnapshot>($"/metrics/resilience{query}", ct).ConfigureAwait(false);
     }
 
-    public async Task<ResilienceMetricsSample[]?> GetHistoryAsync(int minutes = 60, int limit = 300, CancellationToken ct = default)
+    public async Task<ResilienceHistoryResponse?> GetHistoryAsync(int minutes = 60, int limit = 300, int page = 1, int perPage = 300, CancellationToken ct = default)
     {
         var query = QueryBuilder.Create()
             .Add("minutes", minutes.ToString())
-            .Add("limit", limit.ToString());
-        return await _http.GetFromJsonAsync<ResilienceMetricsSample[]>($"/metrics/resilience/history{query}", ct).ConfigureAwait(false);
+            .Add("limit", limit.ToString())
+            .Add("page", page.ToString())
+            .Add("perPage", perPage.ToString());
+        return await _http.GetFromJsonAsync<ResilienceHistoryResponse>($"/metrics/resilience/history{query}", ct).ConfigureAwait(false);
+    }
+
+    public async Task<ResilienceHistoryResponse?> GetHistoryRangeAsync(DateTimeOffset? start, DateTimeOffset? end, int? limit = null, int? page = null, int? perPage = null, int? bucketMinutes = null, CancellationToken ct = default)
+    {
+        var query = QueryBuilder.Create()
+            .Add("start", start?.ToString("O"))
+            .Add("end", end?.ToString("O"))
+            .Add("limit", limit?.ToString())
+            .Add("page", page?.ToString())
+            .Add("perPage", perPage?.ToString())
+            .Add("bucketMinutes", bucketMinutes?.ToString());
+        return await _http.GetFromJsonAsync<ResilienceHistoryResponse>($"/metrics/resilience/history{query}", ct).ConfigureAwait(false);
     }
 
     public async Task<ApiOkResponse?> ResetMetricsAsync(CancellationToken ct = default)
@@ -50,19 +64,21 @@ public sealed class ResilienceApiClient
         return await response.Content.ReadFromJsonAsync<ResilienceAlertRule>(cancellationToken: ct).ConfigureAwait(false);
     }
 
-    public async Task<ResilienceAlertsResponse?> GetAlertsAsync(int limit = 50, CancellationToken ct = default)
+    public async Task<ResilienceAlertsResponse?> GetAlertsAsync(int limit = 50, string? severity = null, bool includeAcknowledged = true, CancellationToken ct = default)
     {
         var query = QueryBuilder.Create()
-            .Add("limit", limit.ToString());
+            .Add("limit", limit.ToString())
+            .Add("severity", severity)
+            .Add("includeAcknowledged", includeAcknowledged.ToString());
         return await _http.GetFromJsonAsync<ResilienceAlertsResponse>($"/alerts{query}", ct).ConfigureAwait(false);
     }
 
-    public async Task<ApiOkResponse?> DeleteAlertsAsync(string? ruleId = null, CancellationToken ct = default)
+    public async Task<AlertDeleteResponse?> DeleteAlertsAsync(string? ruleId = null, CancellationToken ct = default)
     {
         var query = QueryBuilder.Create()
             .Add("ruleId", ruleId);
         using var response = await _http.DeleteAsync($"/alerts{query}", ct).ConfigureAwait(false);
-        return await response.Content.ReadFromJsonAsync<ApiOkResponse>(cancellationToken: ct).ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<AlertDeleteResponse>(cancellationToken: ct).ConfigureAwait(false);
     }
 
     public async Task<ResilienceAlertRule?> CreateAlertAsync(ResilienceAlertRuleRequest request, CancellationToken ct = default)
@@ -71,19 +87,62 @@ public sealed class ResilienceApiClient
         return await response.Content.ReadFromJsonAsync<ResilienceAlertRule>(cancellationToken: ct).ConfigureAwait(false);
     }
 
+    public async Task<ResilienceAlertRule?> UpdateAlertRuleAsync(string ruleId, ResilienceAlertRuleUpdate request, CancellationToken ct = default)
+    {
+        using var response = await _http.PatchAsJsonAsync($"/alerts/{ruleId}", request, ct).ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<ResilienceAlertRule>(cancellationToken: ct).ConfigureAwait(false);
+    }
+
+    public async Task<ResilienceAlertEvent?> AcknowledgeAlertAsync(string eventId, CancellationToken ct = default)
+    {
+        using var response = await _http.PatchAsJsonAsync($"/alerts/events/{eventId}", new { acknowledged = true }, ct).ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<ResilienceAlertEvent>(cancellationToken: ct).ConfigureAwait(false);
+    }
+
     public sealed record ApiOkResponse(bool Ok, DateTimeOffset ResetAt);
 
+    public sealed record AlertDeleteResponse(bool Ok, string? RuleId);
+
     public sealed record ResilienceMetricsSample(DateTimeOffset Timestamp, CircuitMetricsSnapshot Metrics);
+
+    public sealed record ResilienceHistoryResponse(int Total, int Page, int PerPage, ResilienceMetricsSample[] Items);
 
     public sealed record CircuitMetricsSnapshot(int OpenCount, int HalfOpenCount, int ClosedCount, int RetryAttempts);
 
     public sealed record ResilienceAlertRuleRequest(string? Name, int OpenThreshold, int RetryThreshold, int WindowMinutes, string? Severity);
 
+    public sealed record ResilienceAlertRuleUpdate(
+        string? Name,
+        int? OpenThreshold,
+        int? RetryThreshold,
+        int? WindowMinutes,
+        string? Severity,
+        bool? Enabled);
+
     public sealed record ResilienceAlertRule(string Id, string Name, int OpenThreshold, int RetryThreshold, int WindowMinutes, string Severity, bool Enabled);
 
-    public sealed record ResilienceAlertEvent(string Id, string RuleId, string Message, string Severity, DateTimeOffset TriggeredAt, int OpenDelta, int RetryDelta);
+    public sealed record ResilienceAlertRuleSummary(
+        string Id,
+        string Name,
+        int OpenThreshold,
+        int RetryThreshold,
+        int WindowMinutes,
+        string Severity,
+        bool Enabled,
+        ResilienceAlertEvent[] RecentEvents);
 
-    public sealed record ResilienceAlertsResponse(ResilienceAlertRule[] Rules, ResilienceAlertEvent[] Events);
+    public sealed record ResilienceAlertEvent(
+        string Id,
+        string RuleId,
+        string Message,
+        string Severity,
+        DateTimeOffset TriggeredAt,
+        int OpenDelta,
+        int RetryDelta,
+        bool Acknowledged,
+        DateTimeOffset? AcknowledgedAt);
+
+    public sealed record ResilienceAlertsResponse(ResilienceAlertRuleSummary[] Rules, ResilienceAlertEvent[] Events);
 
     private sealed class QueryBuilder
     {

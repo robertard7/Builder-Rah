@@ -83,19 +83,40 @@ public static class ResilienceDiagnosticsHub
         return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes, severity);
     }
 
+    public static ResilienceAlertRule? UpdateAlertRule(
+        string ruleId,
+        string? name,
+        int? openThreshold,
+        int? retryThreshold,
+        int? windowMinutes,
+        string? severity,
+        bool? enabled)
+    {
+        return Alerts.UpdateRule(ruleId, name, openThreshold, retryThreshold, windowMinutes, severity, enabled);
+    }
+
     public static IReadOnlyList<ResilienceAlertRule> ListAlertRules()
     {
         return Alerts.ListRules();
     }
 
-    public static IReadOnlyList<ResilienceAlertEvent> ListAlertEvents(int limit = 50)
+    public static IReadOnlyList<ResilienceAlertEvent> ListAlertEvents(
+        int limit = 50,
+        string? severity = null,
+        bool includeAcknowledged = true,
+        string? ruleId = null)
     {
-        return Alerts.ListEvents(limit);
+        return Alerts.ListEvents(limit, severity, includeAcknowledged, ruleId);
     }
 
     public static bool RemoveAlertRule(string ruleId)
     {
         return Alerts.RemoveRule(ruleId);
+    }
+
+    public static ResilienceAlertEvent? AcknowledgeAlertEvent(string eventId)
+    {
+        return Alerts.Acknowledge(eventId);
     }
 
     public static void ClearAlerts()
