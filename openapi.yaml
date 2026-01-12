@@ -264,6 +264,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProviderMetrics"
+  /metrics/resilience:
+    get:
+      summary: Resilience metrics
+      responses:
+        "200":
+          description: Resilience metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResilienceMetrics"
   /healthz:
     get:
       summary: Health check
@@ -373,6 +383,17 @@ components:
     ProviderMetrics:
       type: object
       additionalProperties: true
+    ResilienceMetrics:
+      type: object
+      properties:
+        openCount:
+          type: integer
+        halfOpenCount:
+          type: integer
+        closedCount:
+          type: integer
+        retryAttempts:
+          type: integer
     ProviderEvent:
       type: object
       properties:

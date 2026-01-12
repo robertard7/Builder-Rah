@@ -7,6 +7,11 @@ namespace RahOllamaOnly.Tools.Prompts;
 
 public sealed class PromptMetadataStore
 {
+    private static readonly Lazy<PromptMetadataStore> DefaultStore =
+        new(() => LoadFromFile(Path.Combine("tools", "prompts_metadata.json")));
+
+    public static PromptMetadataStore Default => DefaultStore.Value;
+
     public PromptMetadata Metadata { get; }
 
     private PromptMetadataStore(PromptMetadata metadata)
@@ -14,8 +19,7 @@ public sealed class PromptMetadataStore
         Metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
     }
 
-    public static PromptMetadataStore LoadDefault()
-        => LoadFromFile(Path.Combine("tools", "prompts_metadata.json"));
+    public static PromptMetadataStore LoadDefault() => Default;
 
     public static PromptMetadataStore LoadFromFile(string path)
     {
