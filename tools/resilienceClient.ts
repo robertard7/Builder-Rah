@@ -16,7 +16,19 @@ export type ResilienceMetricsSample = {
   metrics: CircuitMetricsSnapshot;
 };
 
+export type ResilienceMetadata = {
+  version: string;
+  timestamp: string;
+  requestId: string;
+};
+
+export type ResilienceMetricsResponse = {
+  metadata: ResilienceMetadata;
+  data: CircuitMetricsSnapshot;
+};
+
 export type ResilienceHistoryResponse = {
+  metadata: ResilienceMetadata;
   total: number;
   page: number;
   perPage: number;
@@ -63,18 +75,27 @@ export type ResilienceAlertEvent = {
 };
 
 export type ResilienceAlertsResponse = {
+  metadata: ResilienceMetadata;
   rules: ResilienceAlertRuleSummary[];
   events: ResilienceAlertEvent[];
 };
 
-export type ResilienceResetResponse = { ok: boolean; resetAt: string };
+export type ResilienceResetResponse = { metadata: ResilienceMetadata; ok: boolean; resetAt: string };
 
-export type AlertDeleteResponse = { ok: boolean; ruleId?: string };
+export type AlertDeleteResponse = { metadata: ResilienceMetadata; ok: boolean; ruleId?: string };
 
 export class ResilienceClient {
   constructor(private readonly baseUrl: string, private readonly token?: string) {}
 
   async getMetrics(params?: { state?: ResilienceState; minRetryAttempts?: number }): Promise<CircuitMetricsSnapshot> {
+    const query = new URLSearchParams();
+    if (params?.state) query.set("state", params.state);
+    if (params?.minRetryAttempts !== undefined) query.set("minRetryAttempts", String(params.minRetryAttempts));
+    const response = await this.getJson<ResilienceMetricsResponse>(`/metrics/resilience${query.toString() ? `?${query}` : ""}`);
+    return response.data;
+  }
+
+  async getMetricsResponse(params?: { state?: ResilienceState; minRetryAttempts?: number }): Promise<ResilienceMetricsResponse> {
     const query = new URLSearchParams();
     if (params?.state) query.set("state", params.state);
     if (params?.minRetryAttempts !== undefined) query.set("minRetryAttempts", String(params.minRetryAttempts));
@@ -114,17 +135,19 @@ export class ResilienceClient {
   }
 
   async createAlertRule(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
-    return this.sendJson<ResilienceAlertRule>("/alerts/thresholds", {
+    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertRule }>("/alerts/thresholds", {
       method: "POST",
       body: JSON.stringify(rule)
     });
+    return response.data;
   }
 
   async createAlert(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
-    return this.sendJson<ResilienceAlertRule>("/alerts", {
+    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertRule }>("/alerts", {
       method: "POST",
       body: JSON.stringify(rule)
     });
+    return response.data;
   }
 
   async getAlerts(limit = 50, options?: { severity?: ResilienceSeverity; includeAcknowledged?: boolean }): Promise<ResilienceAlertsResponse> {
@@ -147,17 +170,19 @@ export class ResilienceClient {
   }
 
   async updateAlertRule(ruleId: string, update: ResilienceAlertRuleUpdate): Promise<ResilienceAlertRule> {
-    return this.sendJson<ResilienceAlertRule>(`/alerts/${ruleId}`, {
+    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertRule }>(`/alerts/${ruleId}`, {
       method: "PATCH",
       body: JSON.stringify(update)
     });
+    return response.data;
   }
 
   async acknowledgeAlert(eventId: string): Promise<ResilienceAlertEvent> {
-    return this.sendJson<ResilienceAlertEvent>(`/alerts/events/${eventId}`, {
+    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertEvent }>(`/alerts/events/${eventId}`, {
       method: "PATCH",
       body: JSON.stringify({ acknowledged: true })
     });
+    return response.data;
   }
 
   async *watchAlerts(intervalMs = 5000, options?: { severity?: ResilienceSeverity; includeAcknowledged?: boolean }): AsyncGenerator<ResilienceAlertEvent[]> {

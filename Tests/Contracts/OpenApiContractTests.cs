@@ -21,6 +21,7 @@ public sealed class OpenApiContractTests
         Assert.Contains("/alerts/{id}", text);
         Assert.Contains("/alerts/events/{id}", text);
         Assert.Contains("ResilienceHistoryResponse", text);
+        Assert.Contains("/metrics/resilience/prometheus", text);
     }
 
     [Fact]

@@ -23,7 +23,7 @@ public sealed class ResilienceAlertApiTests
             new { name = "test", openThreshold = 1, retryThreshold = 0, windowMinutes = 30, severity = "warning" });
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         using var createdDoc = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
-        var ruleId = createdDoc.RootElement.GetProperty("id").GetString();
+        var ruleId = createdDoc.RootElement.GetProperty("data").GetProperty("id").GetString();
         Assert.False(string.IsNullOrWhiteSpace(ruleId));
 
         using var patchRequest = new HttpRequestMessage(

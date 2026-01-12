@@ -33,6 +33,8 @@ public sealed class ResilienceAlertStore
     private readonly ConcurrentDictionary<string, ResilienceAlertEvent> _events = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, bool> _activeStates = new(StringComparer.OrdinalIgnoreCase);
     private readonly int _maxEvents;
+    public event Action<ResilienceAlertEvent>? AlertRaised;
+    public event Action<ResilienceAlertEvent>? AlertAcknowledged;
 
     public ResilienceAlertStore(int maxEvents = 200)
     {
@@ -159,6 +161,7 @@ public sealed class ResilienceAlertStore
                 _events[alert.Id] = alert;
                 _eventIds.Enqueue(alert.Id);
                 TrimEvents();
+                AlertRaised?.Invoke(alert);
             }
         }
     }
@@ -173,6 +176,7 @@ public sealed class ResilienceAlertStore
             return existing;
         var updated = existing with { Acknowledged = true, AcknowledgedAt = DateTimeOffset.UtcNow };
         _events[eventId] = updated;
+        AlertAcknowledged?.Invoke(updated);
         return updated;
     }
 

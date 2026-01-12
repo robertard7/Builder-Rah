@@ -19,6 +19,8 @@ namespace RahBuilder.Workflow;
 
 public sealed class WorkflowFacade
 {
+    private static readonly object ResilienceLogLock = new();
+    private static bool _resilienceLogHooked;
     private readonly RunTrace _trace;
     private readonly WorkflowRouter _router = new();
     private readonly ExecutionOrchestrator _executor;
@@ -82,6 +84,7 @@ public sealed class WorkflowFacade
     {
         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
         _cfg = ConfigStore.Load();
+        HookResilienceLogs();
         _providerManager = new ProviderManager(new ProviderState(_cfg.General.ProviderEnabled, true), msg => _trace.Emit(msg));
         _providerManager.StateChanged += state => ProviderStateChanged?.Invoke(state);
         _providerManager.ConfigureRetryHandler(async ct =>
@@ -112,6 +115,7 @@ public sealed class WorkflowFacade
     {
         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
+        HookResilienceLogs();
         _providerManager = new ProviderManager(new ProviderState(_cfg.General.ProviderEnabled, true), msg => _trace.Emit(msg));
         _providerManager.StateChanged += state => ProviderStateChanged?.Invoke(state);
         _providerManager.ConfigureRetryHandler(async ct =>
@@ -143,6 +147,17 @@ public sealed class WorkflowFacade
         if (card == null) return;
         SessionManager.AppendCard(_state.SessionToken, card);
         OutputCardProduced?.Invoke(card);
+    }
+
+    private void HookResilienceLogs()
+    {
+        lock (ResilienceLogLock)
+        {
+            if (_resilienceLogHooked)
+                return;
+            RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ResilienceLog += msg => _trace.Emit("[resilience] " + msg);
+            _resilienceLogHooked = true;
+        }
     }
 
     private void BroadcastEvent(string type, object payload) => SessionManager.AddEvent(_state.SessionToken, type, payload);

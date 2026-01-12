@@ -74,6 +74,8 @@ public sealed class HeadlessApiServer
     {
         var sw = Stopwatch.StartNew();
         var isError = false;
+        var requestId = Guid.NewGuid().ToString("N");
+        var metadata = BuildMetadata(requestId);
         try
         {
             if (!Authorize(ctx))
@@ -105,7 +107,7 @@ public sealed class HeadlessApiServer
                     if (!int.TryParse(minRetryValue, out var parsedMinRetry))
                     {
                         isError = true;
-                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("invalid_min_retry_attempts"), ct).ConfigureAwait(false);
+                        await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("invalid_min_retry_attempts"), metadata, ct).ConfigureAwait(false);
                         return;
                     }
                     minRetryAttempts = parsedMinRetry;
@@ -122,13 +124,13 @@ public sealed class HeadlessApiServer
                     if (!TryApplyStateFilter(metrics, stateFilter, out var filtered))
                     {
                         isError = true;
-                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("invalid_state"), ct).ConfigureAwait(false);
+                        await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("invalid_state"), metadata, ct).ConfigureAwait(false);
                         return;
                     }
                     metrics = filtered;
                 }
 
-                await WriteJsonAsync(ctx, 200, metrics, ct).ConfigureAwait(false);
+                await WriteJsonAsync(ctx, 200, WrapResiliencePayload(metadata, metrics), ct).ConfigureAwait(false);
                 return;
             }
 
@@ -144,7 +146,7 @@ public sealed class HeadlessApiServer
                 if (start.HasValue && end.HasValue && start.Value > end.Value)
                 {
                     isError = true;
-                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("invalid_date_range"), ct).ConfigureAwait(false);
+                    await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("invalid_date_range"), metadata, ct).ConfigureAwait(false);
                     return;
                 }
                 if (minutes <= 0) minutes = 60;
@@ -164,20 +166,28 @@ public sealed class HeadlessApiServer
                 var effectivePage = page <= 0 ? 1 : page;
                 var effectivePerPage = perPage <= 0 ? Math.Max(1, limit) : perPage;
                 var pagedItems = history.Skip((effectivePage - 1) * effectivePerPage).Take(effectivePerPage).ToList();
-                await WriteJsonAsync(ctx, 200, new { total, page = effectivePage, perPage = effectivePerPage, items = pagedItems }, ct).ConfigureAwait(false);
+                await WriteJsonAsync(ctx, 200, WrapResilienceListPayload(metadata, total, effectivePage, effectivePerPage, pagedItems), ct).ConfigureAwait(false);
                 return;
             }
 
             if (req.HttpMethod == "PUT" && path == "/metrics/resilience/reset")
             {
                 RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Reset();
-                await WriteJsonAsync(ctx, 200, new { ok = true, resetAt = DateTimeOffset.UtcNow }, ct).ConfigureAwait(false);
+                await WriteJsonAsync(ctx, 200, WrapResilienceResetPayload(metadata, DateTimeOffset.UtcNow), ct).ConfigureAwait(false);
                 return;
             }
             if (req.HttpMethod == "POST" && path == "/metrics/resilience/reset")
             {
                 RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Reset();
-                await WriteJsonAsync(ctx, 200, new { ok = true, resetAt = DateTimeOffset.UtcNow }, ct).ConfigureAwait(false);
+                await WriteJsonAsync(ctx, 200, WrapResilienceResetPayload(metadata, DateTimeOffset.UtcNow), ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "GET" && path == "/metrics/resilience/prometheus")
+            {
+                var snapshot = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                var text = BuildPrometheusMetrics(snapshot, RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotByTool());
+                await WriteTextAsync(ctx, 200, text, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -198,11 +208,11 @@ public sealed class HeadlessApiServer
                 if (openThreshold <= 0 && retryThreshold <= 0)
                 {
                     isError = true;
-                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
+                    await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), metadata, ct).ConfigureAwait(false);
                     return;
                 }
                 var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes, severity);
-                await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
+                await WriteJsonAsync(ctx, 201, WrapResiliencePayload(metadata, rule), ct).ConfigureAwait(false);
                 return;
             }
 
@@ -223,11 +233,11 @@ public sealed class HeadlessApiServer
                 if (openThreshold <= 0 && retryThreshold <= 0)
                 {
                     isError = true;
-                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
+                    await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), metadata, ct).ConfigureAwait(false);
                     return;
                 }
                 var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes, severity);
-                await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
+                await WriteJsonAsync(ctx, 201, WrapResiliencePayload(metadata, rule), ct).ConfigureAwait(false);
                 return;
             }
 
@@ -250,7 +260,7 @@ public sealed class HeadlessApiServer
                     rule.Enabled,
                     recentEvents = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(5, severity, includeAcknowledged, rule.Id)
                 }).ToList();
-                await WriteJsonAsync(ctx, 200, new { rules = rulesWithEvents, events = eventsList }, ct).ConfigureAwait(false);
+                await WriteJsonAsync(ctx, 200, WrapResilienceAlertsPayload(metadata, rulesWithEvents, eventsList), ct).ConfigureAwait(false);
                 return;
             }
 
@@ -260,11 +270,11 @@ public sealed class HeadlessApiServer
                 if (!string.IsNullOrWhiteSpace(ruleId))
                 {
                     var removed = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.RemoveAlertRule(ruleId);
-                    await WriteJsonAsync(ctx, 200, new { ok = removed, ruleId }, ct).ConfigureAwait(false);
+                    await WriteJsonAsync(ctx, 200, WrapResilienceDeletePayload(metadata, removed, ruleId), ct).ConfigureAwait(false);
                     return;
                 }
                 RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ClearAlerts();
-                await WriteJsonAsync(ctx, 200, new { ok = true }, ct).ConfigureAwait(false);
+                await WriteJsonAsync(ctx, 200, WrapResilienceDeletePayload(metadata, true, null), ct).ConfigureAwait(false);
                 return;
             }
 
@@ -301,10 +311,10 @@ public sealed class HeadlessApiServer
                     if (updated == null)
                     {
                         isError = true;
-                        await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
+                        await WriteResilienceErrorAsync(ctx, 404, ApiError.NotFound(), metadata, ct).ConfigureAwait(false);
                         return;
                     }
-                    await WriteJsonAsync(ctx, 200, updated, ct).ConfigureAwait(false);
+                    await WriteJsonAsync(ctx, 200, WrapResiliencePayload(metadata, updated), ct).ConfigureAwait(false);
                     return;
                 }
 
@@ -316,24 +326,31 @@ public sealed class HeadlessApiServer
                     if (!acknowledged && !resolved)
                     {
                         isError = true;
-                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("acknowledged_required"), ct).ConfigureAwait(false);
+                        await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("acknowledged_required"), metadata, ct).ConfigureAwait(false);
                         return;
                     }
                     var updated = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AcknowledgeAlertEvent(parts[2]);
                     if (updated == null)
                     {
                         isError = true;
-                        await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
+                        await WriteResilienceErrorAsync(ctx, 404, ApiError.NotFound(), metadata, ct).ConfigureAwait(false);
                         return;
                     }
-                    await WriteJsonAsync(ctx, 200, updated, ct).ConfigureAwait(false);
+                    await WriteJsonAsync(ctx, 200, WrapResiliencePayload(metadata, updated), ct).ConfigureAwait(false);
                     return;
                 }
             }
 
             if (req.HttpMethod == "GET" && path == "/healthz")
             {
-                await WriteJsonAsync(ctx, 200, new { ok = true, telemetry = TelemetryRegistry.Snapshot() }, ct).ConfigureAwait(false);
+                var lastAlertAt = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.LastAlertTimestamp();
+                var healthSummary = new
+                {
+                    state = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.OverallState(),
+                    openCircuits = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.OpenCircuitCount(),
+                    lastAlertAt
+                };
+                await WriteJsonAsync(ctx, 200, new { ok = true, telemetry = TelemetryRegistry.Snapshot(), resilience = healthSummary, metadata }, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -737,6 +754,17 @@ public sealed class HeadlessApiServer
         ctx.Response.OutputStream.Close();
     }
 
+    private static async Task WriteTextAsync(HttpListenerContext ctx, int statusCode, string payload, CancellationToken ct)
+    {
+        var bytes = Encoding.UTF8.GetBytes(payload);
+        ctx.Response.StatusCode = statusCode;
+        ctx.Response.ContentType = "text/plain";
+        ctx.Response.ContentEncoding = Encoding.UTF8;
+        ctx.Response.ContentLength64 = bytes.Length;
+        await ctx.Response.OutputStream.WriteAsync(bytes.AsMemory(0, bytes.Length), ct).ConfigureAwait(false);
+        ctx.Response.OutputStream.Close();
+    }
+
     private static async Task WriteEmptyAsync(HttpListenerContext ctx, int statusCode, CancellationToken ct)
     {
         ctx.Response.StatusCode = statusCode;
@@ -748,5 +776,84 @@ public sealed class HeadlessApiServer
     private static Task WriteErrorAsync(HttpListenerContext ctx, int statusCode, ApiError error, CancellationToken ct)
     {
         return WriteJsonAsync(ctx, statusCode, error, ct);
+    }
+
+    private static Task WriteResilienceErrorAsync(HttpListenerContext ctx, int statusCode, ApiError error, object metadata, CancellationToken ct)
+    {
+        var enriched = EnrichError(error);
+        return WriteJsonAsync(ctx, statusCode, new { metadata, error = enriched }, ct);
+    }
+
+    private static ApiError EnrichError(ApiError error)
+    {
+        var details = error.Details == null
+            ? new Dictionary<string, object>()
+            : new Dictionary<string, object>(error.Details, StringComparer.OrdinalIgnoreCase);
+        if (!details.ContainsKey("docs"))
+            details["docs"] = "README.md#resilience-api-examples";
+        if (!details.ContainsKey("errorCode"))
+            details["errorCode"] = error.Message;
+        return new ApiError(error.Code, error.Message, details);
+    }
+
+    private static object BuildMetadata(string requestId)
+    {
+        return new
+        {
+            version = "1",
+            timestamp = DateTimeOffset.UtcNow,
+            requestId
+        };
+    }
+
+    private static object WrapResiliencePayload(object metadata, object data)
+    {
+        return new { metadata, data };
+    }
+
+    private static object WrapResilienceListPayload(object metadata, int total, int page, int perPage, object items)
+    {
+        return new { metadata, total, page, perPage, items };
+    }
+
+    private static object WrapResilienceResetPayload(object metadata, DateTimeOffset resetAt)
+    {
+        return new { metadata, ok = true, resetAt };
+    }
+
+    private static object WrapResilienceAlertsPayload(object metadata, object rules, object eventsList)
+    {
+        return new { metadata, rules, events = eventsList };
+    }
+
+    private static object WrapResilienceDeletePayload(object metadata, bool ok, string? ruleId)
+    {
+        return new { metadata, ok, ruleId };
+    }
+
+    private static string BuildPrometheusMetrics(
+        RahOllamaOnly.Metrics.CircuitMetricsSnapshot metrics,
+        IReadOnlyDictionary<string, RahOllamaOnly.Metrics.CircuitMetricsSnapshot> byTool)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("# HELP resilience_open_count Number of open circuits.");
+        sb.AppendLine("# TYPE resilience_open_count gauge");
+        sb.AppendLine($"resilience_open_count {metrics.OpenCount}");
+        sb.AppendLine("# HELP resilience_half_open_count Number of half-open circuits.");
+        sb.AppendLine("# TYPE resilience_half_open_count gauge");
+        sb.AppendLine($"resilience_half_open_count {metrics.HalfOpenCount}");
+        sb.AppendLine("# HELP resilience_closed_count Number of closed circuits.");
+        sb.AppendLine("# TYPE resilience_closed_count gauge");
+        sb.AppendLine($"resilience_closed_count {metrics.ClosedCount}");
+        sb.AppendLine("# HELP resilience_retry_attempts Number of retry attempts.");
+        sb.AppendLine("# TYPE resilience_retry_attempts counter");
+        sb.AppendLine($"resilience_retry_attempts {metrics.RetryAttempts}");
+        foreach (var entry in byTool)
+        {
+            var tool = entry.Key.Replace("\"", "'");
+            sb.AppendLine($"resilience_tool_open_count{{tool=\"{tool}\"}} {entry.Value.OpenCount}");
+            sb.AppendLine($"resilience_tool_retry_attempts{{tool=\"{tool}\"}} {entry.Value.RetryAttempts}");
+        }
+        return sb.ToString();
     }
 }

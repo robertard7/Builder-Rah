@@ -1,0 +1,991 @@
+commit 1ca5da6148188cbe9d819300f40a6f67d9981884
+Author: Codex <codex@openai.com>
+Date:   Sun Jan 11 22:06:05 2026 -0600
+
+    Add resilience metadata, health info, and prometheus
+
+diff --git a/Headless/Api/ResilienceApiClient.cs b/Headless/Api/ResilienceApiClient.cs
+index 1d6b74c..083f87d 100644
+--- a/Headless/Api/ResilienceApiClient.cs
++++ b/Headless/Api/ResilienceApiClient.cs
+@@ -16,12 +16,12 @@ public sealed class ResilienceApiClient
+         _http = http ?? throw new ArgumentNullException(nameof(http));
+     }
+ 
+-    public async Task<CircuitMetricsSnapshot?> GetMetricsAsync(string? state = null, int? minRetryAttempts = null, CancellationToken ct = default)
++    public async Task<ResilienceMetricsResponse?> GetMetricsAsync(string? state = null, int? minRetryAttempts = null, CancellationToken ct = default)
+     {
+         var query = QueryBuilder.Create()
+             .Add("state", state)
+             .Add("minRetryAttempts", minRetryAttempts?.ToString());
+-        return await _http.GetFromJsonAsync<CircuitMetricsSnapshot>($"/metrics/resilience{query}", ct).ConfigureAwait(false);
++        return await _http.GetFromJsonAsync<ResilienceMetricsResponse>($"/metrics/resilience{query}", ct).ConfigureAwait(false);
+     }
+ 
+     public async Task<ResilienceHistoryResponse?> GetHistoryAsync(int minutes = 60, int limit = 300, int page = 1, int perPage = 300, CancellationToken ct = default)
+@@ -46,22 +46,22 @@ public sealed class ResilienceApiClient
+         return await _http.GetFromJsonAsync<ResilienceHistoryResponse>($"/metrics/resilience/history{query}", ct).ConfigureAwait(false);
+     }
+ 
+-    public async Task<ApiOkResponse?> ResetMetricsAsync(CancellationToken ct = default)
++    public async Task<ResilienceResetResponse?> ResetMetricsAsync(CancellationToken ct = default)
+     {
+         using var response = await _http.PutAsync("/metrics/resilience/reset", content: null, ct).ConfigureAwait(false);
+-        return await response.Content.ReadFromJsonAsync<ApiOkResponse>(cancellationToken: ct).ConfigureAwait(false);
++        return await response.Content.ReadFromJsonAsync<ResilienceResetResponse>(cancellationToken: ct).ConfigureAwait(false);
+     }
+ 
+-    public async Task<ApiOkResponse?> ResetMetricsPostAsync(CancellationToken ct = default)
++    public async Task<ResilienceResetResponse?> ResetMetricsPostAsync(CancellationToken ct = default)
+     {
+         using var response = await _http.PostAsync("/metrics/resilience/reset", content: null, ct).ConfigureAwait(false);
+-        return await response.Content.ReadFromJsonAsync<ApiOkResponse>(cancellationToken: ct).ConfigureAwait(false);
++        return await response.Content.ReadFromJsonAsync<ResilienceResetResponse>(cancellationToken: ct).ConfigureAwait(false);
+     }
+ 
+-    public async Task<ResilienceAlertRule?> CreateAlertRuleAsync(ResilienceAlertRuleRequest request, CancellationToken ct = default)
++    public async Task<ResilienceAlertRuleResponse?> CreateAlertRuleAsync(ResilienceAlertRuleRequest request, CancellationToken ct = default)
+     {
+         using var response = await _http.PostAsJsonAsync("/alerts/thresholds", request, ct).ConfigureAwait(false);
+-        return await response.Content.ReadFromJsonAsync<ResilienceAlertRule>(cancellationToken: ct).ConfigureAwait(false);
++        return await response.Content.ReadFromJsonAsync<ResilienceAlertRuleResponse>(cancellationToken: ct).ConfigureAwait(false);
+     }
+ 
+     public async Task<ResilienceAlertsResponse?> GetAlertsAsync(int limit = 50, string? severity = null, bool includeAcknowledged = true, CancellationToken ct = default)
+@@ -73,42 +73,44 @@ public sealed class ResilienceApiClient
+         return await _http.GetFromJsonAsync<ResilienceAlertsResponse>($"/alerts{query}", ct).ConfigureAwait(false);
+     }
+ 
+-    public async Task<AlertDeleteResponse?> DeleteAlertsAsync(string? ruleId = null, CancellationToken ct = default)
++    public async Task<ResilienceDeleteResponse?> DeleteAlertsAsync(string? ruleId = null, CancellationToken ct = default)
+     {
+         var query = QueryBuilder.Create()
+             .Add("ruleId", ruleId);
+         using var response = await _http.DeleteAsync($"/alerts{query}", ct).ConfigureAwait(false);
+-        return await response.Content.ReadFromJsonAsync<AlertDeleteResponse>(cancellationToken: ct).ConfigureAwait(false);
++        return await response.Content.ReadFromJsonAsync<ResilienceDeleteResponse>(cancellationToken: ct).ConfigureAwait(false);
+     }
+ 
+-    public async Task<ResilienceAlertRule?> CreateAlertAsync(ResilienceAlertRuleRequest request, CancellationToken ct = default)
++    public async Task<ResilienceAlertRuleResponse?> CreateAlertAsync(ResilienceAlertRuleRequest request, CancellationToken ct = default)
+     {
+         using var response = await _http.PostAsJsonAsync("/alerts", request, ct).ConfigureAwait(false);
+-        return await response.Content.ReadFromJsonAsync<ResilienceAlertRule>(cancellationToken: ct).ConfigureAwait(false);
++        return await response.Content.ReadFromJsonAsync<ResilienceAlertRuleResponse>(cancellationToken: ct).ConfigureAwait(false);
+     }
+ 
+-    public async Task<ResilienceAlertRule?> UpdateAlertRuleAsync(string ruleId, ResilienceAlertRuleUpdate request, CancellationToken ct = default)
++    public async Task<ResilienceAlertRuleResponse?> UpdateAlertRuleAsync(string ruleId, ResilienceAlertRuleUpdate request, CancellationToken ct = default)
+     {
+         using var response = await _http.PatchAsJsonAsync($"/alerts/{ruleId}", request, ct).ConfigureAwait(false);
+-        return await response.Content.ReadFromJsonAsync<ResilienceAlertRule>(cancellationToken: ct).ConfigureAwait(false);
++        return await response.Content.ReadFromJsonAsync<ResilienceAlertRuleResponse>(cancellationToken: ct).ConfigureAwait(false);
+     }
+ 
+-    public async Task<ResilienceAlertEvent?> AcknowledgeAlertAsync(string eventId, CancellationToken ct = default)
++    public async Task<ResilienceAlertEventResponse?> AcknowledgeAlertAsync(string eventId, CancellationToken ct = default)
+     {
+         using var response = await _http.PatchAsJsonAsync($"/alerts/events/{eventId}", new { acknowledged = true }, ct).ConfigureAwait(false);
+-        return await response.Content.ReadFromJsonAsync<ResilienceAlertEvent>(cancellationToken: ct).ConfigureAwait(false);
++        return await response.Content.ReadFromJsonAsync<ResilienceAlertEventResponse>(cancellationToken: ct).ConfigureAwait(false);
+     }
+ 
+-    public sealed record ApiOkResponse(bool Ok, DateTimeOffset ResetAt);
++    public sealed record ResilienceMetadata(string Version, DateTimeOffset Timestamp, string RequestId);
+ 
+-    public sealed record AlertDeleteResponse(bool Ok, string? RuleId);
++    public sealed record ResilienceMetricsResponse(ResilienceMetadata Metadata, CircuitMetricsSnapshot Data);
+ 
+     public sealed record ResilienceMetricsSample(DateTimeOffset Timestamp, CircuitMetricsSnapshot Metrics);
+ 
+-    public sealed record ResilienceHistoryResponse(int Total, int Page, int PerPage, ResilienceMetricsSample[] Items);
++    public sealed record ResilienceHistoryResponse(ResilienceMetadata Metadata, int Total, int Page, int PerPage, ResilienceMetricsSample[] Items);
+ 
+     public sealed record CircuitMetricsSnapshot(int OpenCount, int HalfOpenCount, int ClosedCount, int RetryAttempts);
+ 
++    public sealed record ResilienceResetResponse(ResilienceMetadata Metadata, bool Ok, DateTimeOffset ResetAt);
++
+     public sealed record ResilienceAlertRuleRequest(string? Name, int OpenThreshold, int RetryThreshold, int WindowMinutes, string? Severity);
+ 
+     public sealed record ResilienceAlertRuleUpdate(
+@@ -121,6 +123,8 @@ public sealed class ResilienceApiClient
+ 
+     public sealed record ResilienceAlertRule(string Id, string Name, int OpenThreshold, int RetryThreshold, int WindowMinutes, string Severity, bool Enabled);
+ 
++    public sealed record ResilienceAlertRuleResponse(ResilienceMetadata Metadata, ResilienceAlertRule Data);
++
+     public sealed record ResilienceAlertRuleSummary(
+         string Id,
+         string Name,
+@@ -142,7 +146,11 @@ public sealed class ResilienceApiClient
+         bool Acknowledged,
+         DateTimeOffset? AcknowledgedAt);
+ 
+-    public sealed record ResilienceAlertsResponse(ResilienceAlertRuleSummary[] Rules, ResilienceAlertEvent[] Events);
++    public sealed record ResilienceAlertEventResponse(ResilienceMetadata Metadata, ResilienceAlertEvent Data);
++
++    public sealed record ResilienceAlertsResponse(ResilienceMetadata Metadata, ResilienceAlertRuleSummary[] Rules, ResilienceAlertEvent[] Events);
++
++    public sealed record ResilienceDeleteResponse(ResilienceMetadata Metadata, bool Ok, string? RuleId);
+ 
+     private sealed class QueryBuilder
+     {
+diff --git a/Metrics/ResilienceAlertStore.cs b/Metrics/ResilienceAlertStore.cs
+index 228f704..d1910ec 100644
+--- a/Metrics/ResilienceAlertStore.cs
++++ b/Metrics/ResilienceAlertStore.cs
+@@ -33,6 +33,8 @@ public sealed class ResilienceAlertStore
+     private readonly ConcurrentDictionary<string, ResilienceAlertEvent> _events = new(StringComparer.OrdinalIgnoreCase);
+     private readonly ConcurrentDictionary<string, bool> _activeStates = new(StringComparer.OrdinalIgnoreCase);
+     private readonly int _maxEvents;
++    public event Action<ResilienceAlertEvent>? AlertRaised;
++    public event Action<ResilienceAlertEvent>? AlertAcknowledged;
+ 
+     public ResilienceAlertStore(int maxEvents = 200)
+     {
+@@ -159,6 +161,7 @@ public sealed class ResilienceAlertStore
+                 _events[alert.Id] = alert;
+                 _eventIds.Enqueue(alert.Id);
+                 TrimEvents();
++                AlertRaised?.Invoke(alert);
+             }
+         }
+     }
+@@ -173,6 +176,7 @@ public sealed class ResilienceAlertStore
+             return existing;
+         var updated = existing with { Acknowledged = true, AcknowledgedAt = DateTimeOffset.UtcNow };
+         _events[eventId] = updated;
++        AlertAcknowledged?.Invoke(updated);
+         return updated;
+     }
+ 
+diff --git a/Metrics/ResilienceDiagnosticsHub.cs b/Metrics/ResilienceDiagnosticsHub.cs
+index 76bd6c0..b12da06 100644
+--- a/Metrics/ResilienceDiagnosticsHub.cs
++++ b/Metrics/ResilienceDiagnosticsHub.cs
+@@ -15,6 +15,13 @@ public static class ResilienceDiagnosticsHub
+     private static readonly ConcurrentDictionary<string, CircuitMetricsStore> ToolStores = new(StringComparer.OrdinalIgnoreCase);
+     private static readonly ResilienceHistoryStore History = new();
+     private static readonly ResilienceAlertStore Alerts = new();
++    public static event Action<string>? ResilienceLog;
++
++    static ResilienceDiagnosticsHub()
++    {
++        Alerts.AlertRaised += alert => ResilienceLog?.Invoke($"alert_triggered id={alert.Id} severity={alert.Severity} ruleId={alert.RuleId}");
++        Alerts.AlertAcknowledged += alert => ResilienceLog?.Invoke($"alert_acknowledged id={alert.Id} ruleId={alert.RuleId}");
++    }
+ 
+     public static void Attach(CircuitBreaker breaker)
+     {
+@@ -25,6 +32,7 @@ public static class ResilienceDiagnosticsHub
+         {
+             Store.RecordStateChange(args.Previous, args.Current);
+             BreakerStates[breaker] = args.Current;
++            ResilienceLog?.Invoke($"circuit_state tool=unknown previous={args.Previous} current={args.Current}");
+         });
+ 
+         if (Subscriptions.TryAdd(breaker, handler))
+@@ -78,6 +86,26 @@ public static class ResilienceDiagnosticsHub
+         return BreakerStates.Values.Any(state => state == CircuitState.Open);
+     }
+ 
++    public static int OpenCircuitCount()
++    {
++        return BreakerStates.Values.Count(state => state == CircuitState.Open);
++    }
++
++    public static string OverallState()
++    {
++        if (BreakerStates.Values.Any(state => state == CircuitState.Open))
++            return "open";
++        if (BreakerStates.Values.Any(state => state == CircuitState.HalfOpen))
++            return "halfopen";
++        return "closed";
++    }
++
++    public static DateTimeOffset? LastAlertTimestamp()
++    {
++        var latest = Alerts.ListEvents(1, includeAcknowledged: true).FirstOrDefault();
++        return latest?.TriggeredAt;
++    }
++
+     public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes, string severity)
+     {
+         return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes, severity);
+diff --git a/Tests/Contracts/OpenApiContractTests.cs b/Tests/Contracts/OpenApiContractTests.cs
+index ca82652..dbd96b4 100644
+--- a/Tests/Contracts/OpenApiContractTests.cs
++++ b/Tests/Contracts/OpenApiContractTests.cs
+@@ -21,6 +21,7 @@ public sealed class OpenApiContractTests
+         Assert.Contains("/alerts/{id}", text);
+         Assert.Contains("/alerts/events/{id}", text);
+         Assert.Contains("ResilienceHistoryResponse", text);
++        Assert.Contains("/metrics/resilience/prometheus", text);
+     }
+ 
+     [Fact]
+diff --git a/Tests/Headless/ResilienceAlertApiTests.cs b/Tests/Headless/ResilienceAlertApiTests.cs
+index b8927f8..e6fd82f 100644
+--- a/Tests/Headless/ResilienceAlertApiTests.cs
++++ b/Tests/Headless/ResilienceAlertApiTests.cs
+@@ -23,7 +23,7 @@ public sealed class ResilienceAlertApiTests
+             new { name = "test", openThreshold = 1, retryThreshold = 0, windowMinutes = 30, severity = "warning" });
+         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+         using var createdDoc = JsonDocument.Parse(await createResponse.Content.ReadAsStringAsync());
+-        var ruleId = createdDoc.RootElement.GetProperty("id").GetString();
++        var ruleId = createdDoc.RootElement.GetProperty("data").GetProperty("id").GetString();
+         Assert.False(string.IsNullOrWhiteSpace(ruleId));
+ 
+         using var patchRequest = new HttpRequestMessage(
+diff --git a/Workflow/HeadlessApiServer.cs b/Workflow/HeadlessApiServer.cs
+index 962ab2a..601269c 100644
+--- a/Workflow/HeadlessApiServer.cs
++++ b/Workflow/HeadlessApiServer.cs
+@@ -74,6 +74,8 @@ public sealed class HeadlessApiServer
+     {
+         var sw = Stopwatch.StartNew();
+         var isError = false;
++        var requestId = Guid.NewGuid().ToString("N");
++        var metadata = BuildMetadata(requestId);
+         try
+         {
+             if (!Authorize(ctx))
+@@ -105,7 +107,7 @@ public sealed class HeadlessApiServer
+                     if (!int.TryParse(minRetryValue, out var parsedMinRetry))
+                     {
+                         isError = true;
+-                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("invalid_min_retry_attempts"), ct).ConfigureAwait(false);
++                        await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("invalid_min_retry_attempts"), metadata, ct).ConfigureAwait(false);
+                         return;
+                     }
+                     minRetryAttempts = parsedMinRetry;
+@@ -122,13 +124,13 @@ public sealed class HeadlessApiServer
+                     if (!TryApplyStateFilter(metrics, stateFilter, out var filtered))
+                     {
+                         isError = true;
+-                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("invalid_state"), ct).ConfigureAwait(false);
++                        await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("invalid_state"), metadata, ct).ConfigureAwait(false);
+                         return;
+                     }
+                     metrics = filtered;
+                 }
+ 
+-                await WriteJsonAsync(ctx, 200, metrics, ct).ConfigureAwait(false);
++                await WriteJsonAsync(ctx, 200, WrapResiliencePayload(metadata, metrics), ct).ConfigureAwait(false);
+                 return;
+             }
+ 
+@@ -144,7 +146,7 @@ public sealed class HeadlessApiServer
+                 if (start.HasValue && end.HasValue && start.Value > end.Value)
+                 {
+                     isError = true;
+-                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("invalid_date_range"), ct).ConfigureAwait(false);
++                    await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("invalid_date_range"), metadata, ct).ConfigureAwait(false);
+                     return;
+                 }
+                 if (minutes <= 0) minutes = 60;
+@@ -164,20 +166,28 @@ public sealed class HeadlessApiServer
+                 var effectivePage = page <= 0 ? 1 : page;
+                 var effectivePerPage = perPage <= 0 ? Math.Max(1, limit) : perPage;
+                 var pagedItems = history.Skip((effectivePage - 1) * effectivePerPage).Take(effectivePerPage).ToList();
+-                await WriteJsonAsync(ctx, 200, new { total, page = effectivePage, perPage = effectivePerPage, items = pagedItems }, ct).ConfigureAwait(false);
++                await WriteJsonAsync(ctx, 200, WrapResilienceListPayload(metadata, total, effectivePage, effectivePerPage, pagedItems), ct).ConfigureAwait(false);
+                 return;
+             }
+ 
+             if (req.HttpMethod == "PUT" && path == "/metrics/resilience/reset")
+             {
+                 RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Reset();
+-                await WriteJsonAsync(ctx, 200, new { ok = true, resetAt = DateTimeOffset.UtcNow }, ct).ConfigureAwait(false);
++                await WriteJsonAsync(ctx, 200, WrapResilienceResetPayload(metadata, DateTimeOffset.UtcNow), ct).ConfigureAwait(false);
+                 return;
+             }
+             if (req.HttpMethod == "POST" && path == "/metrics/resilience/reset")
+             {
+                 RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Reset();
+-                await WriteJsonAsync(ctx, 200, new { ok = true, resetAt = DateTimeOffset.UtcNow }, ct).ConfigureAwait(false);
++                await WriteJsonAsync(ctx, 200, WrapResilienceResetPayload(metadata, DateTimeOffset.UtcNow), ct).ConfigureAwait(false);
++                return;
++            }
++
++            if (req.HttpMethod == "GET" && path == "/metrics/resilience/prometheus")
++            {
++                var snapshot = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
++                var text = BuildPrometheusMetrics(snapshot, RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotByTool());
++                await WriteTextAsync(ctx, 200, text, ct).ConfigureAwait(false);
+                 return;
+             }
+ 
+@@ -198,11 +208,11 @@ public sealed class HeadlessApiServer
+                 if (openThreshold <= 0 && retryThreshold <= 0)
+                 {
+                     isError = true;
+-                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
++                    await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), metadata, ct).ConfigureAwait(false);
+                     return;
+                 }
+                 var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes, severity);
+-                await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
++                await WriteJsonAsync(ctx, 201, WrapResiliencePayload(metadata, rule), ct).ConfigureAwait(false);
+                 return;
+             }
+ 
+@@ -223,11 +233,11 @@ public sealed class HeadlessApiServer
+                 if (openThreshold <= 0 && retryThreshold <= 0)
+                 {
+                     isError = true;
+-                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
++                    await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), metadata, ct).ConfigureAwait(false);
+                     return;
+                 }
+                 var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes, severity);
+-                await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
++                await WriteJsonAsync(ctx, 201, WrapResiliencePayload(metadata, rule), ct).ConfigureAwait(false);
+                 return;
+             }
+ 
+@@ -250,7 +260,7 @@ public sealed class HeadlessApiServer
+                     rule.Enabled,
+                     recentEvents = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(5, severity, includeAcknowledged, rule.Id)
+                 }).ToList();
+-                await WriteJsonAsync(ctx, 200, new { rules = rulesWithEvents, events = eventsList }, ct).ConfigureAwait(false);
++                await WriteJsonAsync(ctx, 200, WrapResilienceAlertsPayload(metadata, rulesWithEvents, eventsList), ct).ConfigureAwait(false);
+                 return;
+             }
+ 
+@@ -260,11 +270,11 @@ public sealed class HeadlessApiServer
+                 if (!string.IsNullOrWhiteSpace(ruleId))
+                 {
+                     var removed = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.RemoveAlertRule(ruleId);
+-                    await WriteJsonAsync(ctx, 200, new { ok = removed, ruleId }, ct).ConfigureAwait(false);
++                    await WriteJsonAsync(ctx, 200, WrapResilienceDeletePayload(metadata, removed, ruleId), ct).ConfigureAwait(false);
+                     return;
+                 }
+                 RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ClearAlerts();
+-                await WriteJsonAsync(ctx, 200, new { ok = true }, ct).ConfigureAwait(false);
++                await WriteJsonAsync(ctx, 200, WrapResilienceDeletePayload(metadata, true, null), ct).ConfigureAwait(false);
+                 return;
+             }
+ 
+@@ -301,10 +311,10 @@ public sealed class HeadlessApiServer
+                     if (updated == null)
+                     {
+                         isError = true;
+-                        await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
++                        await WriteResilienceErrorAsync(ctx, 404, ApiError.NotFound(), metadata, ct).ConfigureAwait(false);
+                         return;
+                     }
+-                    await WriteJsonAsync(ctx, 200, updated, ct).ConfigureAwait(false);
++                    await WriteJsonAsync(ctx, 200, WrapResiliencePayload(metadata, updated), ct).ConfigureAwait(false);
+                     return;
+                 }
+ 
+@@ -316,24 +326,31 @@ public sealed class HeadlessApiServer
+                     if (!acknowledged && !resolved)
+                     {
+                         isError = true;
+-                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("acknowledged_required"), ct).ConfigureAwait(false);
++                        await WriteResilienceErrorAsync(ctx, 400, ApiError.BadRequest("acknowledged_required"), metadata, ct).ConfigureAwait(false);
+                         return;
+                     }
+                     var updated = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AcknowledgeAlertEvent(parts[2]);
+                     if (updated == null)
+                     {
+                         isError = true;
+-                        await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
++                        await WriteResilienceErrorAsync(ctx, 404, ApiError.NotFound(), metadata, ct).ConfigureAwait(false);
+                         return;
+                     }
+-                    await WriteJsonAsync(ctx, 200, updated, ct).ConfigureAwait(false);
++                    await WriteJsonAsync(ctx, 200, WrapResiliencePayload(metadata, updated), ct).ConfigureAwait(false);
+                     return;
+                 }
+             }
+ 
+             if (req.HttpMethod == "GET" && path == "/healthz")
+             {
+-                await WriteJsonAsync(ctx, 200, new { ok = true, telemetry = TelemetryRegistry.Snapshot() }, ct).ConfigureAwait(false);
++                var lastAlertAt = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.LastAlertTimestamp();
++                var healthSummary = new
++                {
++                    state = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.OverallState(),
++                    openCircuits = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.OpenCircuitCount(),
++                    lastAlertAt
++                };
++                await WriteJsonAsync(ctx, 200, new { ok = true, telemetry = TelemetryRegistry.Snapshot(), resilience = healthSummary, metadata }, ct).ConfigureAwait(false);
+                 return;
+             }
+ 
+@@ -737,6 +754,17 @@ public sealed class HeadlessApiServer
+         ctx.Response.OutputStream.Close();
+     }
+ 
++    private static async Task WriteTextAsync(HttpListenerContext ctx, int statusCode, string payload, CancellationToken ct)
++    {
++        var bytes = Encoding.UTF8.GetBytes(payload);
++        ctx.Response.StatusCode = statusCode;
++        ctx.Response.ContentType = "text/plain";
++        ctx.Response.ContentEncoding = Encoding.UTF8;
++        ctx.Response.ContentLength64 = bytes.Length;
++        await ctx.Response.OutputStream.WriteAsync(bytes.AsMemory(0, bytes.Length), ct).ConfigureAwait(false);
++        ctx.Response.OutputStream.Close();
++    }
++
+     private static async Task WriteEmptyAsync(HttpListenerContext ctx, int statusCode, CancellationToken ct)
+     {
+         ctx.Response.StatusCode = statusCode;
+@@ -749,4 +777,83 @@ public sealed class HeadlessApiServer
+     {
+         return WriteJsonAsync(ctx, statusCode, error, ct);
+     }
++
++    private static Task WriteResilienceErrorAsync(HttpListenerContext ctx, int statusCode, ApiError error, object metadata, CancellationToken ct)
++    {
++        var enriched = EnrichError(error);
++        return WriteJsonAsync(ctx, statusCode, new { metadata, error = enriched }, ct);
++    }
++
++    private static ApiError EnrichError(ApiError error)
++    {
++        var details = error.Details == null
++            ? new Dictionary<string, object>()
++            : new Dictionary<string, object>(error.Details, StringComparer.OrdinalIgnoreCase);
++        if (!details.ContainsKey("docs"))
++            details["docs"] = "README.md#resilience-api-examples";
++        if (!details.ContainsKey("errorCode"))
++            details["errorCode"] = error.Message;
++        return new ApiError(error.Code, error.Message, details);
++    }
++
++    private static object BuildMetadata(string requestId)
++    {
++        return new
++        {
++            version = "1",
++            timestamp = DateTimeOffset.UtcNow,
++            requestId
++        };
++    }
++
++    private static object WrapResiliencePayload(object metadata, object data)
++    {
++        return new { metadata, data };
++    }
++
++    private static object WrapResilienceListPayload(object metadata, int total, int page, int perPage, object items)
++    {
++        return new { metadata, total, page, perPage, items };
++    }
++
++    private static object WrapResilienceResetPayload(object metadata, DateTimeOffset resetAt)
++    {
++        return new { metadata, ok = true, resetAt };
++    }
++
++    private static object WrapResilienceAlertsPayload(object metadata, object rules, object eventsList)
++    {
++        return new { metadata, rules, events = eventsList };
++    }
++
++    private static object WrapResilienceDeletePayload(object metadata, bool ok, string? ruleId)
++    {
++        return new { metadata, ok, ruleId };
++    }
++
++    private static string BuildPrometheusMetrics(
++        RahOllamaOnly.Metrics.CircuitMetricsSnapshot metrics,
++        IReadOnlyDictionary<string, RahOllamaOnly.Metrics.CircuitMetricsSnapshot> byTool)
++    {
++        var sb = new StringBuilder();
++        sb.AppendLine("# HELP resilience_open_count Number of open circuits.");
++        sb.AppendLine("# TYPE resilience_open_count gauge");
++        sb.AppendLine($"resilience_open_count {metrics.OpenCount}");
++        sb.AppendLine("# HELP resilience_half_open_count Number of half-open circuits.");
++        sb.AppendLine("# TYPE resilience_half_open_count gauge");
++        sb.AppendLine($"resilience_half_open_count {metrics.HalfOpenCount}");
++        sb.AppendLine("# HELP resilience_closed_count Number of closed circuits.");
++        sb.AppendLine("# TYPE resilience_closed_count gauge");
++        sb.AppendLine($"resilience_closed_count {metrics.ClosedCount}");
++        sb.AppendLine("# HELP resilience_retry_attempts Number of retry attempts.");
++        sb.AppendLine("# TYPE resilience_retry_attempts counter");
++        sb.AppendLine($"resilience_retry_attempts {metrics.RetryAttempts}");
++        foreach (var entry in byTool)
++        {
++            var tool = entry.Key.Replace("\"", "'");
++            sb.AppendLine($"resilience_tool_open_count{{tool=\"{tool}\"}} {entry.Value.OpenCount}");
++            sb.AppendLine($"resilience_tool_retry_attempts{{tool=\"{tool}\"}} {entry.Value.RetryAttempts}");
++        }
++        return sb.ToString();
++    }
+ }
+diff --git a/Workflow/WorkflowFacade.cs b/Workflow/WorkflowFacade.cs
+index 3e77f52..52f668c 100644
+--- a/Workflow/WorkflowFacade.cs
++++ b/Workflow/WorkflowFacade.cs
+@@ -19,6 +19,8 @@ namespace RahBuilder.Workflow;
+ 
+ public sealed class WorkflowFacade
+ {
++    private static readonly object ResilienceLogLock = new();
++    private static bool _resilienceLogHooked;
+     private readonly RunTrace _trace;
+     private readonly WorkflowRouter _router = new();
+     private readonly ExecutionOrchestrator _executor;
+@@ -82,6 +84,7 @@ public sealed class WorkflowFacade
+     {
+         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
+         _cfg = ConfigStore.Load();
++        HookResilienceLogs();
+         _providerManager = new ProviderManager(new ProviderState(_cfg.General.ProviderEnabled, true), msg => _trace.Emit(msg));
+         _providerManager.StateChanged += state => ProviderStateChanged?.Invoke(state);
+         _providerManager.ConfigureRetryHandler(async ct =>
+@@ -112,6 +115,7 @@ public sealed class WorkflowFacade
+     {
+         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
+         _trace = trace ?? throw new ArgumentNullException(nameof(trace));
++        HookResilienceLogs();
+         _providerManager = new ProviderManager(new ProviderState(_cfg.General.ProviderEnabled, true), msg => _trace.Emit(msg));
+         _providerManager.StateChanged += state => ProviderStateChanged?.Invoke(state);
+         _providerManager.ConfigureRetryHandler(async ct =>
+@@ -145,6 +149,17 @@ public sealed class WorkflowFacade
+         OutputCardProduced?.Invoke(card);
+     }
+ 
++    private void HookResilienceLogs()
++    {
++        lock (ResilienceLogLock)
++        {
++            if (_resilienceLogHooked)
++                return;
++            RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ResilienceLog += msg => _trace.Emit("[resilience] " + msg);
++            _resilienceLogHooked = true;
++        }
++    }
++
+     private void BroadcastEvent(string type, object payload) => SessionManager.AddEvent(_state.SessionToken, type, payload);
+ 
+     private void EmitWorkflowEvent(WorkflowEvent evt, string message)
+diff --git a/openapi.yaml b/openapi.yaml
+index 11231e5..95614e9 100644
+--- a/openapi.yaml
++++ b/openapi.yaml
+@@ -339,7 +339,7 @@ paths:
+           content:
+             application/json:
+               schema:
+-                $ref: "#/components/schemas/ResilienceMetrics"
++                $ref: "#/components/schemas/ResilienceMetricsResponse"
+         "204":
+           description: No matching metrics
+         "400":
+@@ -347,7 +347,7 @@ paths:
+           content:
+             application/json:
+               schema:
+-                $ref: "#/components/schemas/ApiError"
++                $ref: "#/components/schemas/ResilienceErrorResponse"
+   /metrics/resilience/history:
+     get:
+       summary: Resilience metrics history
+@@ -401,7 +401,7 @@ paths:
+           content:
+             application/json:
+               schema:
+-                $ref: "#/components/schemas/ApiError"
++                $ref: "#/components/schemas/ResilienceErrorResponse"
+   /metrics/resilience/reset:
+     put:
+       summary: Reset resilience metrics
+@@ -411,13 +411,7 @@ paths:
+           content:
+             application/json:
+               schema:
+-                type: object
+-                properties:
+-                  ok:
+-                    type: boolean
+-                  resetAt:
+-                    type: string
+-                    format: date-time
++                $ref: "#/components/schemas/ResilienceResetResponse"
+     post:
+       summary: Reset resilience metrics
+       responses:
+@@ -426,13 +420,17 @@ paths:
+           content:
+             application/json:
+               schema:
+-                type: object
+-                properties:
+-                  ok:
+-                    type: boolean
+-                  resetAt:
+-                    type: string
+-                    format: date-time
++                $ref: "#/components/schemas/ResilienceResetResponse"
++  /metrics/resilience/prometheus:
++    get:
++      summary: Resilience metrics in Prometheus format
++      responses:
++        "200":
++          description: Prometheus metrics
++          content:
++            text/plain:
++              schema:
++                type: string
+   /alerts/thresholds:
+     post:
+       summary: Create alert threshold rule
+@@ -448,13 +446,13 @@ paths:
+           content:
+             application/json:
+               schema:
+-                $ref: "#/components/schemas/ResilienceAlertRule"
++                $ref: "#/components/schemas/ResilienceAlertRuleResponse"
+         "400":
+           description: Bad request
+           content:
+             application/json:
+               schema:
+-                $ref: "#/components/schemas/ApiError"
++                $ref: "#/components/schemas/ResilienceErrorResponse"
+   /alerts:
+     post:
+       summary: Create alert rule
+@@ -470,13 +468,13 @@ paths:
+           content:
+             application/json:
+               schema:
+-                $ref: "#/components/schemas/ResilienceAlertRule"
++                $ref: "#/components/schemas/ResilienceAlertRuleResponse"
+         "400":
+           description: Bad request
+           content:
+             application/json:
+               schema:
+-                $ref: "#/components/schemas/ApiError"
++                $ref: "#/components/schemas/ResilienceErrorResponse"
+     get:
+       summary: List alert rules and recent events
+       parameters:
+@@ -502,16 +500,7 @@ paths:
+           content:
+             application/json:
+               schema:
+-                type: object
+-                properties:
+-                  rules:
+-                    type: array
+-                    items:
+-                      $ref: "#/components/schemas/ResilienceAlertRuleSummary"
+-                  events:
+-                    type: array
+-                    items:
+-                      $ref: "#/components/schemas/ResilienceAlertEvent"
++                $ref: "#/components/schemas/ResilienceAlertsResponse"
+     delete:
+       summary: Delete alert rules
+       parameters:
+@@ -526,12 +515,7 @@ paths:
+           content:
+             application/json:
+               schema:
+-                type: object
+-                properties:
+-                  ok:
+-                    type: boolean
+-                  ruleId:
+-                    type: string
++                $ref: "#/components/schemas/ResilienceDeleteResponse"
+   /alerts/{id}:
+     patch:
+       summary: Update alert rule
+@@ -553,13 +537,13 @@ paths:
+           content:
+             application/json:
+               schema:
+-                $ref: "#/components/schemas/ResilienceAlertRule"
++                $ref: "#/components/schemas/ResilienceAlertRuleResponse"
+         "404":
+           description: Not found
+           content:
+             application/json:
+               schema:
+-                $ref: "#/components/schemas/ApiError"
++                $ref: "#/components/schemas/ResilienceErrorResponse"
+   /alerts/events/{id}:
+     patch:
+       summary: Acknowledge alert event
+@@ -586,19 +570,29 @@ paths:
+           content:
+             application/json:
+               schema:
+-                $ref: "#/components/schemas/ResilienceAlertEvent"
++                $ref: "#/components/schemas/ResilienceAlertEventResponse"
++        "400":
++          description: Bad request
++          content:
++            application/json:
++              schema:
++                $ref: "#/components/schemas/ResilienceErrorResponse"
+         "404":
+           description: Not found
+           content:
+             application/json:
+               schema:
+-                $ref: "#/components/schemas/ApiError"
++                $ref: "#/components/schemas/ResilienceErrorResponse"
+   /healthz:
+     get:
+       summary: Health check
+       responses:
+         "200":
+           description: Health
++          content:
++            application/json:
++              schema:
++                $ref: "#/components/schemas/HealthzResponse"
+   /readyz:
+     get:
+       summary: Readiness check
+@@ -653,6 +647,14 @@ components:
+         message: invalid_state
+         details:
+           errorCode: invalid_state
++          docs: README.md#resilience-api-examples
++    ResilienceErrorResponse:
++      type: object
++      properties:
++        metadata:
++          $ref: "#/components/schemas/ResilienceMetadata"
++        error:
++          $ref: "#/components/schemas/ApiError"
+     SessionSummary:
+       type: object
+       properties:
+@@ -737,6 +739,23 @@ components:
+         halfOpenCount: 0
+         closedCount: 5
+         retryAttempts: 3
++    ResilienceMetadata:
++      type: object
++      properties:
++        version:
++          type: string
++        timestamp:
++          type: string
++          format: date-time
++        requestId:
++          type: string
++    ResilienceMetricsResponse:
++      type: object
++      properties:
++        metadata:
++          $ref: "#/components/schemas/ResilienceMetadata"
++        data:
++          $ref: "#/components/schemas/ResilienceMetrics"
+     ResilienceState:
+       type: string
+       enum:
+@@ -765,6 +784,8 @@ components:
+     ResilienceHistoryResponse:
+       type: object
+       properties:
++        metadata:
++          $ref: "#/components/schemas/ResilienceMetadata"
+         total:
+           type: integer
+         page:
+@@ -775,6 +796,16 @@ components:
+           type: array
+           items:
+             $ref: "#/components/schemas/ResilienceMetricsSample"
++    ResilienceResetResponse:
++      type: object
++      properties:
++        metadata:
++          $ref: "#/components/schemas/ResilienceMetadata"
++        ok:
++          type: boolean
++        resetAt:
++          type: string
++          format: date-time
+     ResilienceAlertRuleRequest:
+       type: object
+       properties:
+@@ -837,6 +868,13 @@ components:
+         windowMinutes: 60
+         severity: warning
+         enabled: true
++    ResilienceAlertRuleResponse:
++      type: object
++      properties:
++        metadata:
++          $ref: "#/components/schemas/ResilienceMetadata"
++        data:
++          $ref: "#/components/schemas/ResilienceAlertRule"
+     ResilienceAlertRuleSummary:
+       type: object
+       properties:
+@@ -859,6 +897,19 @@ components:
+           type: array
+           items:
+             $ref: "#/components/schemas/ResilienceAlertEvent"
++    ResilienceAlertsResponse:
++      type: object
++      properties:
++        metadata:
++          $ref: "#/components/schemas/ResilienceMetadata"
++        rules:
++          type: array
++          items:
++            $ref: "#/components/schemas/ResilienceAlertRuleSummary"
++        events:
++          type: array
++          items:
++            $ref: "#/components/schemas/ResilienceAlertEvent"
+     ResilienceAlertEvent:
+       type: object
+       properties:
+@@ -892,6 +943,43 @@ components:
+         openDelta: 0
+         retryDelta: 12
+         acknowledged: false
++    ResilienceAlertEventResponse:
++      type: object
++      properties:
++        metadata:
++          $ref: "#/components/schemas/ResilienceMetadata"
++        data:
++          $ref: "#/components/schemas/ResilienceAlertEvent"
++    ResilienceDeleteResponse:
++      type: object
++      properties:
++        metadata:
++          $ref: "#/components/schemas/ResilienceMetadata"
++        ok:
++          type: boolean
++        ruleId:
++          type: string
++    ResilienceHealthSummary:
++      type: object
++      properties:
++        state:
++          type: string
++        openCircuits:
++          type: integer
++        lastAlertAt:
++          type: string
++          format: date-time
++    HealthzResponse:
++      type: object
++      properties:
++        ok:
++          type: boolean
++        telemetry:
++          type: object
++        resilience:
++          $ref: "#/components/schemas/ResilienceHealthSummary"
++        metadata:
++          $ref: "#/components/schemas/ResilienceMetadata"
+     ProviderEvent:
+       type: object
+       properties:
+diff --git a/tools/resilienceClient.ts b/tools/resilienceClient.ts
+index ab4ea64..9737343 100644
+--- a/tools/resilienceClient.ts
++++ b/tools/resilienceClient.ts
+@@ -16,7 +16,19 @@ export type ResilienceMetricsSample = {
+   metrics: CircuitMetricsSnapshot;
+ };
+ 
++export type ResilienceMetadata = {
++  version: string;
++  timestamp: string;
++  requestId: string;
++};
++
++export type ResilienceMetricsResponse = {
++  metadata: ResilienceMetadata;
++  data: CircuitMetricsSnapshot;
++};
++
+ export type ResilienceHistoryResponse = {
++  metadata: ResilienceMetadata;
+   total: number;
+   page: number;
+   perPage: number;
+@@ -63,18 +75,27 @@ export type ResilienceAlertEvent = {
+ };
+ 
+ export type ResilienceAlertsResponse = {
++  metadata: ResilienceMetadata;
+   rules: ResilienceAlertRuleSummary[];
+   events: ResilienceAlertEvent[];
+ };
+ 
+-export type ResilienceResetResponse = { ok: boolean; resetAt: string };
++export type ResilienceResetResponse = { metadata: ResilienceMetadata; ok: boolean; resetAt: string };
+ 
+-export type AlertDeleteResponse = { ok: boolean; ruleId?: string };
++export type AlertDeleteResponse = { metadata: ResilienceMetadata; ok: boolean; ruleId?: string };
+ 
+ export class ResilienceClient {
+   constructor(private readonly baseUrl: string, private readonly token?: string) {}
+ 
+   async getMetrics(params?: { state?: ResilienceState; minRetryAttempts?: number }): Promise<CircuitMetricsSnapshot> {
++    const query = new URLSearchParams();
++    if (params?.state) query.set("state", params.state);
++    if (params?.minRetryAttempts !== undefined) query.set("minRetryAttempts", String(params.minRetryAttempts));
++    const response = await this.getJson<ResilienceMetricsResponse>(`/metrics/resilience${query.toString() ? `?${query}` : ""}`);
++    return response.data;
++  }
++
++  async getMetricsResponse(params?: { state?: ResilienceState; minRetryAttempts?: number }): Promise<ResilienceMetricsResponse> {
+     const query = new URLSearchParams();
+     if (params?.state) query.set("state", params.state);
+     if (params?.minRetryAttempts !== undefined) query.set("minRetryAttempts", String(params.minRetryAttempts));
+@@ -114,17 +135,19 @@ export class ResilienceClient {
+   }
+ 
+   async createAlertRule(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
+-    return this.sendJson<ResilienceAlertRule>("/alerts/thresholds", {
++    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertRule }>("/alerts/thresholds", {
+       method: "POST",
+       body: JSON.stringify(rule)
+     });
++    return response.data;
+   }
+ 
+   async createAlert(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
+-    return this.sendJson<ResilienceAlertRule>("/alerts", {
++    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertRule }>("/alerts", {
+       method: "POST",
+       body: JSON.stringify(rule)
+     });
++    return response.data;
+   }
+ 
+   async getAlerts(limit = 50, options?: { severity?: ResilienceSeverity; includeAcknowledged?: boolean }): Promise<ResilienceAlertsResponse> {
+@@ -147,17 +170,19 @@ export class ResilienceClient {
+   }
+ 
+   async updateAlertRule(ruleId: string, update: ResilienceAlertRuleUpdate): Promise<ResilienceAlertRule> {
+-    return this.sendJson<ResilienceAlertRule>(`/alerts/${ruleId}`, {
++    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertRule }>(`/alerts/${ruleId}`, {
+       method: "PATCH",
+       body: JSON.stringify(update)
+     });
++    return response.data;
+   }
+ 
+   async acknowledgeAlert(eventId: string): Promise<ResilienceAlertEvent> {
+-    return this.sendJson<ResilienceAlertEvent>(`/alerts/events/${eventId}`, {
++    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertEvent }>(`/alerts/events/${eventId}`, {
+       method: "PATCH",
+       body: JSON.stringify({ acknowledged: true })
+     });
++    return response.data;
+   }
+ 
+   async *watchAlerts(intervalMs = 5000, options?: { severity?: ResilienceSeverity; includeAcknowledged?: boolean }): AsyncGenerator<ResilienceAlertEvent[]> {

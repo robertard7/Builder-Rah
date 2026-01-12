@@ -15,6 +15,13 @@ public static class ResilienceDiagnosticsHub
     private static readonly ConcurrentDictionary<string, CircuitMetricsStore> ToolStores = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ResilienceHistoryStore History = new();
     private static readonly ResilienceAlertStore Alerts = new();
+    public static event Action<string>? ResilienceLog;
+
+    static ResilienceDiagnosticsHub()
+    {
+        Alerts.AlertRaised += alert => ResilienceLog?.Invoke($"alert_triggered id={alert.Id} severity={alert.Severity} ruleId={alert.RuleId}");
+        Alerts.AlertAcknowledged += alert => ResilienceLog?.Invoke($"alert_acknowledged id={alert.Id} ruleId={alert.RuleId}");
+    }
 
     public static void Attach(CircuitBreaker breaker)
     {
@@ -25,6 +32,7 @@ public static class ResilienceDiagnosticsHub
         {
             Store.RecordStateChange(args.Previous, args.Current);
             BreakerStates[breaker] = args.Current;
+            ResilienceLog?.Invoke($"circuit_state tool=unknown previous={args.Previous} current={args.Current}");
         });
 
         if (Subscriptions.TryAdd(breaker, handler))
@@ -76,6 +84,26 @@ public static class ResilienceDiagnosticsHub
     public static bool IsCircuitOpen()
     {
         return BreakerStates.Values.Any(state => state == CircuitState.Open);
+    }
+
+    public static int OpenCircuitCount()
+    {
+        return BreakerStates.Values.Count(state => state == CircuitState.Open);
+    }
+
+    public static string OverallState()
+    {
+        if (BreakerStates.Values.Any(state => state == CircuitState.Open))
+            return "open";
+        if (BreakerStates.Values.Any(state => state == CircuitState.HalfOpen))
+            return "halfopen";
+        return "closed";
+    }
+
+    public static DateTimeOffset? LastAlertTimestamp()
+    {
+        var latest = Alerts.ListEvents(1, includeAcknowledged: true).FirstOrDefault();
+        return latest?.TriggeredAt;
     }
 
     public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes, string severity)
