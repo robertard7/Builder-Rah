@@ -93,6 +93,13 @@ public sealed class HeadlessApiServer
                 return;
             }
 
+            if (req.HttpMethod == "GET" && path == "/metrics/resilience")
+            {
+                var metrics = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                await WriteJsonAsync(ctx, 200, metrics, ct).ConfigureAwait(false);
+                return;
+            }
+
             if (req.HttpMethod == "GET" && path == "/healthz")
             {
                 await WriteJsonAsync(ctx, 200, new { ok = true, telemetry = TelemetryRegistry.Snapshot() }, ct).ConfigureAwait(false);

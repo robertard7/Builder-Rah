@@ -42,6 +42,8 @@ public static class Program
             return HandleRun(ctx, filtered.Skip(1).ToArray());
         if (verb == "provider")
             return HandleProvider(ctx, filtered.Skip(1).ToArray());
+        if (verb == "resilience")
+            return HandleResilience(ctx, filtered.Skip(1).ToArray());
 
         PrintHelp();
         WriteError(ctx, ApiError.BadRequest("unknown_command"));
@@ -127,6 +129,25 @@ public static class Program
         }
 
         WriteError(context, ApiError.BadRequest("unknown_provider_command"));
+        return ExitCodes.UserError;
+    }
+
+    private static int HandleResilience(CommandContext context, string[] args)
+    {
+        if (args.Length == 0)
+        {
+            WriteError(context, ApiError.BadRequest("missing_resilience_command"));
+            return ExitCodes.UserError;
+        }
+
+        var cmd = args[0].ToLowerInvariant();
+        switch (cmd)
+        {
+            case "metrics":
+                return ResilienceMetricsCommand.Execute(context, context.JsonOutput);
+        }
+
+        WriteError(context, ApiError.BadRequest("unknown_resilience_command"));
         return ExitCodes.UserError;
     }
 
@@ -236,6 +257,7 @@ public static class Program
         Console.WriteLine("rah run --id <id>");
         Console.WriteLine("rah provider metrics");
         Console.WriteLine("rah provider events");
+        Console.WriteLine("rah resilience metrics");
         Console.WriteLine("rah --headless");
     }
 }
