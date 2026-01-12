@@ -302,7 +302,8 @@ public sealed class HeadlessApiServer
                     var resilience = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
                     var resilienceSummary = BuildResilienceSummary(resilience);
                     var resilienceByTool = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotByTool();
-                    await WriteJsonAsync(ctx, 200, new { sessionId, status, resilienceSummary, resilience, resilienceByTool }, ct).ConfigureAwait(false);
+                    var resilienceAlerts = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(10);
+                    await WriteJsonAsync(ctx, 200, new { sessionId, status, resilienceSummary, resilience, resilienceByTool, resilienceAlerts }, ct).ConfigureAwait(false);
                     return;
                 }
 
@@ -517,11 +518,15 @@ public sealed class HeadlessApiServer
 
     private static Task WriteCircuitOpenAsync(HttpListenerContext ctx, CancellationToken ct)
     {
+        var endpoint = ctx.Request.Url?.AbsolutePath ?? "";
         ctx.Response.Headers["Retry-After"] = "30";
         var details = new Dictionary<string, object>
         {
             ["retryAfterSeconds"] = 30,
-            ["hint"] = "The circuit breaker is open. Retry after backoff."
+            ["hint"] = "The circuit breaker is open. Retry after backoff.",
+            ["circuitState"] = "open",
+            ["endpoint"] = endpoint,
+            ["errorCode"] = "circuit_open"
         };
         return WriteErrorAsync(ctx, 503, ApiError.ServiceUnavailable("circuit_open", details), ct);
     }
