@@ -41,7 +41,10 @@ public sealed class LLMPromptExecutor : IPromptExecutor
         for (var attempt = 0; attempt < attempts; attempt++)
         {
             if (!_circuitBreaker.CanExecute())
+            {
+                ResilienceDiagnosticsHub.RecordCircuitOpen(options.ToolId);
                 return BuildCircuitOpenResult(options, resilienceEvents);
+            }
 
             using var cts = CreateCancellation(options);
             try
@@ -72,7 +75,7 @@ public sealed class LLMPromptExecutor : IPromptExecutor
                     break;
                 }
 
-                ResilienceDiagnosticsHub.RecordRetryAttempt();
+                ResilienceDiagnosticsHub.RecordRetryAttempt(options.ToolId);
                 var delay = _retryPolicy.GetDelay(attempt);
                 resilienceEvents?.Add($"retry_attempt={attempt + 1} delayMs={delay.TotalMilliseconds:0}");
                 try
