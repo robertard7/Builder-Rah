@@ -17,5 +17,16 @@ jobs:
         run: dotnet build -c Debug --no-restore
       - name: Test
         run: dotnet test -c Debug --no-build
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      - name: Install TS client dependencies
+        run: npm install
+        working-directory: tools
+      - name: Test TS client
+        run: npm test
+        working-directory: tools
       - name: Security scan
         run: dotnet list package --vulnerable
