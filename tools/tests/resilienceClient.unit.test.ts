@@ -15,6 +15,15 @@ const createServer = async (handler: http.RequestListener) => {
 let server: http.Server | undefined;
 let baseUrl = "";
 
+const captureError = async (operation: () => Promise<unknown>): Promise<ResilienceClientError | undefined> => {
+  try {
+    await operation();
+  } catch (error) {
+    if (isResilienceClientError(error)) return error;
+  }
+  return undefined;
+};
+
 beforeEach(async () => {
   const result = await createServer((req, res) => {
     const url = new URL(req.url ?? "", "http://localhost");
@@ -138,48 +147,33 @@ test("getMetricsWithHistory combines responses", async () => {
 
 test("errors include metadata and docs", async () => {
   const client = new ResilienceClient(baseUrl);
-  let thrown: ResilienceClientError | undefined;
-
-  try {
-    await client.deleteAlerts();
-  } catch (error) {
-    if (isResilienceClientError(error)) thrown = error;
-  }
+  const thrown = await captureError(() => client.deleteAlerts());
 
   assert.ok(thrown);
   assert.equal(thrown?.status, 404);
   assert.equal(thrown?.code, "not_found");
   assert.equal(thrown?.documentation, "README.md#resilience-api-examples");
+  assert.equal(thrown?.metadata?.requestId, "req-404");
 });
 
 test("503 circuit open errors include retry hints", async () => {
   const client = new ResilienceClient(baseUrl);
-  let thrown: ResilienceClientError | undefined;
-
-  try {
-    await client.getMetrics({ minRetryAttempts: 99 });
-  } catch (error) {
-    if (isResilienceClientError(error)) thrown = error;
-  }
+  const thrown = await captureError(() => client.getMetrics({ minRetryAttempts: 99 }));
 
   assert.ok(thrown);
   assert.equal(thrown?.status, 503);
   assert.equal(thrown?.code, "circuit_open");
+  assert.equal(thrown?.documentation, "README.md#resilience-api-examples");
   const retryAfterSeconds = (thrown?.details as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds;
   assert.equal(retryAfterSeconds, 15);
 });
 
 test("invalid range errors surface with status", async () => {
   const client = new ResilienceClient(baseUrl);
-  let thrown: ResilienceClientError | undefined;
-
-  try {
-    await client.getHistoryRange("2026-02-01T00:00:00Z", "2026-01-01T00:00:00Z");
-  } catch (error) {
-    if (isResilienceClientError(error)) thrown = error;
-  }
+  const thrown = await captureError(() => client.getHistoryRange("2026-02-01T00:00:00Z", "2026-01-01T00:00:00Z"));
 
   assert.ok(thrown);
   assert.equal(thrown?.status, 400);
   assert.equal(thrown?.code, "invalid_range");
+  assert.equal(thrown?.message, "start must be before end");
 });
