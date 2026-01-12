@@ -14,5 +14,6 @@ public sealed class CircuitOpenResponseTests
         Assert.True(error.Details!.ContainsKey("retryAfterSeconds"));
         Assert.True(error.Details.ContainsKey("circuitState"));
         Assert.True(error.Details.ContainsKey("endpoint"));
+        Assert.True(error.Details.ContainsKey("hint"));
     }
 }
