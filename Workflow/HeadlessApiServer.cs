@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -96,7 +97,149 @@ public sealed class HeadlessApiServer
             if (req.HttpMethod == "GET" && path == "/metrics/resilience")
             {
                 var metrics = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                var stateFilter = req.QueryString["state"];
+                int? minRetryAttempts = null;
+                var minRetryValue = req.QueryString["minRetryAttempts"];
+                if (!string.IsNullOrWhiteSpace(minRetryValue))
+                {
+                    if (!int.TryParse(minRetryValue, out var parsedMinRetry))
+                    {
+                        isError = true;
+                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("invalid_min_retry_attempts"), ct).ConfigureAwait(false);
+                        return;
+                    }
+                    minRetryAttempts = parsedMinRetry;
+                }
+
+                if (minRetryAttempts.HasValue && metrics.RetryAttempts < minRetryAttempts.Value)
+                {
+                    await WriteEmptyAsync(ctx, 204, ct).ConfigureAwait(false);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(stateFilter))
+                {
+                    if (!TryApplyStateFilter(metrics, stateFilter, out var filtered))
+                    {
+                        isError = true;
+                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("invalid_state"), ct).ConfigureAwait(false);
+                        return;
+                    }
+                    metrics = filtered;
+                }
+
                 await WriteJsonAsync(ctx, 200, metrics, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "GET" && path == "/metrics/resilience/history")
+            {
+                var minutes = ParseQueryInt(req, "minutes", 60);
+                var limit = ParseQueryInt(req, "limit", 300);
+                var bucketMinutes = ParseQueryInt(req, "bucketMinutes", 0);
+                var start = ParseQueryDateTime(req, "start");
+                var end = ParseQueryDateTime(req, "end");
+                if (minutes <= 0) minutes = 60;
+                if (limit <= 0) limit = 300;
+                if (bucketMinutes < 0) bucketMinutes = 0;
+                IReadOnlyList<RahOllamaOnly.Metrics.ResilienceMetricsSample> history;
+                if (start.HasValue || end.HasValue)
+                {
+                    history = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotHistoryRange(start, end, limit, bucketMinutes > 0 ? bucketMinutes : null);
+                }
+                else
+                {
+                    var window = TimeSpan.FromMinutes(minutes);
+                    history = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotHistory(window, limit);
+                }
+                await WriteJsonAsync(ctx, 200, history, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "PUT" && path == "/metrics/resilience/reset")
+            {
+                RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Reset();
+                await WriteJsonAsync(ctx, 200, new { ok = true, resetAt = DateTimeOffset.UtcNow }, ct).ConfigureAwait(false);
+                return;
+            }
+            if (req.HttpMethod == "POST" && path == "/metrics/resilience/reset")
+            {
+                RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Reset();
+                await WriteJsonAsync(ctx, 200, new { ok = true, resetAt = DateTimeOffset.UtcNow }, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "POST" && path == "/alerts/thresholds")
+            {
+                var payload = await ReadJsonAsync(req, ct).ConfigureAwait(false);
+                var name = payload.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
+                var openThreshold = payload.TryGetProperty("openThreshold", out var openEl) && openEl.TryGetInt32(out var open)
+                    ? open
+                    : 0;
+                var retryThreshold = payload.TryGetProperty("retryThreshold", out var retryEl) && retryEl.TryGetInt32(out var retry)
+                    ? retry
+                    : 0;
+                var windowMinutes = payload.TryGetProperty("windowMinutes", out var winEl) && winEl.TryGetInt32(out var win)
+                    ? win
+                    : 60;
+                var severity = payload.TryGetProperty("severity", out var severityEl) ? severityEl.GetString() ?? "" : "";
+                if (openThreshold <= 0 && retryThreshold <= 0)
+                {
+                    isError = true;
+                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
+                    return;
+                }
+                var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes, severity);
+                await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "POST" && path == "/alerts")
+            {
+                var payload = await ReadJsonAsync(req, ct).ConfigureAwait(false);
+                var name = payload.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
+                var openThreshold = payload.TryGetProperty("openThreshold", out var openEl) && openEl.TryGetInt32(out var open)
+                    ? open
+                    : 0;
+                var retryThreshold = payload.TryGetProperty("retryThreshold", out var retryEl) && retryEl.TryGetInt32(out var retry)
+                    ? retry
+                    : 0;
+                var windowMinutes = payload.TryGetProperty("windowMinutes", out var winEl) && winEl.TryGetInt32(out var win)
+                    ? win
+                    : 60;
+                var severity = payload.TryGetProperty("severity", out var severityEl) ? severityEl.GetString() ?? "" : "";
+                if (openThreshold <= 0 && retryThreshold <= 0)
+                {
+                    isError = true;
+                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
+                    return;
+                }
+                var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes, severity);
+                await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "GET" && path == "/alerts")
+            {
+                var limit = ParseQueryInt(req, "limit", 50);
+                if (limit <= 0) limit = 50;
+                var rules = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertRules();
+                var eventsList = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(limit);
+                await WriteJsonAsync(ctx, 200, new { rules, events = eventsList }, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "DELETE" && path == "/alerts")
+            {
+                var ruleId = req.QueryString["ruleId"];
+                if (!string.IsNullOrWhiteSpace(ruleId))
+                {
+                    var removed = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.RemoveAlertRule(ruleId);
+                    await WriteJsonAsync(ctx, 200, new { ok = removed, ruleId }, ct).ConfigureAwait(false);
+                    return;
+                }
+                RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ClearAlerts();
+                await WriteJsonAsync(ctx, 200, new { ok = true }, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -134,7 +277,15 @@ public sealed class HeadlessApiServer
             if (req.HttpMethod == "GET" && path == "/sessions")
             {
                 var list = _store.ListSessions();
-                var payload = list.Select(s => new { sessionId = s.SessionId, lastTouched = s.LastTouched });
+                var resilience = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                var resilienceSummary = BuildResilienceSummary(resilience);
+                var payload = list.Select(s => new
+                {
+                    sessionId = s.SessionId,
+                    lastTouched = s.LastTouched,
+                    resilienceSummary,
+                    resilience
+                });
                 await WriteJsonAsync(ctx, 200, payload, ct).ConfigureAwait(false);
                 return;
             }
@@ -143,7 +294,15 @@ public sealed class HeadlessApiServer
             {
                 var state = new SessionState { SessionId = Guid.NewGuid().ToString("N") };
                 _store.Save(state);
-                await WriteJsonAsync(ctx, 201, new { sessionId = state.SessionId, lastTouched = state.LastTouched }, ct).ConfigureAwait(false);
+                var resilience = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                var resilienceSummary = BuildResilienceSummary(resilience);
+                await WriteJsonAsync(ctx, 201, new
+                {
+                    sessionId = state.SessionId,
+                    lastTouched = state.LastTouched,
+                    resilienceSummary,
+                    resilience
+                }, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -160,7 +319,15 @@ public sealed class HeadlessApiServer
                         await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
                         return;
                     }
-                    await WriteJsonAsync(ctx, 200, new { sessionId = state.SessionId, lastTouched = state.LastTouched }, ct).ConfigureAwait(false);
+                    var resilience = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                    var resilienceSummary = BuildResilienceSummary(resilience);
+                    await WriteJsonAsync(ctx, 200, new
+                    {
+                        sessionId = state.SessionId,
+                        lastTouched = state.LastTouched,
+                        resilienceSummary,
+                        resilience
+                    }, ct).ConfigureAwait(false);
                     return;
                 }
 
@@ -190,7 +357,11 @@ public sealed class HeadlessApiServer
                     workflow.ApplySessionState(state);
                     var statusCode = workflow.GetSessionStatusSnapshot();
                     var status = new SessionStatusDto(statusCode.ToString(), StatusMapper.ToDisplay(statusCode));
-                    await WriteJsonAsync(ctx, 200, new { sessionId, status }, ct).ConfigureAwait(false);
+                    var resilience = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                    var resilienceSummary = BuildResilienceSummary(resilience);
+                    var resilienceByTool = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotByTool();
+                    var resilienceAlerts = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(10);
+                    await WriteJsonAsync(ctx, 200, new { sessionId, status, resilienceSummary, resilience, resilienceByTool, resilienceAlerts }, ct).ConfigureAwait(false);
                     return;
                 }
 
@@ -221,6 +392,12 @@ public sealed class HeadlessApiServer
                         return;
                     }
                     var response = await RunMessageAsync(sessionId, text, ct).ConfigureAwait(false);
+                    if (IsCircuitOpenResponse(response))
+                    {
+                        isError = true;
+                        await WriteCircuitOpenAsync(ctx, ct).ConfigureAwait(false);
+                        return;
+                    }
                     await WriteJsonAsync(ctx, 200, response, ct).ConfigureAwait(false);
                     return;
                 }
@@ -250,6 +427,12 @@ public sealed class HeadlessApiServer
                 if (parts.Length == 3 && parts[2] == "run" && req.HttpMethod == "POST")
                 {
                     var response = await RunPlanAsync(sessionId, ct).ConfigureAwait(false);
+                    if (IsCircuitOpenResponse(response))
+                    {
+                        isError = true;
+                        await WriteCircuitOpenAsync(ctx, ct).ConfigureAwait(false);
+                        return;
+                    }
                     await WriteJsonAsync(ctx, 200, response, ct).ConfigureAwait(false);
                     return;
                 }
@@ -310,7 +493,7 @@ public sealed class HeadlessApiServer
         return string.Equals(header, _token, StringComparison.Ordinal);
     }
 
-    private async Task<object> RunMessageAsync(string sessionId, string text, CancellationToken ct)
+    private async Task<RunResponse> RunMessageAsync(string sessionId, string text, CancellationToken ct)
     {
         var state = _store.Load(sessionId) ?? new SessionState { SessionId = sessionId };
         var workflow = new WorkflowFacade(_cfg, _trace);
@@ -325,10 +508,10 @@ public sealed class HeadlessApiServer
         await workflow.RouteUserInput(_cfg, text, ct).ConfigureAwait(false);
         var updated = workflow.BuildSessionState();
         _store.Save(updated);
-        return new { sessionId = updated.SessionId, responses, status = workflow.GetPublicSnapshot() };
+        return new RunResponse(updated.SessionId, responses, workflow.GetPublicSnapshot());
     }
 
-    private async Task<object> RunPlanAsync(string sessionId, CancellationToken ct)
+    private async Task<RunResponse> RunPlanAsync(string sessionId, CancellationToken ct)
     {
         var state = _store.Load(sessionId) ?? new SessionState { SessionId = sessionId };
         var workflow = new WorkflowFacade(_cfg, _trace);
@@ -342,7 +525,7 @@ public sealed class HeadlessApiServer
         await workflow.ApproveAllStepsAsync(ct).ConfigureAwait(false);
         var updated = workflow.BuildSessionState();
         _store.Save(updated);
-        return new { sessionId = updated.SessionId, responses, status = workflow.GetPublicSnapshot() };
+        return new RunResponse(updated.SessionId, responses, workflow.GetPublicSnapshot());
     }
 
     private static async Task<JsonElement> ReadJsonAsync(HttpListenerRequest req, CancellationToken ct)
@@ -361,6 +544,60 @@ public sealed class HeadlessApiServer
             return parsed;
         return fallback;
     }
+
+    private static DateTimeOffset? ParseQueryDateTime(HttpListenerRequest req, string key)
+    {
+        var value = req.QueryString[key];
+        if (DateTimeOffset.TryParse(value, out var parsed))
+            return parsed;
+        return null;
+    }
+
+    private static bool TryApplyStateFilter(CircuitMetricsSnapshot metrics, string state, out CircuitMetricsSnapshot filtered)
+    {
+        switch (state.Trim().ToLowerInvariant())
+        {
+            case "open":
+                filtered = new CircuitMetricsSnapshot(metrics.OpenCount, 0, 0, metrics.RetryAttempts);
+                return true;
+            case "halfopen":
+                filtered = new CircuitMetricsSnapshot(0, metrics.HalfOpenCount, 0, metrics.RetryAttempts);
+                return true;
+            case "closed":
+                filtered = new CircuitMetricsSnapshot(0, 0, metrics.ClosedCount, metrics.RetryAttempts);
+                return true;
+            default:
+                filtered = metrics;
+                return false;
+        }
+    }
+
+    private static string BuildResilienceSummary(CircuitMetricsSnapshot metrics)
+    {
+        return $"retries: {metrics.RetryAttempts}, open: {metrics.OpenCount}, half-open: {metrics.HalfOpenCount}, closed: {metrics.ClosedCount}";
+    }
+
+    private static bool IsCircuitOpenResponse(RunResponse response)
+    {
+        return response.Responses.Any(msg => msg.Contains("circuit is open", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static Task WriteCircuitOpenAsync(HttpListenerContext ctx, CancellationToken ct)
+    {
+        var endpoint = ctx.Request.Url?.AbsolutePath ?? "";
+        ctx.Response.Headers["Retry-After"] = "30";
+        var details = new Dictionary<string, object>
+        {
+            ["retryAfterSeconds"] = 30,
+            ["hint"] = "The circuit breaker is open. Retry after backoff.",
+            ["circuitState"] = "open",
+            ["endpoint"] = endpoint,
+            ["errorCode"] = "circuit_open"
+        };
+        return WriteErrorAsync(ctx, 503, ApiError.ServiceUnavailable("circuit_open", details), ct);
+    }
+
+    private sealed record RunResponse(string SessionId, List<string> Responses, object Status);
 
     private void DeleteArtifactsForSession(string sessionId)
     {
@@ -396,6 +633,14 @@ public sealed class HeadlessApiServer
         ctx.Response.ContentEncoding = Encoding.UTF8;
         ctx.Response.ContentLength64 = bytes.Length;
         await ctx.Response.OutputStream.WriteAsync(bytes.AsMemory(0, bytes.Length), ct).ConfigureAwait(false);
+        ctx.Response.OutputStream.Close();
+    }
+
+    private static async Task WriteEmptyAsync(HttpListenerContext ctx, int statusCode, CancellationToken ct)
+    {
+        ctx.Response.StatusCode = statusCode;
+        ctx.Response.ContentLength64 = 0;
+        await ctx.Response.OutputStream.FlushAsync(ct).ConfigureAwait(false);
         ctx.Response.OutputStream.Close();
     }
 

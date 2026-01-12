@@ -17,6 +17,11 @@ public sealed class CircuitMetricsStore
 
     public void RecordRetryAttempt() => System.Threading.Interlocked.Increment(ref _retryAttempts);
 
+    public void RecordOpenEvent()
+    {
+        _stateCounts.AddOrUpdate(CircuitState.Open, 1, (_, count) => count + 1);
+    }
+
     public CircuitMetricsSnapshot Snapshot()
     {
         _stateCounts.TryGetValue(CircuitState.Open, out var openCount);
@@ -24,6 +29,12 @@ public sealed class CircuitMetricsStore
         _stateCounts.TryGetValue(CircuitState.Closed, out var closedCount);
 
         return new CircuitMetricsSnapshot(openCount, halfOpenCount, closedCount, _retryAttempts);
+    }
+
+    public void Reset()
+    {
+        _stateCounts.Clear();
+        System.Threading.Interlocked.Exchange(ref _retryAttempts, 0);
     }
 }
 

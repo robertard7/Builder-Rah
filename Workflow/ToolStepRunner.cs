@@ -60,7 +60,11 @@ public static class ToolStepRunner
             return await RunFileReadAsync(attachment, trace, ct).ConfigureAwait(false);
 
         if (step.ToolId.Equals("vision.describe.image", StringComparison.OrdinalIgnoreCase))
+        {
+            if (RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.IsCircuitOpen())
+                return new ToolRunResult(false, "[resilience] circuit OPEN; execution skipped. Retry after 30s.");
             return await RunVisionAsync(attachment, cfg, trace, ct).ConfigureAwait(false);
+        }
 
         return new ToolRunResult(false, $"[tool:error] unsupported tool: {step.ToolId}");
     }

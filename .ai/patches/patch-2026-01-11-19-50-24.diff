@@ -1,0 +1,318 @@
+diff --git a/Headless/Api/ResilienceApiClient.cs b/Headless/Api/ResilienceApiClient.cs
+index 89d20f9..ca9faa6 100644
+--- a/Headless/Api/ResilienceApiClient.cs
++++ b/Headless/Api/ResilienceApiClient.cs
+@@ -38,6 +38,12 @@ public sealed class ResilienceApiClient
+         return await response.Content.ReadFromJsonAsync<ApiOkResponse>(cancellationToken: ct).ConfigureAwait(false);
+     }
+ 
++    public async Task<ApiOkResponse?> ResetMetricsPostAsync(CancellationToken ct = default)
++    {
++        using var response = await _http.PostAsync("/metrics/resilience/reset", content: null, ct).ConfigureAwait(false);
++        return await response.Content.ReadFromJsonAsync<ApiOkResponse>(cancellationToken: ct).ConfigureAwait(false);
++    }
++
+     public async Task<ResilienceAlertRule?> CreateAlertRuleAsync(ResilienceAlertRuleRequest request, CancellationToken ct = default)
+     {
+         using var response = await _http.PostAsJsonAsync("/alerts/thresholds", request, ct).ConfigureAwait(false);
+@@ -51,6 +57,20 @@ public sealed class ResilienceApiClient
+         return await _http.GetFromJsonAsync<ResilienceAlertsResponse>($"/alerts{query}", ct).ConfigureAwait(false);
+     }
+ 
++    public async Task<ApiOkResponse?> DeleteAlertsAsync(string? ruleId = null, CancellationToken ct = default)
++    {
++        var query = QueryBuilder.Create()
++            .Add("ruleId", ruleId);
++        using var response = await _http.DeleteAsync($"/alerts{query}", ct).ConfigureAwait(false);
++        return await response.Content.ReadFromJsonAsync<ApiOkResponse>(cancellationToken: ct).ConfigureAwait(false);
++    }
++
++    public async Task<ResilienceAlertRule?> CreateAlertAsync(ResilienceAlertRuleRequest request, CancellationToken ct = default)
++    {
++        using var response = await _http.PostAsJsonAsync("/alerts", request, ct).ConfigureAwait(false);
++        return await response.Content.ReadFromJsonAsync<ResilienceAlertRule>(cancellationToken: ct).ConfigureAwait(false);
++    }
++
+     public sealed record ApiOkResponse(bool Ok, DateTimeOffset ResetAt);
+ 
+     public sealed record ResilienceMetricsSample(DateTimeOffset Timestamp, CircuitMetricsSnapshot Metrics);
+diff --git a/Metrics/ResilienceAlertStore.cs b/Metrics/ResilienceAlertStore.cs
+index 27f9f69..11557d4 100644
+--- a/Metrics/ResilienceAlertStore.cs
++++ b/Metrics/ResilienceAlertStore.cs
+@@ -63,6 +63,21 @@ public sealed class ResilienceAlertStore
+         return _events.Reverse().Take(limit).ToList();
+     }
+ 
++    public bool RemoveRule(string ruleId)
++    {
++        if (string.IsNullOrWhiteSpace(ruleId))
++            return false;
++        _activeStates.TryRemove(ruleId, out _);
++        return _rules.TryRemove(ruleId, out _);
++    }
++
++    public void Clear()
++    {
++        _rules.Clear();
++        _activeStates.Clear();
++        while (_events.TryDequeue(out _)) { }
++    }
++
+     public void Evaluate(CircuitMetricsSnapshot current, IReadOnlyList<ResilienceMetricsSample> history)
+     {
+         if (history.Count == 0)
+diff --git a/Metrics/ResilienceDiagnosticsHub.cs b/Metrics/ResilienceDiagnosticsHub.cs
+index e6984c4..c84bb94 100644
+--- a/Metrics/ResilienceDiagnosticsHub.cs
++++ b/Metrics/ResilienceDiagnosticsHub.cs
+@@ -93,6 +93,16 @@ public static class ResilienceDiagnosticsHub
+         return Alerts.ListEvents(limit);
+     }
+ 
++    public static bool RemoveAlertRule(string ruleId)
++    {
++        return Alerts.RemoveRule(ruleId);
++    }
++
++    public static void ClearAlerts()
++    {
++        Alerts.Clear();
++    }
++
+     public static void Reset()
+     {
+         Store.Reset();
+diff --git a/Workflow/HeadlessApiServer.cs b/Workflow/HeadlessApiServer.cs
+index 9880d4b..6153a76 100644
+--- a/Workflow/HeadlessApiServer.cs
++++ b/Workflow/HeadlessApiServer.cs
+@@ -162,6 +162,12 @@ public sealed class HeadlessApiServer
+                 await WriteJsonAsync(ctx, 200, new { ok = true, resetAt = DateTimeOffset.UtcNow }, ct).ConfigureAwait(false);
+                 return;
+             }
++            if (req.HttpMethod == "POST" && path == "/metrics/resilience/reset")
++            {
++                RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Reset();
++                await WriteJsonAsync(ctx, 200, new { ok = true, resetAt = DateTimeOffset.UtcNow }, ct).ConfigureAwait(false);
++                return;
++            }
+ 
+             if (req.HttpMethod == "POST" && path == "/alerts/thresholds")
+             {
+@@ -188,6 +194,31 @@ public sealed class HeadlessApiServer
+                 return;
+             }
+ 
++            if (req.HttpMethod == "POST" && path == "/alerts")
++            {
++                var payload = await ReadJsonAsync(req, ct).ConfigureAwait(false);
++                var name = payload.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
++                var openThreshold = payload.TryGetProperty("openThreshold", out var openEl) && openEl.TryGetInt32(out var open)
++                    ? open
++                    : 0;
++                var retryThreshold = payload.TryGetProperty("retryThreshold", out var retryEl) && retryEl.TryGetInt32(out var retry)
++                    ? retry
++                    : 0;
++                var windowMinutes = payload.TryGetProperty("windowMinutes", out var winEl) && winEl.TryGetInt32(out var win)
++                    ? win
++                    : 60;
++                var severity = payload.TryGetProperty("severity", out var severityEl) ? severityEl.GetString() ?? "" : "";
++                if (openThreshold <= 0 && retryThreshold <= 0)
++                {
++                    isError = true;
++                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
++                    return;
++                }
++                var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes, severity);
++                await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
++                return;
++            }
++
+             if (req.HttpMethod == "GET" && path == "/alerts")
+             {
+                 var limit = ParseQueryInt(req, "limit", 50);
+@@ -198,6 +229,20 @@ public sealed class HeadlessApiServer
+                 return;
+             }
+ 
++            if (req.HttpMethod == "DELETE" && path == "/alerts")
++            {
++                var ruleId = req.QueryString["ruleId"];
++                if (!string.IsNullOrWhiteSpace(ruleId))
++                {
++                    var removed = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.RemoveAlertRule(ruleId);
++                    await WriteJsonAsync(ctx, 200, new { ok = removed, ruleId }, ct).ConfigureAwait(false);
++                    return;
++                }
++                RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ClearAlerts();
++                await WriteJsonAsync(ctx, 200, new { ok = true }, ct).ConfigureAwait(false);
++                return;
++            }
++
+             if (req.HttpMethod == "GET" && path == "/healthz")
+             {
+                 await WriteJsonAsync(ctx, 200, new { ok = true, telemetry = TelemetryRegistry.Snapshot() }, ct).ConfigureAwait(false);
+diff --git a/openapi.yaml b/openapi.yaml
+index 86ab43f..9b93c35 100644
+--- a/openapi.yaml
++++ b/openapi.yaml
+@@ -404,6 +404,21 @@ paths:
+                   resetAt:
+                     type: string
+                     format: date-time
++    post:
++      summary: Reset resilience metrics
++      responses:
++        "200":
++          description: Reset
++          content:
++            application/json:
++              schema:
++                type: object
++                properties:
++                  ok:
++                    type: boolean
++                  resetAt:
++                    type: string
++                    format: date-time
+   /alerts/thresholds:
+     post:
+       summary: Create alert threshold rule
+@@ -427,6 +442,27 @@ paths:
+               schema:
+                 $ref: "#/components/schemas/ApiError"
+   /alerts:
++    post:
++      summary: Create alert rule
++      requestBody:
++        required: true
++        content:
++          application/json:
++            schema:
++              $ref: "#/components/schemas/ResilienceAlertRuleRequest"
++      responses:
++        "201":
++          description: Rule created
++          content:
++            application/json:
++              schema:
++                $ref: "#/components/schemas/ResilienceAlertRule"
++        "400":
++          description: Bad request
++          content:
++            application/json:
++              schema:
++                $ref: "#/components/schemas/ApiError"
+     get:
+       summary: List alert rules and recent events
+       parameters:
+@@ -451,6 +487,26 @@ paths:
+                     type: array
+                     items:
+                       $ref: "#/components/schemas/ResilienceAlertEvent"
++    delete:
++      summary: Delete alert rules
++      parameters:
++        - name: ruleId
++          in: query
++          required: false
++          schema:
++            type: string
++      responses:
++        "200":
++          description: Deleted
++          content:
++            application/json:
++              schema:
++                type: object
++                properties:
++                  ok:
++                    type: boolean
++                  ruleId:
++                    type: string
+   /healthz:
+     get:
+       summary: Health check
+diff --git a/tools/resilienceClient.ts b/tools/resilienceClient.ts
+index 916fa8c..f465fb0 100644
+--- a/tools/resilienceClient.ts
++++ b/tools/resilienceClient.ts
+@@ -60,6 +60,10 @@ export class ResilienceClient {
+     return this.sendJson<ApiOkResponse>("/metrics/resilience/reset", { method: "PUT" });
+   }
+ 
++  async resetMetricsPost(): Promise<ApiOkResponse> {
++    return this.sendJson<ApiOkResponse>("/metrics/resilience/reset", { method: "POST" });
++  }
++
+   async createAlertRule(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
+     return this.sendJson<ResilienceAlertRule>("/alerts/thresholds", {
+       method: "POST",
+@@ -67,11 +71,50 @@ export class ResilienceClient {
+     });
+   }
+ 
++  async createAlert(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
++    return this.sendJson<ResilienceAlertRule>("/alerts", {
++      method: "POST",
++      body: JSON.stringify(rule)
++    });
++  }
++
+   async getAlerts(limit = 50): Promise<ResilienceAlertsResponse> {
+     const query = new URLSearchParams({ limit: String(limit) });
+     return this.getJson(`/alerts?${query.toString()}`);
+   }
+ 
++  async deleteAlerts(ruleId?: string): Promise<ApiOkResponse> {
++    const query = new URLSearchParams();
++    if (ruleId) query.set("ruleId", ruleId);
++    return this.sendJson<ApiOkResponse>(`/alerts${query.toString() ? `?${query}` : ""}`, {
++      method: "DELETE"
++    });
++  }
++
++  async *watchMetrics(intervalMs = 2000): AsyncGenerator<CircuitMetricsSnapshot> {
++    while (true) {
++      yield await this.getMetrics();
++      await new Promise((resolve) => setTimeout(resolve, intervalMs));
++    }
++  }
++
++  async *watchCsv(intervalMs = 2000): AsyncGenerator<string> {
++    yield "capturedAt,openCount,halfOpenCount,closedCount,retryAttempts";
++    for await (const metrics of this.watchMetrics(intervalMs)) {
++      const capturedAt = new Date().toISOString();
++      yield `${capturedAt},${metrics.openCount},${metrics.halfOpenCount},${metrics.closedCount},${metrics.retryAttempts}`;
++    }
++  }
++
++  watchMetricsObservable(intervalMs = 2000): Observable<CircuitMetricsSnapshot> {
++    return createObservable(async (next, stop) => {
++      for await (const metrics of this.watchMetrics(intervalMs)) {
++        if (stop.aborted) return;
++        next(metrics);
++      }
++    });
++  }
++
+   private async getJson<T>(path: string): Promise<T> {
+     const res = await fetch(this.baseUrl + path, { headers: this.headers() });
+     if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+@@ -94,3 +137,15 @@ export class ResilienceClient {
+     return this.token ? { "X-Builder-Token": this.token } : {};
+   }
+ }
++
++export type Observable<T> = {
++  subscribe: (next: (value: T) => void) => { unsubscribe: () => void };
++};
++
++const createObservable = <T>(producer: (next: (value: T) => void, stop: AbortController) => Promise<void>): Observable<T> => ({
++  subscribe: (next) => {
++    const stop = new AbortController();
++    void producer(next, stop);
++    return { unsubscribe: () => stop.abort() };
++  }
++});

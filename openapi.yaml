@@ -89,12 +89,28 @@ paths:
                     type: string
                   status:
                     $ref: "#/components/schemas/SessionStatus"
+                  resilienceSummary:
+                    type: string
+                    description: Summary of resilience metrics at time of request.
+                  resilience:
+                    $ref: "#/components/schemas/ResilienceMetrics"
+                  resilienceByTool:
+                    $ref: "#/components/schemas/ResilienceMetricsByTool"
+                  resilienceAlerts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ResilienceAlertEvent"
         "404":
           description: Not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              examples:
+                notFound:
+                  value:
+                    code: not_found
+                    message: not_found
   /sessions/{id}/plan:
     get:
       summary: Get pending plan
@@ -177,6 +193,28 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              examples:
+                badRequest:
+                  value:
+                    code: bad_request
+                    message: text_required
+        "503":
+          description: Circuit open
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              examples:
+                circuitOpen:
+                  value:
+                    code: service_unavailable
+                    message: circuit_open
+                    details:
+                      retryAfterSeconds: 30
+                      hint: The circuit breaker is open. Retry after backoff.
+                      circuitState: open
+                      endpoint: /sessions/abc123/message
+                      errorCode: circuit_open
   /sessions/{id}/attachments:
     post:
       summary: Add attachment
@@ -233,6 +271,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SessionRunResponse"
+        "503":
+          description: Circuit open
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              examples:
+                circuitOpen:
+                  value:
+                    code: service_unavailable
+                    message: circuit_open
+                    details:
+                      retryAfterSeconds: 30
+                      hint: The circuit breaker is open. Retry after backoff.
+                      circuitState: open
+                      endpoint: /sessions/abc123/run
+                      errorCode: circuit_open
   /sessions/{id}/cancel:
     post:
       summary: Cancel plan
@@ -267,6 +322,17 @@ paths:
   /metrics/resilience:
     get:
       summary: Resilience metrics
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ResilienceState"
+        - name: minRetryAttempts
+          in: query
+          required: false
+          schema:
+            type: integer
       responses:
         "200":
           description: Resilience metrics
@@ -274,6 +340,173 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ResilienceMetrics"
+        "204":
+          description: No matching metrics
+        "400":
+          description: Invalid filter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /metrics/resilience/history:
+    get:
+      summary: Resilience metrics history
+      parameters:
+        - name: minutes
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: bucketMinutes
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Resilience history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResilienceMetricsSample"
+  /metrics/resilience/reset:
+    put:
+      summary: Reset resilience metrics
+      responses:
+        "200":
+          description: Reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  resetAt:
+                    type: string
+                    format: date-time
+    post:
+      summary: Reset resilience metrics
+      responses:
+        "200":
+          description: Reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  resetAt:
+                    type: string
+                    format: date-time
+  /alerts/thresholds:
+    post:
+      summary: Create alert threshold rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResilienceAlertRuleRequest"
+      responses:
+        "201":
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResilienceAlertRule"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /alerts:
+    post:
+      summary: Create alert rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResilienceAlertRuleRequest"
+      responses:
+        "201":
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResilienceAlertRule"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    get:
+      summary: List alert rules and recent events
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ResilienceAlertRule"
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ResilienceAlertEvent"
+    delete:
+      summary: Delete alert rules
+      parameters:
+        - name: ruleId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  ruleId:
+                    type: string
   /healthz:
     get:
       summary: Health check
@@ -329,6 +562,11 @@ components:
           type: string
         details:
           type: object
+      example:
+        code: bad_request
+        message: invalid_state
+        details:
+          errorCode: invalid_state
     SessionSummary:
       type: object
       properties:
@@ -337,6 +575,11 @@ components:
         lastTouched:
           type: string
           format: date-time
+        resilienceSummary:
+          type: string
+          description: Summary of resilience metrics at time of request.
+        resilience:
+          $ref: "#/components/schemas/ResilienceMetrics"
     SessionMessage:
       type: object
       properties:
@@ -385,15 +628,127 @@ components:
       additionalProperties: true
     ResilienceMetrics:
       type: object
+      readOnly: true
       properties:
         openCount:
           type: integer
+          readOnly: true
+          description: OpenCount (number of circuits opened)
         halfOpenCount:
           type: integer
+          readOnly: true
+          description: HalfOpenCount (number of circuits half-opened)
         closedCount:
           type: integer
+          readOnly: true
+          description: ClosedCount (number of circuits closed)
         retryAttempts:
           type: integer
+          readOnly: true
+          description: RetryAttempts (number of retry attempts recorded)
+      example:
+        openCount: 1
+        halfOpenCount: 0
+        closedCount: 5
+        retryAttempts: 3
+    ResilienceState:
+      type: string
+      enum:
+        - open
+        - halfopen
+        - closed
+    ResilienceMetricsByTool:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/ResilienceMetrics"
+    ResilienceMetricsSample:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        metrics:
+          $ref: "#/components/schemas/ResilienceMetrics"
+      example:
+        timestamp: "2026-01-11T01:00:00Z"
+        metrics:
+          openCount: 1
+          halfOpenCount: 0
+          closedCount: 5
+          retryAttempts: 3
+    ResilienceAlertRuleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        openThreshold:
+          type: integer
+        retryThreshold:
+          type: integer
+        windowMinutes:
+          type: integer
+        severity:
+          type: string
+          enum: [warning, critical]
+      example:
+        name: retry-spike
+        openThreshold: 3
+        retryThreshold: 10
+        windowMinutes: 60
+        severity: warning
+    ResilienceAlertRule:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        openThreshold:
+          type: integer
+        retryThreshold:
+          type: integer
+        windowMinutes:
+          type: integer
+        severity:
+          type: string
+          enum: [warning, critical]
+        enabled:
+          type: boolean
+      example:
+        id: rule-1
+        name: retry-spike
+        openThreshold: 3
+        retryThreshold: 10
+        windowMinutes: 60
+        severity: warning
+        enabled: true
+    ResilienceAlertEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        ruleId:
+          type: string
+        message:
+          type: string
+        severity:
+          type: string
+          enum: [warning, critical]
+        triggeredAt:
+          type: string
+          format: date-time
+        openDelta:
+          type: integer
+        retryDelta:
+          type: integer
+      example:
+        id: event-1
+        ruleId: rule-1
+        message: Alert 'retry-spike' triggered: open/hr=0, retry/hr=12.
+        severity: warning
+        triggeredAt: "2026-01-11T01:05:00Z"
+        openDelta: 0
+        retryDelta: 12
     ProviderEvent:
       type: object
       properties:

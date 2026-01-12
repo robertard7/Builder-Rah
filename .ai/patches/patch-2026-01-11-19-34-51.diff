@@ -1,0 +1,17 @@
+diff --git a/openapi.yaml b/openapi.yaml
+index f643403..8fa2a24 100644
+--- a/openapi.yaml
++++ b/openapi.yaml
+@@ -96,12 +96,6 @@ paths:
+                     $ref: "#/components/schemas/ResilienceMetrics"
+                   resilienceByTool:
+                     $ref: "#/components/schemas/ResilienceMetricsByTool"
+-                  resilienceSummary:
+-                    type: string
+-                  resilience:
+-                    $ref: "#/components/schemas/ResilienceMetrics"
+-                  resilienceByTool:
+-                    $ref: "#/components/schemas/ResilienceMetricsByTool"
+         "404":
+           description: Not found
+           content:
