@@ -136,10 +136,22 @@ public sealed class HeadlessApiServer
             {
                 var minutes = ParseQueryInt(req, "minutes", 60);
                 var limit = ParseQueryInt(req, "limit", 300);
+                var bucketMinutes = ParseQueryInt(req, "bucketMinutes", 0);
+                var start = ParseQueryDateTime(req, "start");
+                var end = ParseQueryDateTime(req, "end");
                 if (minutes <= 0) minutes = 60;
                 if (limit <= 0) limit = 300;
-                var window = TimeSpan.FromMinutes(minutes);
-                var history = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotHistory(window, limit);
+                if (bucketMinutes < 0) bucketMinutes = 0;
+                IReadOnlyList<RahOllamaOnly.Metrics.ResilienceMetricsSample> history;
+                if (start.HasValue || end.HasValue)
+                {
+                    history = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotHistoryRange(start, end, limit, bucketMinutes > 0 ? bucketMinutes : null);
+                }
+                else
+                {
+                    var window = TimeSpan.FromMinutes(minutes);
+                    history = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.SnapshotHistory(window, limit);
+                }
                 await WriteJsonAsync(ctx, 200, history, ct).ConfigureAwait(false);
                 return;
             }
@@ -164,13 +176,14 @@ public sealed class HeadlessApiServer
                 var windowMinutes = payload.TryGetProperty("windowMinutes", out var winEl) && winEl.TryGetInt32(out var win)
                     ? win
                     : 60;
+                var severity = payload.TryGetProperty("severity", out var severityEl) ? severityEl.GetString() ?? "" : "";
                 if (openThreshold <= 0 && retryThreshold <= 0)
                 {
                     isError = true;
                     await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
                     return;
                 }
-                var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes);
+                var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes, severity);
                 await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
                 return;
             }
@@ -485,6 +498,14 @@ public sealed class HeadlessApiServer
         if (int.TryParse(value, out var parsed))
             return parsed;
         return fallback;
+    }
+
+    private static DateTimeOffset? ParseQueryDateTime(HttpListenerRequest req, string key)
+    {
+        var value = req.QueryString[key];
+        if (DateTimeOffset.TryParse(value, out var parsed))
+            return parsed;
+        return null;
     }
 
     private static bool TryApplyStateFilter(CircuitMetricsSnapshot metrics, string state, out CircuitMetricsSnapshot filtered)

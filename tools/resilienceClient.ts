@@ -15,10 +15,12 @@ export type ResilienceAlertRuleRequest = {
   openThreshold: number;
   retryThreshold: number;
   windowMinutes: number;
+  severity?: "warning" | "critical";
 };
 
 export type ResilienceAlertRule = ResilienceAlertRuleRequest & {
   id: string;
+  severity: "warning" | "critical";
   enabled: boolean;
 };
 
@@ -26,6 +28,7 @@ export type ResilienceAlertEvent = {
   id: string;
   ruleId: string;
   message: string;
+  severity: "warning" | "critical";
   triggeredAt: string;
   openDelta: number;
   retryDelta: number;

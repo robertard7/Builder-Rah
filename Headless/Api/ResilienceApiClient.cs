@@ -57,11 +57,11 @@ public sealed class ResilienceApiClient
 
     public sealed record CircuitMetricsSnapshot(int OpenCount, int HalfOpenCount, int ClosedCount, int RetryAttempts);
 
-    public sealed record ResilienceAlertRuleRequest(string? Name, int OpenThreshold, int RetryThreshold, int WindowMinutes);
+    public sealed record ResilienceAlertRuleRequest(string? Name, int OpenThreshold, int RetryThreshold, int WindowMinutes, string? Severity);
 
-    public sealed record ResilienceAlertRule(string Id, string Name, int OpenThreshold, int RetryThreshold, int WindowMinutes, bool Enabled);
+    public sealed record ResilienceAlertRule(string Id, string Name, int OpenThreshold, int RetryThreshold, int WindowMinutes, string Severity, bool Enabled);
 
-    public sealed record ResilienceAlertEvent(string Id, string RuleId, string Message, DateTimeOffset TriggeredAt, int OpenDelta, int RetryDelta);
+    public sealed record ResilienceAlertEvent(string Id, string RuleId, string Message, string Severity, DateTimeOffset TriggeredAt, int OpenDelta, int RetryDelta);
 
     public sealed record ResilienceAlertsResponse(ResilienceAlertRule[] Rules, ResilienceAlertEvent[] Events);
 

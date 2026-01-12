@@ -357,7 +357,24 @@ paths:
           required: false
           schema:
             type: integer
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
         - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: bucketMinutes
           in: query
           required: false
           schema:
@@ -614,11 +631,15 @@ components:
           type: integer
         windowMinutes:
           type: integer
+        severity:
+          type: string
+          enum: [warning, critical]
       example:
         name: retry-spike
         openThreshold: 3
         retryThreshold: 10
         windowMinutes: 60
+        severity: warning
     ResilienceAlertRule:
       type: object
       properties:
@@ -632,6 +653,9 @@ components:
           type: integer
         windowMinutes:
           type: integer
+        severity:
+          type: string
+          enum: [warning, critical]
         enabled:
           type: boolean
       example:
@@ -640,6 +664,7 @@ components:
         openThreshold: 3
         retryThreshold: 10
         windowMinutes: 60
+        severity: warning
         enabled: true
     ResilienceAlertEvent:
       type: object
@@ -650,6 +675,9 @@ components:
           type: string
         message:
           type: string
+        severity:
+          type: string
+          enum: [warning, critical]
         triggeredAt:
           type: string
           format: date-time
@@ -661,6 +689,7 @@ components:
         id: event-1
         ruleId: rule-1
         message: Alert 'retry-spike' triggered: open/hr=0, retry/hr=12.
+        severity: warning
         triggeredAt: "2026-01-11T01:05:00Z"
         openDelta: 0
         retryDelta: 12

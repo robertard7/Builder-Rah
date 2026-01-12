@@ -12,12 +12,14 @@ public sealed record ResilienceAlertRule(
     int OpenThreshold,
     int RetryThreshold,
     int WindowMinutes,
+    string Severity,
     bool Enabled);
 
 public sealed record ResilienceAlertEvent(
     string Id,
     string RuleId,
     string Message,
+    string Severity,
     DateTimeOffset TriggeredAt,
     int OpenDelta,
     int RetryDelta);
@@ -34,14 +36,18 @@ public sealed class ResilienceAlertStore
         _maxEvents = Math.Max(1, maxEvents);
     }
 
-    public ResilienceAlertRule AddRule(string name, int openThreshold, int retryThreshold, int windowMinutes)
+    public ResilienceAlertRule AddRule(string name, int openThreshold, int retryThreshold, int windowMinutes, string severity)
     {
+        var normalizedSeverity = string.IsNullOrWhiteSpace(severity) ? "warning" : severity.Trim().ToLowerInvariant();
+        if (normalizedSeverity != "warning" && normalizedSeverity != "critical")
+            normalizedSeverity = "warning";
         var rule = new ResilienceAlertRule(
             Guid.NewGuid().ToString("N"),
             string.IsNullOrWhiteSpace(name) ? "threshold" : name.Trim(),
             Math.Max(0, openThreshold),
             Math.Max(0, retryThreshold),
             Math.Max(1, windowMinutes),
+            normalizedSeverity,
             true);
         _rules[rule.Id] = rule;
         _activeStates[rule.Id] = false;
@@ -81,7 +87,7 @@ public sealed class ResilienceAlertStore
             if (triggered && !wasActive)
             {
                 var message = $"Alert '{rule.Name}' triggered: open/hr={openDelta}, retry/hr={retryDelta}.";
-                var alert = new ResilienceAlertEvent(Guid.NewGuid().ToString("N"), rule.Id, message, DateTimeOffset.UtcNow, openDelta, retryDelta);
+                var alert = new ResilienceAlertEvent(Guid.NewGuid().ToString("N"), rule.Id, message, rule.Severity, DateTimeOffset.UtcNow, openDelta, retryDelta);
                 _events.Enqueue(alert);
                 TrimEvents();
             }

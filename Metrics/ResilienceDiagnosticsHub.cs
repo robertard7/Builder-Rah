@@ -68,14 +68,19 @@ public static class ResilienceDiagnosticsHub
         return History.Snapshot(window, limit);
     }
 
+    public static IReadOnlyList<ResilienceMetricsSample> SnapshotHistoryRange(DateTimeOffset? start, DateTimeOffset? end, int? limit = null, int? bucketMinutes = null)
+    {
+        return History.SnapshotRange(start, end, limit, bucketMinutes);
+    }
+
     public static bool IsCircuitOpen()
     {
         return BreakerStates.Values.Any(state => state == CircuitState.Open);
     }
 
-    public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes)
+    public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes, string severity)
     {
-        return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes);
+        return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes, severity);
     }
 
     public static IReadOnlyList<ResilienceAlertRule> ListAlertRules()
