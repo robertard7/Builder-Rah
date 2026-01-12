@@ -26,8 +26,15 @@ jobs:
         run: npm install
         working-directory: tools
       - name: Test TS client
-        run: npm test
+        run: npm run test:ci
         working-directory: tools
+      - name: Publish TS client test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: TS Client Tests
+          path: tools/coverage/junit.xml
+          reporter: java-junit
       - name: Upload TS client coverage
         uses: actions/upload-artifact@v4
         with:

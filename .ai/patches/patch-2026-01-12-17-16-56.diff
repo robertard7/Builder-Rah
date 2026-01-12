@@ -1,0 +1,33 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 598024b..633d8ab 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -26,8 +26,15 @@ jobs:
+         run: npm install
+         working-directory: tools
+       - name: Test TS client
+-        run: npm test
++        run: npm run test:ci
+         working-directory: tools
++      - name: Publish TS client test results
++        if: always()
++        uses: dorny/test-reporter@v1
++        with:
++          name: TS Client Tests
++          path: tools/coverage/junit.xml
++          reporter: java-junit
+       - name: Upload TS client coverage
+         uses: actions/upload-artifact@v4
+         with:
+diff --git a/tools/package.json b/tools/package.json
+index 56b43b6..0433632 100644
+--- a/tools/package.json
++++ b/tools/package.json
+@@ -14,6 +14,7 @@
+     "build": "tsc -p tsconfig.json",
+     "build:test": "tsc -p tsconfig.test.json",
+     "test": "npm run build:test && npm run test:coverage",
++    "test:ci": "npm run build:test && c8 --check-coverage --lines 80 --branches 70 --functions 70 --statements 80 node --test --test-reporter junit --test-reporter-destination coverage/junit.xml dist-tests",
+     "test:coverage": "c8 --check-coverage --lines 80 --branches 70 --functions 70 --statements 80 node --test dist-tests",
+     "lint": "node --check dist/index.js",
+     "generate:openapi-types": "openapi-typescript ../openapi.yaml --output openapi-types.d.ts",
