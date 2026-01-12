@@ -13,6 +13,7 @@ public sealed class ResilienceMetricsPanel : UserControl
 {
     private readonly Chart _chart;
     private readonly ListView _toolList;
+    private readonly ListView _alertList;
     private readonly Label _alertLabel;
     private readonly NumericUpDown _openThreshold;
     private readonly NumericUpDown _retryThreshold;
@@ -29,6 +30,7 @@ public sealed class ResilienceMetricsPanel : UserControl
 
         _chart = BuildChart();
         _toolList = BuildToolList();
+        _alertList = BuildAlertList();
         _alertLabel = new Label { AutoSize = true, ForeColor = Color.SeaGreen, Text = "Alerts: OK" };
         _openThreshold = new NumericUpDown { Minimum = 0, Maximum = 100000, Value = 5, Width = 80 };
         _retryThreshold = new NumericUpDown { Minimum = 0, Maximum = 100000, Value = 25, Width = 80 };
@@ -59,7 +61,15 @@ public sealed class ResilienceMetricsPanel : UserControl
             SplitterDistance = 520
         };
         split.Panel1.Controls.Add(_chart);
-        split.Panel2.Controls.Add(_toolList);
+        var rightSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Horizontal,
+            SplitterDistance = 240
+        };
+        rightSplit.Panel1.Controls.Add(_toolList);
+        rightSplit.Panel2.Controls.Add(_alertList);
+        split.Panel2.Controls.Add(rightSplit);
 
         Controls.Add(split);
         Controls.Add(thresholdPanel);
@@ -124,6 +134,19 @@ public sealed class ResilienceMetricsPanel : UserControl
         return list;
     }
 
+    private static ListView BuildAlertList()
+    {
+        var list = new ListView
+        {
+            Dock = DockStyle.Fill,
+            View = View.Details,
+            FullRowSelect = true
+        };
+        list.Columns.Add("Triggered", 140);
+        list.Columns.Add("Alert", 260);
+        return list;
+    }
+
     private void RefreshMetrics()
     {
         var metrics = ResilienceDiagnosticsHub.Snapshot();
@@ -133,6 +156,7 @@ public sealed class ResilienceMetricsPanel : UserControl
         UpdateChart(history);
         UpdateToolList(byTool);
         UpdateAlerts(metrics, alertHistory);
+        UpdateAlertList();
     }
 
     private void UpdateChart(IReadOnlyList<ResilienceMetricsSample> history)
@@ -215,6 +239,20 @@ public sealed class ResilienceMetricsPanel : UserControl
         {
             _alertActive = false;
         }
+    }
+
+    private void UpdateAlertList()
+    {
+        var eventsList = ResilienceDiagnosticsHub.ListAlertEvents(10);
+        _alertList.BeginUpdate();
+        _alertList.Items.Clear();
+        foreach (var alert in eventsList)
+        {
+            var item = new ListViewItem(alert.TriggeredAt.ToLocalTime().ToString("g"));
+            item.SubItems.Add(alert.Message);
+            _alertList.Items.Add(item);
+        }
+        _alertList.EndUpdate();
     }
 
     private void CopySnapshot()

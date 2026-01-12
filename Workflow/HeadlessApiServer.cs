@@ -151,6 +151,40 @@ public sealed class HeadlessApiServer
                 return;
             }
 
+            if (req.HttpMethod == "POST" && path == "/alerts/thresholds")
+            {
+                var payload = await ReadJsonAsync(req, ct).ConfigureAwait(false);
+                var name = payload.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
+                var openThreshold = payload.TryGetProperty("openThreshold", out var openEl) && openEl.TryGetInt32(out var open)
+                    ? open
+                    : 0;
+                var retryThreshold = payload.TryGetProperty("retryThreshold", out var retryEl) && retryEl.TryGetInt32(out var retry)
+                    ? retry
+                    : 0;
+                var windowMinutes = payload.TryGetProperty("windowMinutes", out var winEl) && winEl.TryGetInt32(out var win)
+                    ? win
+                    : 60;
+                if (openThreshold <= 0 && retryThreshold <= 0)
+                {
+                    isError = true;
+                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
+                    return;
+                }
+                var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes);
+                await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "GET" && path == "/alerts")
+            {
+                var limit = ParseQueryInt(req, "limit", 50);
+                if (limit <= 0) limit = 50;
+                var rules = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertRules();
+                var eventsList = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(limit);
+                await WriteJsonAsync(ctx, 200, new { rules, events = eventsList }, ct).ConfigureAwait(false);
+                return;
+            }
+
             if (req.HttpMethod == "GET" && path == "/healthz")
             {
                 await WriteJsonAsync(ctx, 200, new { ok = true, telemetry = TelemetryRegistry.Snapshot() }, ct).ConfigureAwait(false);

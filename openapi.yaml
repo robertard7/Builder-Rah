@@ -351,6 +351,53 @@ paths:
                   resetAt:
                     type: string
                     format: date-time
+  /alerts/thresholds:
+    post:
+      summary: Create alert threshold rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResilienceAlertRuleRequest"
+      responses:
+        "201":
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResilienceAlertRule"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /alerts:
+    get:
+      summary: List alert rules and recent events
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ResilienceAlertRule"
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ResilienceAlertEvent"
   /healthz:
     get:
       summary: Health check
@@ -491,6 +538,48 @@ components:
           format: date-time
         metrics:
           $ref: "#/components/schemas/ResilienceMetrics"
+    ResilienceAlertRuleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        openThreshold:
+          type: integer
+        retryThreshold:
+          type: integer
+        windowMinutes:
+          type: integer
+    ResilienceAlertRule:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        openThreshold:
+          type: integer
+        retryThreshold:
+          type: integer
+        windowMinutes:
+          type: integer
+        enabled:
+          type: boolean
+    ResilienceAlertEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        ruleId:
+          type: string
+        message:
+          type: string
+        triggeredAt:
+          type: string
+          format: date-time
+        openDelta:
+          type: integer
+        retryDelta:
+          type: integer
     ProviderEvent:
       type: object
       properties:

@@ -13,6 +13,7 @@ public static class ResilienceDiagnosticsHub
     private static readonly ConcurrentDictionary<CircuitBreaker, EventHandler<CircuitBreakerStateChangedEventArgs>> Subscriptions = new();
     private static readonly ConcurrentDictionary<string, CircuitMetricsStore> ToolStores = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ResilienceHistoryStore History = new();
+    private static readonly ResilienceAlertStore Alerts = new();
 
     public static void Attach(CircuitBreaker breaker)
     {
@@ -46,6 +47,7 @@ public static class ResilienceDiagnosticsHub
     {
         var snapshot = Store.Snapshot();
         History.Add(snapshot);
+        Alerts.Evaluate(snapshot, History.Snapshot());
         return snapshot;
     }
 
@@ -62,10 +64,26 @@ public static class ResilienceDiagnosticsHub
         return History.Snapshot(window, limit);
     }
 
+    public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes)
+    {
+        return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes);
+    }
+
+    public static IReadOnlyList<ResilienceAlertRule> ListAlertRules()
+    {
+        return Alerts.ListRules();
+    }
+
+    public static IReadOnlyList<ResilienceAlertEvent> ListAlertEvents(int limit = 50)
+    {
+        return Alerts.ListEvents(limit);
+    }
+
     public static void Reset()
     {
         Store.Reset();
         ToolStores.Clear();
         History.Reset();
+        Alerts.Reset();
     }
 }
