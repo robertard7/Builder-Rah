@@ -38,6 +38,12 @@ public sealed class ResilienceApiClient
         return await response.Content.ReadFromJsonAsync<ApiOkResponse>(cancellationToken: ct).ConfigureAwait(false);
     }
 
+    public async Task<ApiOkResponse?> ResetMetricsPostAsync(CancellationToken ct = default)
+    {
+        using var response = await _http.PostAsync("/metrics/resilience/reset", content: null, ct).ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<ApiOkResponse>(cancellationToken: ct).ConfigureAwait(false);
+    }
+
     public async Task<ResilienceAlertRule?> CreateAlertRuleAsync(ResilienceAlertRuleRequest request, CancellationToken ct = default)
     {
         using var response = await _http.PostAsJsonAsync("/alerts/thresholds", request, ct).ConfigureAwait(false);
@@ -49,6 +55,20 @@ public sealed class ResilienceApiClient
         var query = QueryBuilder.Create()
             .Add("limit", limit.ToString());
         return await _http.GetFromJsonAsync<ResilienceAlertsResponse>($"/alerts{query}", ct).ConfigureAwait(false);
+    }
+
+    public async Task<ApiOkResponse?> DeleteAlertsAsync(string? ruleId = null, CancellationToken ct = default)
+    {
+        var query = QueryBuilder.Create()
+            .Add("ruleId", ruleId);
+        using var response = await _http.DeleteAsync($"/alerts{query}", ct).ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<ApiOkResponse>(cancellationToken: ct).ConfigureAwait(false);
+    }
+
+    public async Task<ResilienceAlertRule?> CreateAlertAsync(ResilienceAlertRuleRequest request, CancellationToken ct = default)
+    {
+        using var response = await _http.PostAsJsonAsync("/alerts", request, ct).ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<ResilienceAlertRule>(cancellationToken: ct).ConfigureAwait(false);
     }
 
     public sealed record ApiOkResponse(bool Ok, DateTimeOffset ResetAt);

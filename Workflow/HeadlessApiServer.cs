@@ -162,8 +162,39 @@ public sealed class HeadlessApiServer
                 await WriteJsonAsync(ctx, 200, new { ok = true, resetAt = DateTimeOffset.UtcNow }, ct).ConfigureAwait(false);
                 return;
             }
+            if (req.HttpMethod == "POST" && path == "/metrics/resilience/reset")
+            {
+                RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Reset();
+                await WriteJsonAsync(ctx, 200, new { ok = true, resetAt = DateTimeOffset.UtcNow }, ct).ConfigureAwait(false);
+                return;
+            }
 
             if (req.HttpMethod == "POST" && path == "/alerts/thresholds")
+            {
+                var payload = await ReadJsonAsync(req, ct).ConfigureAwait(false);
+                var name = payload.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
+                var openThreshold = payload.TryGetProperty("openThreshold", out var openEl) && openEl.TryGetInt32(out var open)
+                    ? open
+                    : 0;
+                var retryThreshold = payload.TryGetProperty("retryThreshold", out var retryEl) && retryEl.TryGetInt32(out var retry)
+                    ? retry
+                    : 0;
+                var windowMinutes = payload.TryGetProperty("windowMinutes", out var winEl) && winEl.TryGetInt32(out var win)
+                    ? win
+                    : 60;
+                var severity = payload.TryGetProperty("severity", out var severityEl) ? severityEl.GetString() ?? "" : "";
+                if (openThreshold <= 0 && retryThreshold <= 0)
+                {
+                    isError = true;
+                    await WriteErrorAsync(ctx, 400, ApiError.BadRequest("threshold_required"), ct).ConfigureAwait(false);
+                    return;
+                }
+                var rule = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.AddAlertRule(name, openThreshold, retryThreshold, windowMinutes, severity);
+                await WriteJsonAsync(ctx, 201, rule, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "POST" && path == "/alerts")
             {
                 var payload = await ReadJsonAsync(req, ct).ConfigureAwait(false);
                 var name = payload.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
@@ -195,6 +226,20 @@ public sealed class HeadlessApiServer
                 var rules = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertRules();
                 var eventsList = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ListAlertEvents(limit);
                 await WriteJsonAsync(ctx, 200, new { rules, events = eventsList }, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "DELETE" && path == "/alerts")
+            {
+                var ruleId = req.QueryString["ruleId"];
+                if (!string.IsNullOrWhiteSpace(ruleId))
+                {
+                    var removed = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.RemoveAlertRule(ruleId);
+                    await WriteJsonAsync(ctx, 200, new { ok = removed, ruleId }, ct).ConfigureAwait(false);
+                    return;
+                }
+                RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.ClearAlerts();
+                await WriteJsonAsync(ctx, 200, new { ok = true }, ct).ConfigureAwait(false);
                 return;
             }
 

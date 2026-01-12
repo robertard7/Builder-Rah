@@ -93,6 +93,16 @@ public static class ResilienceDiagnosticsHub
         return Alerts.ListEvents(limit);
     }
 
+    public static bool RemoveAlertRule(string ruleId)
+    {
+        return Alerts.RemoveRule(ruleId);
+    }
+
+    public static void ClearAlerts()
+    {
+        Alerts.Clear();
+    }
+
     public static void Reset()
     {
         Store.Reset();

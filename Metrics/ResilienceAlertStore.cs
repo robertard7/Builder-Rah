@@ -63,6 +63,21 @@ public sealed class ResilienceAlertStore
         return _events.Reverse().Take(limit).ToList();
     }
 
+    public bool RemoveRule(string ruleId)
+    {
+        if (string.IsNullOrWhiteSpace(ruleId))
+            return false;
+        _activeStates.TryRemove(ruleId, out _);
+        return _rules.TryRemove(ruleId, out _);
+    }
+
+    public void Clear()
+    {
+        _rules.Clear();
+        _activeStates.Clear();
+        while (_events.TryDequeue(out _)) { }
+    }
+
     public void Evaluate(CircuitMetricsSnapshot current, IReadOnlyList<ResilienceMetricsSample> history)
     {
         if (history.Count == 0)

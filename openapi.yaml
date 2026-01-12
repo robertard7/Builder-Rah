@@ -404,6 +404,21 @@ paths:
                   resetAt:
                     type: string
                     format: date-time
+    post:
+      summary: Reset resilience metrics
+      responses:
+        "200":
+          description: Reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  resetAt:
+                    type: string
+                    format: date-time
   /alerts/thresholds:
     post:
       summary: Create alert threshold rule
@@ -427,6 +442,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
   /alerts:
+    post:
+      summary: Create alert rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResilienceAlertRuleRequest"
+      responses:
+        "201":
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResilienceAlertRule"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
     get:
       summary: List alert rules and recent events
       parameters:
@@ -451,6 +487,26 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/ResilienceAlertEvent"
+    delete:
+      summary: Delete alert rules
+      parameters:
+        - name: ruleId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  ruleId:
+                    type: string
   /healthz:
     get:
       summary: Health check

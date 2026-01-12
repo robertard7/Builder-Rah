@@ -60,8 +60,19 @@ export class ResilienceClient {
     return this.sendJson<ApiOkResponse>("/metrics/resilience/reset", { method: "PUT" });
   }
 
+  async resetMetricsPost(): Promise<ApiOkResponse> {
+    return this.sendJson<ApiOkResponse>("/metrics/resilience/reset", { method: "POST" });
+  }
+
   async createAlertRule(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
     return this.sendJson<ResilienceAlertRule>("/alerts/thresholds", {
+      method: "POST",
+      body: JSON.stringify(rule)
+    });
+  }
+
+  async createAlert(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
+    return this.sendJson<ResilienceAlertRule>("/alerts", {
       method: "POST",
       body: JSON.stringify(rule)
     });
@@ -70,6 +81,38 @@ export class ResilienceClient {
   async getAlerts(limit = 50): Promise<ResilienceAlertsResponse> {
     const query = new URLSearchParams({ limit: String(limit) });
     return this.getJson(`/alerts?${query.toString()}`);
+  }
+
+  async deleteAlerts(ruleId?: string): Promise<ApiOkResponse> {
+    const query = new URLSearchParams();
+    if (ruleId) query.set("ruleId", ruleId);
+    return this.sendJson<ApiOkResponse>(`/alerts${query.toString() ? `?${query}` : ""}`, {
+      method: "DELETE"
+    });
+  }
+
+  async *watchMetrics(intervalMs = 2000): AsyncGenerator<CircuitMetricsSnapshot> {
+    while (true) {
+      yield await this.getMetrics();
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  }
+
+  async *watchCsv(intervalMs = 2000): AsyncGenerator<string> {
+    yield "capturedAt,openCount,halfOpenCount,closedCount,retryAttempts";
+    for await (const metrics of this.watchMetrics(intervalMs)) {
+      const capturedAt = new Date().toISOString();
+      yield `${capturedAt},${metrics.openCount},${metrics.halfOpenCount},${metrics.closedCount},${metrics.retryAttempts}`;
+    }
+  }
+
+  watchMetricsObservable(intervalMs = 2000): Observable<CircuitMetricsSnapshot> {
+    return createObservable(async (next, stop) => {
+      for await (const metrics of this.watchMetrics(intervalMs)) {
+        if (stop.aborted) return;
+        next(metrics);
+      }
+    });
   }
 
   private async getJson<T>(path: string): Promise<T> {
@@ -94,3 +137,15 @@ export class ResilienceClient {
     return this.token ? { "X-Builder-Token": this.token } : {};
   }
 }
+
+export type Observable<T> = {
+  subscribe: (next: (value: T) => void) => { unsubscribe: () => void };
+};
+
+const createObservable = <T>(producer: (next: (value: T) => void, stop: AbortController) => Promise<void>): Observable<T> => ({
+  subscribe: (next) => {
+    const stop = new AbortController();
+    void producer(next, stop);
+    return { unsubscribe: () => stop.abort() };
+  }
+});
