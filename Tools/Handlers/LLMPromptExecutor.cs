@@ -3,6 +3,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using RahBuilder.Settings;
+using RahOllamaOnly.Metrics;
 using RahOllamaOnly.Tools;
 
 namespace RahOllamaOnly.Tools.Handlers;
@@ -20,6 +21,7 @@ public sealed class LLMPromptExecutor : IPromptExecutor
         _defaultRole = string.IsNullOrWhiteSpace(defaultRole) ? "Orchestrator" : defaultRole;
         _retryPolicy = retryPolicy ?? new RetryPolicy();
         _circuitBreaker = circuitBreaker ?? new CircuitBreaker();
+        ResilienceDiagnosticsHub.Attach(_circuitBreaker);
     }
 
     public async Task<ExecutionResult> ExecuteAsync(string prompt, ExecutionOptions options)
@@ -60,6 +62,7 @@ public sealed class LLMPromptExecutor : IPromptExecutor
                 if (!_retryPolicy.ShouldRetry(ex))
                     break;
 
+                ResilienceDiagnosticsHub.RecordRetryAttempt();
                 var delay = _retryPolicy.GetDelay(attempt);
                 try
                 {
