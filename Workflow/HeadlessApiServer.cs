@@ -172,7 +172,15 @@ public sealed class HeadlessApiServer
             if (req.HttpMethod == "GET" && path == "/sessions")
             {
                 var list = _store.ListSessions();
-                var payload = list.Select(s => new { sessionId = s.SessionId, lastTouched = s.LastTouched });
+                var resilience = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                var resilienceSummary = BuildResilienceSummary(resilience);
+                var payload = list.Select(s => new
+                {
+                    sessionId = s.SessionId,
+                    lastTouched = s.LastTouched,
+                    resilienceSummary,
+                    resilience
+                });
                 await WriteJsonAsync(ctx, 200, payload, ct).ConfigureAwait(false);
                 return;
             }
@@ -181,7 +189,15 @@ public sealed class HeadlessApiServer
             {
                 var state = new SessionState { SessionId = Guid.NewGuid().ToString("N") };
                 _store.Save(state);
-                await WriteJsonAsync(ctx, 201, new { sessionId = state.SessionId, lastTouched = state.LastTouched }, ct).ConfigureAwait(false);
+                var resilience = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                var resilienceSummary = BuildResilienceSummary(resilience);
+                await WriteJsonAsync(ctx, 201, new
+                {
+                    sessionId = state.SessionId,
+                    lastTouched = state.LastTouched,
+                    resilienceSummary,
+                    resilience
+                }, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -198,7 +214,15 @@ public sealed class HeadlessApiServer
                         await WriteErrorAsync(ctx, 404, ApiError.NotFound(), ct).ConfigureAwait(false);
                         return;
                     }
-                    await WriteJsonAsync(ctx, 200, new { sessionId = state.SessionId, lastTouched = state.LastTouched }, ct).ConfigureAwait(false);
+                    var resilience = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                    var resilienceSummary = BuildResilienceSummary(resilience);
+                    await WriteJsonAsync(ctx, 200, new
+                    {
+                        sessionId = state.SessionId,
+                        lastTouched = state.LastTouched,
+                        resilienceSummary,
+                        resilience
+                    }, ct).ConfigureAwait(false);
                     return;
                 }
 
@@ -418,6 +442,11 @@ public sealed class HeadlessApiServer
                 filtered = metrics;
                 return false;
         }
+    }
+
+    private static string BuildResilienceSummary(CircuitMetricsSnapshot metrics)
+    {
+        return $"retries: {metrics.RetryAttempts}, open: {metrics.OpenCount}, half-open: {metrics.HalfOpenCount}, closed: {metrics.ClosedCount}";
     }
 
     private void DeleteArtifactsForSession(string sessionId)

@@ -375,6 +375,10 @@ components:
         lastTouched:
           type: string
           format: date-time
+        resilienceSummary:
+          type: string
+        resilience:
+          $ref: "#/components/schemas/ResilienceMetrics"
     SessionMessage:
       type: object
       properties:
