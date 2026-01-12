@@ -8,6 +8,7 @@ public sealed class CircuitBreaker
     private readonly object _lock = new();
     private readonly int _failureThreshold;
     private readonly TimeSpan _breakDuration;
+    private readonly Func<DateTimeOffset> _timeProvider;
     private int _failureCount;
     private DateTimeOffset? _openedUntil;
     private CircuitState _state = CircuitState.Closed;
@@ -15,10 +16,11 @@ public sealed class CircuitBreaker
 
     public event EventHandler<CircuitBreakerStateChangedEventArgs>? StateChanged;
 
-    public CircuitBreaker(int failureThreshold = 3, TimeSpan? breakDuration = null)
+    public CircuitBreaker(int failureThreshold = 3, TimeSpan? breakDuration = null, Func<DateTimeOffset>? timeProvider = null)
     {
         _failureThreshold = Math.Max(1, failureThreshold);
         _breakDuration = breakDuration ?? TimeSpan.FromSeconds(30);
+        _timeProvider = timeProvider ?? (() => DateTimeOffset.UtcNow);
     }
 
     public bool CanExecute()
@@ -30,7 +32,7 @@ public sealed class CircuitBreaker
 
             if (_state == CircuitState.Open)
             {
-                if (_openedUntil != null && _openedUntil <= DateTimeOffset.UtcNow)
+                if (_openedUntil != null && _openedUntil <= _timeProvider())
                     TransitionTo(CircuitState.HalfOpen);
                 else
                     return false;
@@ -79,7 +81,7 @@ public sealed class CircuitBreaker
 
     private void OpenCircuit()
     {
-        _openedUntil = DateTimeOffset.UtcNow.Add(_breakDuration);
+        _openedUntil = _timeProvider().Add(_breakDuration);
         TransitionTo(CircuitState.Open);
     }
 
@@ -90,6 +92,6 @@ public sealed class CircuitBreaker
 
         var previous = _state;
         _state = next;
-        StateChanged?.Invoke(this, new CircuitBreakerStateChangedEventArgs(previous, next, DateTimeOffset.UtcNow));
+        StateChanged?.Invoke(this, new CircuitBreakerStateChangedEventArgs(previous, next, _timeProvider()));
     }
 }
