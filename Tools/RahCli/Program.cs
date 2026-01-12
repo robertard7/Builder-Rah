@@ -144,7 +144,9 @@ public static class Program
         switch (cmd)
         {
             case "metrics":
-                return ResilienceMetricsCommand.Execute(context, context.JsonOutput);
+                return ResilienceMetricsCommand.Execute(context, args.Skip(1).ToArray(), context.JsonOutput);
+            case "reset":
+                return ResilienceResetCommand.Execute(context, context.JsonOutput);
         }
 
         WriteError(context, ApiError.BadRequest("unknown_resilience_command"));
@@ -258,6 +260,8 @@ public static class Program
         Console.WriteLine("rah provider metrics");
         Console.WriteLine("rah provider events");
         Console.WriteLine("rah resilience metrics");
+        Console.WriteLine("rah resilience metrics --watch");
+        Console.WriteLine("rah resilience reset");
         Console.WriteLine("rah --headless");
     }
 }

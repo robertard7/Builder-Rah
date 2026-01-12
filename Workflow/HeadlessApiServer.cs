@@ -96,7 +96,45 @@ public sealed class HeadlessApiServer
             if (req.HttpMethod == "GET" && path == "/metrics/resilience")
             {
                 var metrics = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                var stateFilter = req.QueryString["state"];
+                int? minRetryAttempts = null;
+                var minRetryValue = req.QueryString["minRetryAttempts"];
+                if (!string.IsNullOrWhiteSpace(minRetryValue))
+                {
+                    if (!int.TryParse(minRetryValue, out var parsedMinRetry))
+                    {
+                        isError = true;
+                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("invalid_min_retry_attempts"), ct).ConfigureAwait(false);
+                        return;
+                    }
+                    minRetryAttempts = parsedMinRetry;
+                }
+
+                if (minRetryAttempts.HasValue && metrics.RetryAttempts < minRetryAttempts.Value)
+                {
+                    await WriteEmptyAsync(ctx, 204, ct).ConfigureAwait(false);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(stateFilter))
+                {
+                    if (!TryApplyStateFilter(metrics, stateFilter, out var filtered))
+                    {
+                        isError = true;
+                        await WriteErrorAsync(ctx, 400, ApiError.BadRequest("invalid_state"), ct).ConfigureAwait(false);
+                        return;
+                    }
+                    metrics = filtered;
+                }
+
                 await WriteJsonAsync(ctx, 200, metrics, ct).ConfigureAwait(false);
+                return;
+            }
+
+            if (req.HttpMethod == "PUT" && path == "/metrics/resilience/reset")
+            {
+                RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Reset();
+                await WriteJsonAsync(ctx, 200, new { ok = true, resetAt = DateTimeOffset.UtcNow }, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -190,7 +228,8 @@ public sealed class HeadlessApiServer
                     workflow.ApplySessionState(state);
                     var statusCode = workflow.GetSessionStatusSnapshot();
                     var status = new SessionStatusDto(statusCode.ToString(), StatusMapper.ToDisplay(statusCode));
-                    await WriteJsonAsync(ctx, 200, new { sessionId, status }, ct).ConfigureAwait(false);
+                    var resilience = RahOllamaOnly.Metrics.ResilienceDiagnosticsHub.Snapshot();
+                    await WriteJsonAsync(ctx, 200, new { sessionId, status, resilience }, ct).ConfigureAwait(false);
                     return;
                 }
 
@@ -362,6 +401,25 @@ public sealed class HeadlessApiServer
         return fallback;
     }
 
+    private static bool TryApplyStateFilter(CircuitMetricsSnapshot metrics, string state, out CircuitMetricsSnapshot filtered)
+    {
+        switch (state.Trim().ToLowerInvariant())
+        {
+            case "open":
+                filtered = new CircuitMetricsSnapshot(metrics.OpenCount, 0, 0, metrics.RetryAttempts);
+                return true;
+            case "halfopen":
+                filtered = new CircuitMetricsSnapshot(0, metrics.HalfOpenCount, 0, metrics.RetryAttempts);
+                return true;
+            case "closed":
+                filtered = new CircuitMetricsSnapshot(0, 0, metrics.ClosedCount, metrics.RetryAttempts);
+                return true;
+            default:
+                filtered = metrics;
+                return false;
+        }
+    }
+
     private void DeleteArtifactsForSession(string sessionId)
     {
         if (string.IsNullOrWhiteSpace(sessionId)) return;
@@ -396,6 +454,14 @@ public sealed class HeadlessApiServer
         ctx.Response.ContentEncoding = Encoding.UTF8;
         ctx.Response.ContentLength64 = bytes.Length;
         await ctx.Response.OutputStream.WriteAsync(bytes.AsMemory(0, bytes.Length), ct).ConfigureAwait(false);
+        ctx.Response.OutputStream.Close();
+    }
+
+    private static async Task WriteEmptyAsync(HttpListenerContext ctx, int statusCode, CancellationToken ct)
+    {
+        ctx.Response.StatusCode = statusCode;
+        ctx.Response.ContentLength64 = 0;
+        await ctx.Response.OutputStream.FlushAsync(ct).ConfigureAwait(false);
         ctx.Response.OutputStream.Close();
     }
 

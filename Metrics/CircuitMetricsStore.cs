@@ -25,6 +25,12 @@ public sealed class CircuitMetricsStore
 
         return new CircuitMetricsSnapshot(openCount, halfOpenCount, closedCount, _retryAttempts);
     }
+
+    public void Reset()
+    {
+        _stateCounts.Clear();
+        System.Threading.Interlocked.Exchange(ref _retryAttempts, 0);
+    }
 }
 
 public sealed record CircuitMetricsSnapshot(

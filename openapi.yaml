@@ -89,6 +89,8 @@ paths:
                     type: string
                   status:
                     $ref: "#/components/schemas/SessionStatus"
+                  resilience:
+                    $ref: "#/components/schemas/ResilienceMetrics"
         "404":
           description: Not found
           content:
@@ -267,6 +269,18 @@ paths:
   /metrics/resilience:
     get:
       summary: Resilience metrics
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [open, halfopen, closed]
+        - name: minRetryAttempts
+          in: query
+          required: false
+          schema:
+            type: integer
       responses:
         "200":
           description: Resilience metrics
@@ -274,6 +288,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ResilienceMetrics"
+        "204":
+          description: No matching metrics
+        "400":
+          description: Invalid filter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /metrics/resilience/reset:
+    put:
+      summary: Reset resilience metrics
+      responses:
+        "200":
+          description: Reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  resetAt:
+                    type: string
+                    format: date-time
   /healthz:
     get:
       summary: Health check
@@ -388,12 +426,16 @@ components:
       properties:
         openCount:
           type: integer
+          description: OpenCount (number of circuits opened)
         halfOpenCount:
           type: integer
+          description: HalfOpenCount (number of circuits half-opened)
         closedCount:
           type: integer
+          description: ClosedCount (number of circuits closed)
         retryAttempts:
           type: integer
+          description: RetryAttempts (number of retry attempts recorded)
     ProviderEvent:
       type: object
       properties:

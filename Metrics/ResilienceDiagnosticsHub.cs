@@ -25,4 +25,6 @@ public static class ResilienceDiagnosticsHub
     public static void RecordRetryAttempt() => Store.RecordRetryAttempt();
 
     public static CircuitMetricsSnapshot Snapshot() => Store.Snapshot();
+
+    public static void Reset() => Store.Reset();
 }
