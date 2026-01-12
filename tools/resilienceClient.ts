@@ -22,6 +22,35 @@ export type ResilienceMetadata = {
   requestId: string;
 };
 
+export type ResilienceApiError = {
+  metadata?: ResilienceMetadata;
+  error?: {
+    code?: string;
+    message?: string;
+    details?: Record<string, unknown>;
+  };
+};
+
+export class ResilienceClientError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly metadata?: ResilienceMetadata;
+  readonly details?: Record<string, unknown>;
+  readonly documentation?: string;
+
+  constructor(status: number, message: string, payload?: ResilienceApiError) {
+    super(message);
+    this.status = status;
+    this.code = payload?.error?.code;
+    this.metadata = payload?.metadata;
+    this.details = payload?.error?.details;
+    const docs = payload?.error?.details?.docs;
+    this.documentation = typeof docs === "string" ? docs : undefined;
+  }
+}
+
+export const isResilienceClientError = (error: unknown): error is ResilienceClientError => error instanceof ResilienceClientError;
+
 export type ResilienceMetricsResponse = {
   metadata: ResilienceMetadata;
   data: CircuitMetricsSnapshot;
@@ -74,6 +103,16 @@ export type ResilienceAlertEvent = {
   acknowledgedAt?: string;
 };
 
+export type ResilienceAlertRuleResponse = {
+  metadata: ResilienceMetadata;
+  data: ResilienceAlertRule;
+};
+
+export type ResilienceAlertEventResponse = {
+  metadata: ResilienceMetadata;
+  data: ResilienceAlertEvent;
+};
+
 export type ResilienceAlertsResponse = {
   metadata: ResilienceMetadata;
   rules: ResilienceAlertRuleSummary[];
@@ -82,7 +121,7 @@ export type ResilienceAlertsResponse = {
 
 export type ResilienceResetResponse = { metadata: ResilienceMetadata; ok: boolean; resetAt: string };
 
-export type AlertDeleteResponse = { metadata: ResilienceMetadata; ok: boolean; ruleId?: string };
+export type ResilienceDeleteResponse = { metadata: ResilienceMetadata; ok: boolean; ruleId?: string };
 
 export class ResilienceClient {
   constructor(private readonly baseUrl: string, private readonly token?: string) {}
@@ -126,6 +165,26 @@ export class ResilienceClient {
     return this.getHistory({ start, end, ...options });
   }
 
+  async getHistoryPage(page: number, perPage: number, options?: { minutes?: number; limit?: number; start?: string; end?: string; bucketMinutes?: number }): Promise<ResilienceHistoryResponse> {
+    return this.getHistory({ page, perPage, ...options });
+  }
+
+  async getMetricsWithHistory(options?: { historyMinutes?: number; historyLimit?: number; historyPage?: number; historyPerPage?: number }): Promise<{
+    metrics: ResilienceMetricsResponse;
+    history: ResilienceHistoryResponse;
+  }> {
+    const [metrics, history] = await Promise.all([
+      this.getMetricsResponse(),
+      this.getHistory({
+        minutes: options?.historyMinutes,
+        limit: options?.historyLimit,
+        page: options?.historyPage,
+        perPage: options?.historyPerPage
+      })
+    ]);
+    return { metrics, history };
+  }
+
   async resetMetrics(): Promise<ResilienceResetResponse> {
     return this.sendJson<ResilienceResetResponse>("/metrics/resilience/reset", { method: "PUT" });
   }
@@ -135,7 +194,7 @@ export class ResilienceClient {
   }
 
   async createAlertRule(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
-    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertRule }>("/alerts/thresholds", {
+    const response = await this.sendJson<ResilienceAlertRuleResponse>("/alerts/thresholds", {
       method: "POST",
       body: JSON.stringify(rule)
     });
@@ -143,7 +202,7 @@ export class ResilienceClient {
   }
 
   async createAlert(rule: ResilienceAlertRuleRequest): Promise<ResilienceAlertRule> {
-    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertRule }>("/alerts", {
+    const response = await this.sendJson<ResilienceAlertRuleResponse>("/alerts", {
       method: "POST",
       body: JSON.stringify(rule)
     });
@@ -161,16 +220,16 @@ export class ResilienceClient {
     return this.getAlerts(limit, { severity });
   }
 
-  async deleteAlerts(ruleId?: string): Promise<AlertDeleteResponse> {
+  async deleteAlerts(ruleId?: string): Promise<ResilienceDeleteResponse> {
     const query = new URLSearchParams();
     if (ruleId) query.set("ruleId", ruleId);
-    return this.sendJson<AlertDeleteResponse>(`/alerts${query.toString() ? `?${query}` : ""}`, {
+    return this.sendJson<ResilienceDeleteResponse>(`/alerts${query.toString() ? `?${query}` : ""}`, {
       method: "DELETE"
     });
   }
 
   async updateAlertRule(ruleId: string, update: ResilienceAlertRuleUpdate): Promise<ResilienceAlertRule> {
-    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertRule }>(`/alerts/${ruleId}`, {
+    const response = await this.sendJson<ResilienceAlertRuleResponse>(`/alerts/${ruleId}`, {
       method: "PATCH",
       body: JSON.stringify(update)
     });
@@ -178,7 +237,7 @@ export class ResilienceClient {
   }
 
   async acknowledgeAlert(eventId: string): Promise<ResilienceAlertEvent> {
-    const response = await this.sendJson<{ metadata: ResilienceMetadata; data: ResilienceAlertEvent }>(`/alerts/events/${eventId}`, {
+    const response = await this.sendJson<ResilienceAlertEventResponse>(`/alerts/events/${eventId}`, {
       method: "PATCH",
       body: JSON.stringify({ acknowledged: true })
     });
@@ -228,7 +287,7 @@ export class ResilienceClient {
 
   private async getJson<T>(path: string): Promise<T> {
     const res = await fetch(this.baseUrl + path, { headers: this.headers() });
-    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    if (!res.ok) throw await this.buildError(res);
     return res.json() as Promise<T>;
   }
 
@@ -240,12 +299,23 @@ export class ResilienceClient {
         "Content-Type": "application/json"
       }
     });
-    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    if (!res.ok) throw await this.buildError(res);
     return res.json() as Promise<T>;
   }
 
   private headers(): HeadersInit {
     return this.token ? { "X-Builder-Token": this.token } : {};
+  }
+
+  private async buildError(res: Response): Promise<ResilienceClientError> {
+    let payload: ResilienceApiError | undefined;
+    try {
+      payload = (await res.json()) as ResilienceApiError;
+    } catch {
+      payload = undefined;
+    }
+    const message = payload?.error?.message ?? `Request failed: ${res.status}`;
+    return new ResilienceClientError(res.status, message, payload);
   }
 }
 

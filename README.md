@@ -115,6 +115,74 @@ curl "http://localhost:5050/alerts?limit=20"
 curl -X DELETE "http://localhost:5050/alerts?ruleId=rule-1"
 ```
 
+### Resilience TypeScript client
+
+Node usage:
+
+```ts
+import { ResilienceClient } from "@builder-rah/resilience-client";
+
+const client = new ResilienceClient("http://localhost:5050");
+const metrics = await client.getMetrics();
+const history = await client.getHistoryRange("2026-01-11T01:00:00Z", "2026-01-11T02:00:00Z", { page: 1, perPage: 50 });
+console.log(metrics, history.items.length);
+```
+
+Deno usage:
+
+```ts
+import { ResilienceClient } from "npm:@builder-rah/resilience-client";
+
+const client = new ResilienceClient("http://localhost:5050");
+const alerts = await client.getAlertsBySeverity("critical", 25);
+console.log(alerts.events);
+```
+
+Browser usage:
+
+```ts
+import { ResilienceClient } from "@builder-rah/resilience-client";
+
+const client = new ResilienceClient("https://api.example.com", "<token>");
+const reset = await client.resetMetrics();
+console.log(reset.ok);
+```
+
+### Resilience OpenAPI reference
+
+All resilience endpoints return metadata-enveloped payloads. For example:
+
+```json
+{
+  "metadata": {
+    "version": "1",
+    "timestamp": "2026-01-11T01:00:00Z",
+    "requestId": "req-123"
+  },
+  "data": {
+    "openCount": 1,
+    "halfOpenCount": 0,
+    "closedCount": 4,
+    "retryAttempts": 2
+  }
+}
+```
+
+TypeScript snippet using the client:
+
+```ts
+const response = await client.getMetricsResponse();
+console.log(response.metadata.requestId, response.data.openCount);
+```
+
+### Troubleshooting common errors
+
+- `invalid_date_range`: `start` must be less than `end` for history requests.
+- `threshold_required`: alert rules must include `openThreshold` or `retryThreshold`.
+- `acknowledged_required`: alert acknowledgment requires `acknowledged: true`.
+
+When using the TypeScript client, a `ResilienceClientError` includes `status`, `code`, and `documentation` fields for quick diagnosis.
+
 ## CLI
 
 The CLI is available via `rah`:

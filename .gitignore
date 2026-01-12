@@ -9,3 +9,9 @@ obj/
 appsettings.local.json
 *.local.json
 
+tools/node_modules/
+tools/dist/
+tools/dist-tests/
+tools/openapi-types.d.ts
+tools/generated-sdks/
+
