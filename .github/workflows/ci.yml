@@ -33,5 +33,11 @@ jobs:
         with:
           name: ts-client-coverage
           path: tools/coverage
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: tools/coverage/coverage-final.json
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
       - name: Security scan
         run: dotnet list package --vulnerable
