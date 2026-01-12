@@ -91,6 +91,7 @@ paths:
                     $ref: "#/components/schemas/SessionStatus"
                   resilienceSummary:
                     type: string
+                    description: Summary of resilience metrics at time of request.
                   resilience:
                     $ref: "#/components/schemas/ResilienceMetrics"
                   resilienceByTool:
@@ -101,6 +102,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              examples:
+                notFound:
+                  value:
+                    code: not_found
+                    message: not_found
   /sessions/{id}/plan:
     get:
       summary: Get pending plan
@@ -183,12 +189,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              examples:
+                badRequest:
+                  value:
+                    code: bad_request
+                    message: text_required
         "503":
           description: Circuit open
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              examples:
+                circuitOpen:
+                  value:
+                    code: service_unavailable
+                    message: circuit_open
+                    details:
+                      retryAfterSeconds: 30
+                      hint: The circuit breaker is open. Retry after backoff.
   /sessions/{id}/attachments:
     post:
       summary: Add attachment
@@ -251,6 +270,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+              examples:
+                circuitOpen:
+                  value:
+                    code: service_unavailable
+                    message: circuit_open
+                    details:
+                      retryAfterSeconds: 30
+                      hint: The circuit breaker is open. Retry after backoff.
   /sessions/{id}/cancel:
     post:
       summary: Cancel plan
@@ -290,8 +317,7 @@ paths:
           in: query
           required: false
           schema:
-            type: string
-            enum: [open, halfopen, closed]
+            $ref: "#/components/schemas/ResilienceState"
         - name: minRetryAttempts
           in: query
           required: false
@@ -453,6 +479,9 @@ components:
           type: string
         details:
           type: object
+      example:
+        code: bad_request
+        message: invalid_state
     SessionSummary:
       type: object
       properties:
@@ -463,6 +492,7 @@ components:
           format: date-time
         resilienceSummary:
           type: string
+          description: Summary of resilience metrics at time of request.
         resilience:
           $ref: "#/components/schemas/ResilienceMetrics"
     SessionMessage:
@@ -526,6 +556,17 @@ components:
         retryAttempts:
           type: integer
           description: RetryAttempts (number of retry attempts recorded)
+      example:
+        openCount: 1
+        halfOpenCount: 0
+        closedCount: 5
+        retryAttempts: 3
+    ResilienceState:
+      type: string
+      enum:
+        - open
+        - halfopen
+        - closed
     ResilienceMetricsByTool:
       type: object
       additionalProperties:
@@ -549,6 +590,11 @@ components:
           type: integer
         windowMinutes:
           type: integer
+      example:
+        name: retry-spike
+        openThreshold: 3
+        retryThreshold: 10
+        windowMinutes: 60
     ResilienceAlertRule:
       type: object
       properties:
