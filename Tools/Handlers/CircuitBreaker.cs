@@ -13,7 +13,7 @@ public sealed class CircuitBreaker
     private CircuitState _state = CircuitState.Closed;
     private bool _halfOpenInFlight;
 
-    public event Action<CircuitState, CircuitState>? StateChanged;
+    public event EventHandler<CircuitBreakerStateChangedEventArgs>? StateChanged;
 
     public CircuitBreaker(int failureThreshold = 3, TimeSpan? breakDuration = null)
     {
@@ -90,13 +90,6 @@ public sealed class CircuitBreaker
 
         var previous = _state;
         _state = next;
-        StateChanged?.Invoke(previous, next);
+        StateChanged?.Invoke(this, new CircuitBreakerStateChangedEventArgs(previous, next, DateTimeOffset.UtcNow));
     }
-}
-
-public enum CircuitState
-{
-    Closed,
-    Open,
-    HalfOpen
 }
