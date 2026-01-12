@@ -76,6 +76,45 @@ The headless server also exposes session endpoints for integrations:
 
 See `openapi.yaml` for the full schema.
 
+### Resilience API examples
+
+Reset resilience metrics:
+
+```pwsh
+Invoke-RestMethod "http://localhost:5050/metrics/resilience/reset" -Method Put
+```
+
+```bash
+curl -X PUT http://localhost:5050/metrics/resilience/reset
+```
+
+Query resilience history range:
+
+```pwsh
+Invoke-RestMethod "http://localhost:5050/metrics/resilience/history?start=2026-01-11T01:00:00Z&end=2026-01-11T02:00:00Z"
+```
+
+```bash
+curl "http://localhost:5050/metrics/resilience/history?start=2026-01-11T01:00:00Z&end=2026-01-11T02:00:00Z"
+```
+
+Create, list, and delete alert rules:
+
+```pwsh
+$rule = @{ name = "retry-spike"; openThreshold = 3; retryThreshold = 10; windowMinutes = 60; severity = "warning" } | ConvertTo-Json
+Invoke-RestMethod "http://localhost:5050/alerts" -Method Post -Body $rule -ContentType "application/json"
+Invoke-RestMethod "http://localhost:5050/alerts?limit=20"
+Invoke-RestMethod "http://localhost:5050/alerts?ruleId=rule-1" -Method Delete
+```
+
+```bash
+curl -X POST http://localhost:5050/alerts \
+  -H "Content-Type: application/json" \
+  -d '{"name":"retry-spike","openThreshold":3,"retryThreshold":10,"windowMinutes":60,"severity":"warning"}'
+curl "http://localhost:5050/alerts?limit=20"
+curl -X DELETE "http://localhost:5050/alerts?ruleId=rule-1"
+```
+
 ## CLI
 
 The CLI is available via `rah`:
