@@ -11,11 +11,15 @@ public sealed class LLMPromptExecutor : IPromptExecutor
 {
     private readonly AppConfig _cfg;
     private readonly string _defaultRole;
+    private readonly RetryPolicy _retryPolicy;
+    private readonly CircuitBreaker _circuitBreaker;
 
-    public LLMPromptExecutor(AppConfig cfg, string defaultRole)
+    public LLMPromptExecutor(AppConfig cfg, string defaultRole, RetryPolicy? retryPolicy = null, CircuitBreaker? circuitBreaker = null)
     {
         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
         _defaultRole = string.IsNullOrWhiteSpace(defaultRole) ? "Orchestrator" : defaultRole;
+        _retryPolicy = retryPolicy ?? new RetryPolicy();
+        _circuitBreaker = circuitBreaker ?? new CircuitBreaker();
     }
 
     public async Task<ExecutionResult> ExecuteAsync(string prompt, ExecutionOptions options)
@@ -26,11 +30,14 @@ public sealed class LLMPromptExecutor : IPromptExecutor
             throw new ArgumentNullException(nameof(options));
 
         var role = string.IsNullOrWhiteSpace(options.Role) ? _defaultRole : options.Role;
-        var attempts = Math.Max(0, options.MaxRetries) + 1;
+        var attempts = Math.Max(_retryPolicy.MaxRetries, options.MaxRetries) + 1;
         Exception? lastError = null;
 
         for (var attempt = 0; attempt < attempts; attempt++)
         {
+            if (!_circuitBreaker.CanExecute())
+                return new ExecutionResult(false, string.Empty, "Prompt execution circuit is open.");
+
             using var cts = CreateCancellation(options);
             try
             {
@@ -41,15 +48,19 @@ public sealed class LLMPromptExecutor : IPromptExecutor
                     string.Empty,
                     cts.Token).ConfigureAwait(false);
 
+                _circuitBreaker.RecordSuccess();
                 return new ExecutionResult(true, response);
             }
             catch (Exception ex)
             {
                 lastError = ex;
+                _circuitBreaker.RecordFailure();
                 if (attempt >= attempts - 1)
                     break;
+                if (!_retryPolicy.ShouldRetry(ex))
+                    break;
 
-                var delay = TimeSpan.FromMilliseconds(250 * Math.Pow(2, attempt));
+                var delay = _retryPolicy.GetDelay(attempt);
                 try
                 {
                     await Task.Delay(delay, options.CancellationToken).ConfigureAwait(false);
