@@ -1,0 +1,36 @@
+# Prompt Template
+version: 1
+description: Template for running tests and summarizing results.
+tags: [testing, validation, results, usageExamples, inputSpec, outputSpec]
+category: tester
+
+tool_name: <tester-name>
+use_case: Run automated tests and summarize results.
+
+input_template:
+  description: Provide test scope and optional filter pattern.
+  fields:
+    - name: scope
+      type: string
+      required: true
+      example: "unit"
+    - name: filter
+      type: string
+      required: false
+      example: "Auth"
+
+output_spec:
+  success:
+    summary: Test run summary with pass/fail counts.
+    fields:
+      - name: passed
+        type: number
+        description: Number of passing tests.
+      - name: failed
+        type: number
+        description: Number of failing tests.
+      - name: duration
+        type: string
+        description: Total duration of the run.
+  failure:
+    summary: Error with diagnostic hints for rerun.

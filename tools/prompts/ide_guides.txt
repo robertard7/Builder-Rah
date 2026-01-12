@@ -1,0 +1,30 @@
+# Prompt Template
+version: 1
+description: Template for IDE guidance and configuration workflows.
+tags: [ide, guidance, configuration, usageExamples, inputSpec, outputSpec]
+category: IDE
+
+tool_name: <ide-tool-name>
+use_case: Provide step-by-step IDE guidance for configuration or workflows.
+
+input_template:
+  description: Provide IDE name, version, and task to accomplish.
+  fields:
+    - name: ide
+      type: string
+      required: true
+      example: "Visual Studio Code"
+    - name: task
+      type: string
+      required: true
+      example: "Configure formatting on save"
+
+output_spec:
+  success:
+    summary: Ordered instructions that can be followed in the IDE UI.
+    fields:
+      - name: steps
+        type: list
+        description: List of numbered steps.
+  failure:
+    summary: Explain why the IDE guidance cannot be produced.

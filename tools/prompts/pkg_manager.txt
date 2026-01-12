@@ -1,0 +1,33 @@
+# Prompt Template
+version: 1
+description: Template for package manager operations and install guidance.
+tags: [package, install, update, installHints, usageExamples, inputSpec, outputSpec]
+category: pkg manager
+
+tool_name: <pkg-manager-name>
+use_case: Install, update, or remove packages using a package manager.
+
+input_template:
+  description: Provide action, package names, and optional repository hints.
+  fields:
+    - name: action
+      type: string
+      required: true
+      example: "install"
+    - name: packages
+      type: list
+      required: true
+      example: "[\"git\", \"nodejs\"]"
+
+output_spec:
+  success:
+    summary: Command plan and expected output summary.
+    fields:
+      - name: commands
+        type: list
+        description: Commands to run.
+      - name: notes
+        type: string
+        description: Post-install verification tips.
+  failure:
+    summary: Error with action and missing prerequisites.
