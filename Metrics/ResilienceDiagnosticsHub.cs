@@ -11,6 +11,7 @@ public static class ResilienceDiagnosticsHub
 {
     private static readonly CircuitMetricsStore Store = new();
     private static readonly ConcurrentDictionary<CircuitBreaker, EventHandler<CircuitBreakerStateChangedEventArgs>> Subscriptions = new();
+    private static readonly ConcurrentDictionary<CircuitBreaker, CircuitState> BreakerStates = new();
     private static readonly ConcurrentDictionary<string, CircuitMetricsStore> ToolStores = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ResilienceHistoryStore History = new();
     private static readonly ResilienceAlertStore Alerts = new();
@@ -21,7 +22,10 @@ public static class ResilienceDiagnosticsHub
             throw new ArgumentNullException(nameof(breaker));
 
         var handler = new EventHandler<CircuitBreakerStateChangedEventArgs>((_, args) =>
-            Store.RecordStateChange(args.Previous, args.Current));
+        {
+            Store.RecordStateChange(args.Previous, args.Current);
+            BreakerStates[breaker] = args.Current;
+        });
 
         if (Subscriptions.TryAdd(breaker, handler))
             breaker.StateChanged += handler;
@@ -64,6 +68,11 @@ public static class ResilienceDiagnosticsHub
         return History.Snapshot(window, limit);
     }
 
+    public static bool IsCircuitOpen()
+    {
+        return BreakerStates.Values.Any(state => state == CircuitState.Open);
+    }
+
     public static ResilienceAlertRule AddAlertRule(string name, int openThreshold, int retryThreshold, int windowMinutes)
     {
         return Alerts.AddRule(name, openThreshold, retryThreshold, windowMinutes);
@@ -85,5 +94,6 @@ public static class ResilienceDiagnosticsHub
         ToolStores.Clear();
         History.Reset();
         Alerts.Reset();
+        BreakerStates.Clear();
     }
 }
