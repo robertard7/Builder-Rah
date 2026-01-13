@@ -30,6 +30,13 @@ It’s not just a code generator. It is a **build system that can be scripted, a
 
 ---
 
+## 📈 Coverage badges
+
+- **Codecov**: overall repository coverage across all components.
+- **TS Client Coverage**: coverage scoped to the TypeScript client under `tools`.
+
+---
+
 ## 🧠 Core Concepts
 
 **Artifacts**
