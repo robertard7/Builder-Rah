@@ -1,0 +1,17 @@
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+coverage:
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 1%
+    patch:
+      default:
+        target: 80%
+        threshold: 1%
+flags:
+  ts-client:
+    paths:
+      - tools

@@ -54,6 +54,8 @@ jobs:
         with:
           files: tools/coverage/coverage-final.json
           fail_ci_if_error: true
+          flags: ts-client
+          name: ts-client
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Security scan
         run: dotnet list package --vulnerable
