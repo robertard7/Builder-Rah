@@ -1,0 +1,13 @@
+diff --git a/tools/package.json b/tools/package.json
+index 0433632..a6d3923 100644
+--- a/tools/package.json
++++ b/tools/package.json
+@@ -14,7 +14,7 @@
+     "build": "tsc -p tsconfig.json",
+     "build:test": "tsc -p tsconfig.test.json",
+     "test": "npm run build:test && npm run test:coverage",
+-    "test:ci": "npm run build:test && c8 --check-coverage --lines 80 --branches 70 --functions 70 --statements 80 node --test --test-reporter junit --test-reporter-destination coverage/junit.xml dist-tests",
++    "test:ci": "npm run build:test && node -e \"require('fs').mkdirSync('coverage',{recursive:true})\" && c8 --check-coverage --lines 80 --branches 70 --functions 70 --statements 80 node --test --test-reporter junit --test-reporter-destination coverage/junit.xml dist-tests",
+     "test:coverage": "c8 --check-coverage --lines 80 --branches 70 --functions 70 --statements 80 node --test dist-tests",
+     "lint": "node --check dist/index.js",
+     "generate:openapi-types": "openapi-typescript ../openapi.yaml --output openapi-types.d.ts",
