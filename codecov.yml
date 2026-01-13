@@ -24,4 +24,5 @@ coverage:
 flags:
   ts-client:
     paths:
-      - tools
+      - "tools/**/*"
+      - "tools/**/src/**/*"
