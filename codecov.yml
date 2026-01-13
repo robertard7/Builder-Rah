@@ -1,0 +1,30 @@
+comment:
+  layout: "header, diff, flags, files"
+  behavior: default
+coverage:
+  ts-client:
+    target: 80%
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 1%
+      ts-client:
+        flags:
+          - ts-client
+        target: 80%
+        threshold: 1%
+    patch:
+      default:
+        target: 80%
+        threshold: 1%
+      ts-client:
+        flags:
+          - ts-client
+        target: 80%
+        threshold: 1%
+flags:
+  ts-client:
+    paths:
+      - "tools/**/*"
+      - "tools/**/src/**/*"

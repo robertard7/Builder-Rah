@@ -5,6 +5,8 @@ on:
 jobs:
   build-test:
     runs-on: [self-hosted, Windows, X64, Builder-Rah]
+    env:
+      REPO_ROOT: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup .NET
@@ -24,36 +26,38 @@ jobs:
           cache: 'npm'
       - name: Install TS client dependencies
         run: npm install
-        working-directory: tools
+        working-directory: ${{ env.REPO_ROOT }}/tools
       - name: Test TS client
         run: npm run test:ci
-        working-directory: tools
+        working-directory: ${{ env.REPO_ROOT }}/tools
       - name: Publish TS client test results
         if: always()
         uses: dorny/test-reporter@v1
         with:
           name: TS Client Tests
-          path: tools/coverage/junit.xml
+          path: ${{ env.REPO_ROOT }}/tools/coverage/junit.xml
           reporter: java-junit
           fail-on-error: true
       - name: Summarize TS coverage
         if: always()
-        run: node -e "const fs=require('fs');const path='tools/coverage/coverage-summary.json';if(fs.existsSync(path)){const s=JSON.parse(fs.readFileSync(path,'utf8')).total;const lines=['| Metric | Coverage |','| --- | --- |',`| Lines | ${s.lines.pct}% |`, `| Statements | ${s.statements.pct}% |`, `| Functions | ${s.functions.pct}% |`, `| Branches | ${s.branches.pct}% |`].join('\\n');fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\\n## TS Client Coverage\\n${lines}\\n`);}else{fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\\n## TS Client Coverage\\ncoverage-summary.json not found.\\n');}"
+        run: node -e "const fs=require('fs');const path=require('path');const summaryPath=path.join(process.env.REPO_ROOT,'tools','coverage','coverage-summary.json');if(fs.existsSync(summaryPath)){const s=JSON.parse(fs.readFileSync(summaryPath,'utf8')).total;const lines=['| Metric | Coverage |','| --- | --- |',`| Lines | ${s.lines.pct}% |`, `| Statements | ${s.statements.pct}% |`, `| Functions | ${s.functions.pct}% |`, `| Branches | ${s.branches.pct}% |`].join('\\n');fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\\n## TS Client Coverage\\n${lines}\\n`);}else{fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\\n## TS Client Coverage\\ncoverage-summary.json not found.\\n');}"
       - name: Annotate coverage drop
         if: always()
-        run: node -e "const fs=require('fs');const path='tools/coverage/coverage-summary.json';if(!fs.existsSync(path)){console.log('coverage-summary.json not found');process.exit(0);}const s=JSON.parse(fs.readFileSync(path,'utf8')).total;const thresholds={lines:80,statements:80,functions:70,branches:70};const metrics=['lines','statements','functions','branches'];const warnings=metrics.filter((k)=>s[k].pct < thresholds[k]).map((k)=>`::warning title=TS coverage below target::${k} coverage ${s[k].pct}% is below ${thresholds[k]}%`);if(warnings.length){fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\\n## TS Client Coverage Warnings\\n${warnings.map((w)=>w.replace('::warning title=TS coverage below target::','- ')).join('\\n')}\\n`);console.log(warnings.join('\\n'));}"
+        run: node -e "const fs=require('fs');const path=require('path');const summaryPath=path.join(process.env.REPO_ROOT,'tools','coverage','coverage-summary.json');if(!fs.existsSync(summaryPath)){console.log('coverage-summary.json not found');process.exit(0);}const s=JSON.parse(fs.readFileSync(summaryPath,'utf8')).total;const thresholds={lines:80,statements:80,functions:70,branches:70};const metrics=['lines','statements','functions','branches'];const warnings=metrics.filter((k)=>s[k].pct < thresholds[k]).map((k)=>`::warning title=TS coverage below target::${k} coverage ${s[k].pct}% is below ${thresholds[k]}%`);if(warnings.length){fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\\n## TS Client Coverage Warnings\\n${warnings.map((w)=>w.replace('::warning title=TS coverage below target::','- ')).join('\\n')}\\n`);console.log(warnings.join('\\n'));}"
       - name: Block merge on coverage below target
-        run: node -e "const fs=require('fs');const path='tools/coverage/coverage-summary.json';if(!fs.existsSync(path)){throw new Error('coverage-summary.json not found');}const s=JSON.parse(fs.readFileSync(path,'utf8')).total;const thresholds={lines:80,statements:80,functions:70,branches:70};const metrics=['lines','statements','functions','branches'];const failures=metrics.filter((k)=>s[k].pct < thresholds[k]).map((k)=>`${k} coverage ${s[k].pct}% below ${thresholds[k]}%`);if(failures.length){throw new Error(`Coverage below target: ${failures.join('; ')}`);}"
+        run: node -e "const fs=require('fs');const path=require('path');const summaryPath=path.join(process.env.REPO_ROOT,'tools','coverage','coverage-summary.json');if(!fs.existsSync(summaryPath)){throw new Error('coverage-summary.json not found');}const s=JSON.parse(fs.readFileSync(summaryPath,'utf8')).total;const thresholds={lines:80,statements:80,functions:70,branches:70};const metrics=['lines','statements','functions','branches'];const failures=metrics.filter((k)=>s[k].pct < thresholds[k]).map((k)=>`${k} coverage ${s[k].pct}% below ${thresholds[k]}%`);if(failures.length){throw new Error(`Coverage below target: ${failures.join('; ')}`);}"
       - name: Upload TS client coverage
         uses: actions/upload-artifact@v4
         with:
           name: ts-client-coverage
-          path: tools/coverage
+          path: ${{ env.REPO_ROOT }}/tools/coverage
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: tools/coverage/coverage-final.json
+          files: ${{ env.REPO_ROOT }}/tools/coverage/coverage-final.json
           fail_ci_if_error: true
+          flags: ts-client
+          name: ts-client
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Security scan
         run: dotnet list package --vulnerable

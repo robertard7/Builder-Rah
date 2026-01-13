@@ -1,0 +1,29 @@
+diff --git a/README.md b/README.md
+index 4b234b7..b22fd23 100644
+--- a/README.md
++++ b/README.md
+@@ -30,6 +30,13 @@ It’s not just a code generator. It is a **build system that can be scripted, a
+ 
+ ---
+ 
++## 📈 Coverage badges
++
++- **Codecov**: overall repository coverage across all components.
++- **TS Client Coverage**: coverage scoped to the TypeScript client under `tools`.
++
++---
++
+ ## 🧠 Core Concepts
+ 
+ **Artifacts**
+diff --git a/codecov.yml b/codecov.yml
+index 8408f0d..24104e9 100644
+--- a/codecov.yml
++++ b/codecov.yml
+@@ -1,5 +1,5 @@
+ comment:
+-  layout: "reach, diff, flags, files"
++  layout: "header, diff, flags, files"
+   behavior: default
+ coverage:
+   ts-client:
