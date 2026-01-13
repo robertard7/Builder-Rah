@@ -8,8 +8,8 @@
   <a href="https://github.com/robertard7/Builder-Rah/stargazers"><img src="https://img.shields.io/github/stars/robertard7/Builder-Rah?style=flat-square" /></a>
   <a href="https://github.com/robertard7/Builder-Rah/actions"><img src="https://img.shields.io/github/actions/workflow/status/robertard7/Builder-Rah/ci.yml?style=flat-square" /></a>
   <a href="https://github.com/robertard7/Builder-Rah/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/robertard7/Builder-Rah/ci.yml?style=flat-square&label=TS%20Client%20CI" /></a>
-  <a href="https://codecov.io/gh/robertard7/Builder-Rah"><img src="https://img.shields.io/codecov/c/github/robertard7/Builder-Rah?style=flat-square" /></a>
-  <a href="https://codecov.io/gh/robertard7/Builder-Rah"><img src="https://codecov.io/gh/robertard7/Builder-Rah/branch/main/graph/badge.svg?flag=ts-client" alt="TS Client Coverage" /></a>
+  <a href="https://codecov.io/gh/robertard7/Builder-Rah"><img src="https://img.shields.io/codecov/c/github/robertard7/Builder-Rah/main?style=flat-square" /></a>
+  <a href="https://codecov.io/gh/robertard7/Builder-Rah"><img src="https://img.shields.io/codecov/c/github/robertard7/Builder-Rah/main?flag=ts-client&style=flat-square" alt="TS Client Coverage" /></a>
   <a href="https://github.com/robertard7/Builder-Rah/network/members"><img src="https://img.shields.io/github/forks/robertard7/Builder-Rah?style=flat-square" /></a>
   <a href="https://github.com/robertard7/Builder-Rah/blob/main/LICENSE"><img src="https://img.shields.io/github/license/robertard7/Builder-Rah?style=flat-square" /></a>
 </p>
