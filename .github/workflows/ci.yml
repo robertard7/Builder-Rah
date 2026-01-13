@@ -35,6 +35,7 @@ jobs:
           name: TS Client Tests
           path: tools/coverage/junit.xml
           reporter: java-junit
+          fail-on-error: true
       - name: Summarize TS coverage
         if: always()
         run: node -e "const fs=require('fs');const path='tools/coverage/coverage-summary.json';if(fs.existsSync(path)){const s=JSON.parse(fs.readFileSync(path,'utf8')).total;const lines=['| Metric | Coverage |','| --- | --- |',`| Lines | ${s.lines.pct}% |`, `| Statements | ${s.statements.pct}% |`, `| Functions | ${s.functions.pct}% |`, `| Branches | ${s.branches.pct}% |`].join('\\n');fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\\n## TS Client Coverage\\n${lines}\\n`);}else{fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\\n## TS Client Coverage\\ncoverage-summary.json not found.\\n');}"
