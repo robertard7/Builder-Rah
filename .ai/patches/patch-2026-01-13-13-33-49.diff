@@ -1,0 +1,14 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index b081b73..989a6a5 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -39,6 +39,9 @@ jobs:
+       - name: Summarize TS coverage
+         if: always()
+         run: node -e "const fs=require('fs');const path='tools/coverage/coverage-summary.json';if(fs.existsSync(path)){const s=JSON.parse(fs.readFileSync(path,'utf8')).total;const lines=['| Metric | Coverage |','| --- | --- |',`| Lines | ${s.lines.pct}% |`, `| Statements | ${s.statements.pct}% |`, `| Functions | ${s.functions.pct}% |`, `| Branches | ${s.branches.pct}% |`].join('\\n');fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\\n## TS Client Coverage\\n${lines}\\n`);}else{fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\\n## TS Client Coverage\\ncoverage-summary.json not found.\\n');}"
++      - name: Annotate coverage drop
++        if: always()
++        run: node -e "const fs=require('fs');const path='tools/coverage/coverage-summary.json';if(!fs.existsSync(path)){console.log('coverage-summary.json not found');process.exit(0);}const s=JSON.parse(fs.readFileSync(path,'utf8')).total;const thresholds={lines:80,statements:80,functions:70,branches:70};const metrics=['lines','statements','functions','branches'];const warnings=metrics.filter((k)=>s[k].pct < thresholds[k]).map((k)=>`::warning title=TS coverage below target::${k} coverage ${s[k].pct}% is below ${thresholds[k]}%`);if(warnings.length){fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\\n## TS Client Coverage Warnings\\n${warnings.map((w)=>w.replace('::warning title=TS coverage below target::','- ')).join('\\n')}\\n`);console.log(warnings.join('\\n'));}"
+       - name: Upload TS client coverage
+         uses: actions/upload-artifact@v4
+         with:
