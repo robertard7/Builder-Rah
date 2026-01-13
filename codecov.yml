@@ -2,6 +2,8 @@ comment:
   layout: "reach, diff, flags, files"
   behavior: default
 coverage:
+  ts-client:
+    target: 80%
   status:
     project:
       default:

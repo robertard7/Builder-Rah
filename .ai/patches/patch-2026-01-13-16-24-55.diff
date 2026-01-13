@@ -1,0 +1,13 @@
+diff --git a/codecov.yml b/codecov.yml
+index 1dee79c..8408f0d 100644
+--- a/codecov.yml
++++ b/codecov.yml
+@@ -2,6 +2,8 @@ comment:
+   layout: "reach, diff, flags, files"
+   behavior: default
+ coverage:
++  ts-client:
++    target: 80%
+   status:
+     project:
+       default:
