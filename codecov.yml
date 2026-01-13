@@ -7,8 +7,18 @@ coverage:
       default:
         target: 80%
         threshold: 1%
+      ts-client:
+        flags:
+          - ts-client
+        target: 80%
+        threshold: 1%
     patch:
       default:
+        target: 80%
+        threshold: 1%
+      ts-client:
+        flags:
+          - ts-client
         target: 80%
         threshold: 1%
 flags:
