@@ -1,10 +1,9 @@
 name: ci
 
 on:
-  pull_request:
-    branches: [ main ]
   push:
-    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build-test:
@@ -15,44 +14,34 @@ jobs:
         shell: pwsh
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Initialize CI logs
+      - name: Ensure repo is present
         run: |
-          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
-          "" | Out-File -FilePath artifacts\ci.log
+          if (-not (Test-Path .git)) {
+            git clone https://github.com/robertard7/Builder-Rah .
+          } else {
+            git fetch origin
+            git reset --hard origin/main
+          }
 
-      - name: Verify environment
+      - name: Environment info
         run: |
-          dotnet --info 2>&1 | Tee-Object -FilePath artifacts\ci.log -Append
-          Write-Host "PWD=$PWD" | Tee-Object -FilePath artifacts\ci.log -Append
-          Get-Location | Tee-Object -FilePath artifacts\ci.log -Append
+          dotnet --info
+          node --version
+          npm --version
+          git status
 
       - name: Restore
-        run: |
-          dotnet restore 2>&1 | Tee-Object -FilePath artifacts\ci.log -Append
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        run: dotnet restore RahBuilder.csproj
 
       - name: Build
         run: |
-          dotnet build -c Debug --no-restore 2>&1 | Tee-Object -FilePath artifacts\ci.log -Append
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          dotnet build RahBuilder.csproj -c Debug --no-restore `
+            2>&1 | Tee-Object artifacts\ci.log
+          exit $LASTEXITCODE
 
       - name: Test
         run: |
-          dotnet test -c Debug --no-build 2>&1 | Tee-Object -FilePath artifacts\ci.log -Append
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      # OPTIONAL: keep this if Codex needs coverage context
-      - name: Upload build logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-logs
-          path: artifacts
+          dotnet test -c Debug --no-build `
+            2>&1 | Tee-Object -Append artifacts\ci.log
+          exit $LASTEXITCODE
