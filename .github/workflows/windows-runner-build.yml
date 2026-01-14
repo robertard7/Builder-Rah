@@ -3,6 +3,10 @@ name: Windows Runner Build
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   build:
     runs-on: [self-hosted, Windows, X64, Builder-Rah]
@@ -11,20 +15,40 @@ jobs:
       run:
         shell: pwsh
 
-    steps:
-      - name: Sync repo
-        run: |
-          if (-not (Test-Path .git)) {
-            git clone https://github.com/robertard7/Builder-Rah .
-          } else {
-            git fetch origin
-            git reset --hard origin/main
-          }
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
+      DOTNET_NOLOGO: "1"
 
-      - name: Build Release
+    steps:
+      # --- Checkout EXACT ref Codex dispatched ---
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # --- Pin SDK so builds are deterministic ---
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.404"
+
+      # --- Restore ---
+      - name: Restore
+        run: dotnet restore RahBuilder.csproj
+
+      # --- Build + capture logs ---
+      - name: Build (Release)
         run: |
           New-Item -ItemType Directory -Force artifacts | Out-Null
-          dotnet restore RahBuilder.csproj
           dotnet build RahBuilder.csproj -c Release --no-restore `
-            2>&1 | Tee-Object artifacts\build.log
+            2>&1 | Tee-Object artifacts\ci.log
           exit $LASTEXITCODE
+
+      # --- Upload logs so Codex can read them ---
+      - name: Upload CI logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs
+          path: artifacts
