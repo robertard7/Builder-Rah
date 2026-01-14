@@ -1,7 +1,7 @@
 name: openapi-validate
 
 on:
-  workflow_dispatch:   # MANUAL ONLY — no runner starvation
+  workflow_dispatch:
 
 jobs:
   validate:
@@ -12,31 +12,17 @@ jobs:
         shell: pwsh
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-
-      - name: Verify environment
+      - name: Sync repo
         run: |
-          node --version
-          npm --version
-          dotnet --version
-          Write-Host "PWD=$PWD"
+          if (-not (Test-Path .git)) {
+            git clone https://github.com/robertard7/Builder-Rah .
+          } else {
+            git fetch origin
+            git reset --hard origin/main
+          }
 
       - name: Validate OpenAPI spec
-        run: |
-          if (-not (Test-Path "./scripts/validate-openapi.ps1")) {
-            throw "Missing script: scripts/validate-openapi.ps1"
-          }
-          ./scripts/validate-openapi.ps1
+        run: ./scripts/validate-openapi.ps1
 
-      - name: Validate OpenAPI client contract
-        run: |
-          if (-not (Test-Path "./scripts/validate-openapi-client.ps1")) {
-            throw "Missing script: scripts/validate-openapi-client.ps1"
-          }
-          ./scripts/validate-openapi-client.ps1
+      - name: Validate OpenAPI client
+        run: ./scripts/validate-openapi-client.ps1
