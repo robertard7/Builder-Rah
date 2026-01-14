@@ -1,19 +1,27 @@
 name: openapi-validate
+
 on:
-  push:
-  pull_request:
+  workflow_dispatch:   # MANUAL ONLY — prevents runner starvation
+
 jobs:
   validate:
     runs-on: [self-hosted, Windows, X64, Builder-Rah]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate OpenAPI
+
+    defaults:
+      run:
         shell: pwsh
-        run: ./scripts/validate-openapi.ps1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20.x"
+
+      - name: Validate OpenAPI spec
+        run: ./scripts/validate-openapi.ps1
+
       - name: Validate OpenAPI client contract
-        shell: pwsh
         run: ./scripts/validate-openapi-client.ps1
