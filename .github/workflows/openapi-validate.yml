@@ -3,6 +3,9 @@ name: openapi-validate
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: [self-hosted, Windows, X64, Builder-Rah]
@@ -12,17 +15,39 @@ jobs:
         shell: pwsh
 
     steps:
-      - name: Sync repo
+      # --- Checkout EXACT ref that triggered the workflow ---
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # --- Environment sanity (helps Codex reason) ---
+      - name: Environment info
         run: |
-          if (-not (Test-Path .git)) {
-            git clone https://github.com/robertard7/Builder-Rah .
-          } else {
-            git fetch origin
-            git reset --hard origin/main
-          }
+          dotnet --info
+          node --version
+          npm --version
+          git status
 
+      # --- Validate OpenAPI spec ---
       - name: Validate OpenAPI spec
-        run: ./scripts/validate-openapi.ps1
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          ./scripts/validate-openapi.ps1 `
+            2>&1 | Tee-Object artifacts\openapi.log
+          exit $LASTEXITCODE
 
+      # --- Validate OpenAPI client ---
       - name: Validate OpenAPI client
-        run: ./scripts/validate-openapi-client.ps1
+        run: |
+          ./scripts/validate-openapi-client.ps1 `
+            2>&1 | Tee-Object -Append artifacts\openapi.log
+          exit $LASTEXITCODE
+
+      # --- Upload logs for Codex ---
+      - name: Upload OpenAPI logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-validation-logs
+          path: artifacts
