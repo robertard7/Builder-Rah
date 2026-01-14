@@ -21,6 +21,9 @@ jobs:
             git reset --hard origin/main
           }
 
+      - name: SDK version
+        run: dotnet --version
+
       - name: Build Release
         run: |
           New-Item -ItemType Directory -Force artifacts | Out-Null

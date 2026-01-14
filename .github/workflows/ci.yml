@@ -25,6 +25,7 @@ jobs:
 
       - name: Environment info
         run: |
+          dotnet --version
           dotnet --info
           node --version
           npm --version
