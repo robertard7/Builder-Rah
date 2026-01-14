@@ -38,26 +38,28 @@ jobs:
       # --- Environment diagnostics (for Codex) ---
       - name: Environment info
         run: |
+          dotnet --version
           dotnet --info
           node --version
           npm --version
           git status
 
-      # --- Restore ---
-      - name: Restore
-        run: dotnet restore RahBuilder.csproj
-
-      # --- Build + log ---
-      - name: Build
+      - name: Restore, build, test (logged)
         run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          dotnet build RahBuilder.csproj -c Debug --no-restore `
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          if (Test-Path artifacts\ci.log) {
+            Remove-Item artifacts\ci.log -Force
+          }
+          dotnet restore RahBuilder.csproj `
             2>&1 | Tee-Object artifacts\ci.log
-          exit $LASTEXITCODE
-
-      # --- Test + append log ---
-      - name: Test
-        run: |
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          dotnet build RahBuilder.csproj -c Debug --no-restore `
+            2>&1 | Tee-Object -Append artifacts\ci.log
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
           dotnet test -c Debug --no-build `
             2>&1 | Tee-Object -Append artifacts\ci.log
           exit $LASTEXITCODE

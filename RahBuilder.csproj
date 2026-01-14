@@ -13,8 +13,11 @@
   <!-- If you have any xUnit test .cs files accidentally living in this WinForms project,
        exclude them so the app compiles without dragging test deps into the UI app. -->
   <ItemGroup>
-    <Compile Remove="**\*Tests.cs" />
-    <Compile Remove="**\*Test.cs" />
+    <Compile Remove="Tests\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Tools\sdk-samples\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -23,5 +26,6 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0" />
+    <PackageReference Include="System.Windows.Forms.DataVisualization" Version="8.0.0" />
   </ItemGroup>
 </Project>

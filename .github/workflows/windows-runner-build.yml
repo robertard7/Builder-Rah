@@ -21,24 +21,19 @@ jobs:
       DOTNET_NOLOGO: "1"
 
     steps:
-      # --- Checkout EXACT ref Codex dispatched ---
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Sync repo
+        run: |
+          if (-not (Test-Path .git)) {
+            git clone https://github.com/robertard7/Builder-Rah .
+          } else {
+            git fetch origin
+            git reset --hard origin/main
+          }
 
-      # --- Pin SDK so builds are deterministic ---
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.404"
+      - name: SDK version
+        run: dotnet --version
 
-      # --- Restore ---
-      - name: Restore
-        run: dotnet restore RahBuilder.csproj
-
-      # --- Build + capture logs ---
-      - name: Build (Release)
+      - name: Build Release
         run: |
           New-Item -ItemType Directory -Force artifacts | Out-Null
           dotnet build RahBuilder.csproj -c Release --no-restore `

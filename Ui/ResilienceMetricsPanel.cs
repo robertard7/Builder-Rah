@@ -24,7 +24,7 @@ public sealed class ResilienceMetricsPanel : UserControl
     private readonly TrackBar _historyStart;
     private readonly TrackBar _historyEnd;
     private readonly Label _historyLabel;
-    private readonly Timer _timer;
+    private readonly System.Windows.Forms.Timer _timer;
     private readonly Dictionary<string, List<ResilienceMetricsSample>> _toolHistory = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, bool> _toolSeriesVisible = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<ResilienceMetricsSample> _historyCache = new List<ResilienceMetricsSample>();
@@ -102,7 +102,7 @@ public sealed class ResilienceMetricsPanel : UserControl
         Controls.Add(split);
         Controls.Add(thresholdPanel);
 
-        _timer = new Timer { Interval = 2000 };
+        _timer = new System.Windows.Forms.Timer { Interval = 2000 };
         _timer.Tick += (_, _) => RefreshMetrics();
         _timer.Start();
         UpdateHistoryRange();
