@@ -1,7 +1,7 @@
 name: Windows Runner Build
 
 on:
-  workflow_dispatch:  # MANUAL ONLY
+  workflow_dispatch:   # MANUAL ONLY — never competes with CI
 
 permissions:
   contents: read
@@ -28,15 +28,32 @@ jobs:
         with:
           dotnet-version: "9.0.x"
 
+      - name: Verify environment
+        run: |
+          dotnet --version
+          Write-Host "PWD=$PWD"
+          Get-ChildItem .
+
       - name: Restore
-        run: dotnet restore .\RahBuilder.csproj
+        run: |
+          if (-not (Test-Path ".\RahBuilder.csproj")) {
+            throw "RahBuilder.csproj not found in repo root"
+          }
+          dotnet restore .\RahBuilder.csproj
 
       - name: Build (Release)
         run: |
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
-          dotnet build .\RahBuilder.csproj -c Release --no-restore `
+
+          dotnet build .\RahBuilder.csproj `
+            -c Release `
+            --no-restore `
             2>&1 | Tee-Object -FilePath artifacts\build.log
-          exit $LASTEXITCODE
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Build failed — see artifacts/build.log"
+            exit $LASTEXITCODE
+          }
 
       - name: Upload build logs
         if: always()
