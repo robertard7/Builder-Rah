@@ -23,14 +23,31 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Initialize CI logs
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          "" | Out-File -FilePath artifacts\ci.log
+
+      - name: Verify environment
+        run: |
+          dotnet --info 2>&1 | Tee-Object -FilePath artifacts\ci.log -Append
+          Write-Host "PWD=$PWD" | Tee-Object -FilePath artifacts\ci.log -Append
+          Get-Location | Tee-Object -FilePath artifacts\ci.log -Append
+
       - name: Restore
-        run: dotnet restore
+        run: |
+          dotnet restore 2>&1 | Tee-Object -FilePath artifacts\ci.log -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build
-        run: dotnet build -c Debug --no-restore
+        run: |
+          dotnet build -c Debug --no-restore 2>&1 | Tee-Object -FilePath artifacts\ci.log -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Test
-        run: dotnet test -c Debug --no-build
+        run: |
+          dotnet test -c Debug --no-build 2>&1 | Tee-Object -FilePath artifacts\ci.log -Append
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # OPTIONAL: keep this if Codex needs coverage context
       - name: Upload build logs
@@ -38,4 +55,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ci-logs
-          path: .
+          path: artifacts
