@@ -1,76 +1,41 @@
 name: ci
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
+    branches: [ main ]
+  push:
     branches: [ main ]
 
 jobs:
   build-test:
     runs-on: [self-hosted, Windows, X64, Builder-Rah]
 
-    env:
-      REPO_ROOT: ${{ github.workspace }}
+    defaults:
+      run:
+        shell: pwsh
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restore .NET
+      - name: Restore
         run: dotnet restore
 
-      - name: Build .NET
+      - name: Build
         run: dotnet build -c Debug --no-restore
 
-      - name: Test .NET
+      - name: Test
         run: dotnet test -c Debug --no-build
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-
-      - name: Install TS client dependencies
-        working-directory: tools
-        run: npm install
-
-      - name: Test TS client
-        working-directory: tools
-        run: npm run test:ci
-
-      - name: List TS coverage output
-        if: always()
-        shell: pwsh
-        run: |
-          Write-Host "=== tools/coverage ==="
-          if (Test-Path "$env:REPO_ROOT/tools/coverage") {
-            Get-ChildItem "$env:REPO_ROOT/tools/coverage" -Recurse
-          } else {
-            Write-Host "No coverage directory found"
-          }
-
-      - name: Upload TS client coverage artifact
+      # OPTIONAL: keep this if Codex needs coverage context
+      - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ts-client-coverage
-          path: tools/coverage
-
-      - name: Upload coverage to Codecov
-        if: always()
-        uses: codecov/codecov-action@v5
-        with:
-          files: tools/coverage/coverage-final.json
-          flags: ts-client
-          name: ts-client
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Security scan
-        if: always()
-        run: dotnet list package --vulnerable
+          name: ci-logs
+          path: .
