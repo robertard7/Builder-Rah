@@ -51,10 +51,14 @@ jobs:
         with:
           name: ts-client-coverage
           path: ${{ env.REPO_ROOT }}/tools/coverage
+      - name: List TS client coverage files
+        if: always()
+        shell: bash
+        run: ls -R tools/coverage
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ${{ env.REPO_ROOT }}/tools/coverage/coverage-final.json
+          files: ${{ env.REPO_ROOT }}/tools/coverage/lcov.info,${{ env.REPO_ROOT }}/tools/coverage/coverage-final.json,${{ env.REPO_ROOT }}/tools/coverage/coverage-summary.json
           fail_ci_if_error: true
           flags: ts-client
           name: ts-client
