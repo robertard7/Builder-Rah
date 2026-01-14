@@ -23,7 +23,7 @@ public sealed class ChatComposerControl : UserControl
     private readonly LinkLabel _providerStatus;
     private readonly LinkLabel _toolchainStatus;
     private readonly LinkLabel _executionStatus;
-    private readonly Timer _retryTimer;
+    private readonly System.Windows.Forms.Timer _retryTimer;
     private int _retryCountdown;
 
     private AttachmentInbox _inbox;
@@ -210,7 +210,7 @@ public sealed class ChatComposerControl : UserControl
         Height = _minHeight + Padding.Vertical + _chips.Height + statusPanel.Height + _statusLine.Height;
         RefreshAttachments(_inbox.List());
 
-        _retryTimer = new Timer { Interval = 1000 };
+        _retryTimer = new System.Windows.Forms.Timer { Interval = 1000 };
         _retryTimer.Tick += (_, _) => TickRetryCooldown();
     }
 
